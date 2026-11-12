@@ -21,9 +21,9 @@ The agents API is intentionally built as a thin layer over existing Draive runti
 - `AgentIdentity` describes the agent instance: `uri`, `name`, `description`, `meta`.
 - `AgentMessage` is the fully prepared input payload: `thread`, `created`, `content`, `meta`.
 - `AgentThread` is the scoped runtime state propagated through `ctx.scope(...)`: its `identifier`
-    names the conversation thread shared across nested agent calls, while `agent_uri` marks the
-    URI of the agent currently executing within it - agents bind a thread stamped with their own
-    URI while handling a message.
+    names the conversation thread shared across nested agent calls, while `agent_uri` marks the URI
+    of the agent currently executing within it - agents bind a thread stamped with their own URI
+    while handling a message.
 - `AgentExecuting` is the executor protocol:
     `AgentMessage -> AsyncGenerator[MultimodalContentPart | ProcessingEvent]`.
 
@@ -32,8 +32,7 @@ that runs an executor inside a scoped agent context and streams output.
 
 ## 1. Build An Agent From `Step`s
 
-Use `Agent.steps(...)` when you already have a `Step` pipeline and want to expose it as an
-agent.
+Use `Agent.steps(...)` when you already have a `Step` pipeline and want to expose it as an agent.
 
 ```python
 from collections.abc import AsyncGenerator
@@ -168,21 +167,21 @@ For each call, the agent:
 If a tool uses `handling="output"`, the tool can stream visible output directly and terminate the
 loop early.
 
-By default the model context is local to a single request; the agent does not persist prior turns
-by itself. Pass `memory=` to keep context across turns (see below), use higher level conversation
-APIs, or provide the required context explicitly.
+By default the model context is local to a single request; the agent does not persist prior turns by
+itself. Pass `memory=` to keep context across turns (see below), use higher level conversation APIs,
+or provide the required context explicitly.
 
 ### Persist Context Across Turns With `AgentMemory`
 
-`Agent.generative(...)` and `Agent.from_skill(...)` accept a `memory` argument controlling how
-model context is prepared and recalled before each turn and persisted afterwards. The default is
+`Agent.generative(...)` and `Agent.from_skill(...)` accept a `memory` argument controlling how model
+context is prepared and recalled before each turn and persisted afterwards. The default is
 `AgentMemory.disabled`, which scopes context to a single turn. `Agent.steps(...)` applies no memory
-implicitly - compose the predefined memory steps (`memory.recall_step()`,
-`memory.remember_step()`) into the pipeline where needed; `Agent.generative(...)` and
-`Agent.from_skill(...)` invoke `memory.prepare`, `memory.recall`, and `memory.remember` directly
-within their step bodies instead. There is no `prepare` step - a step cannot contribute the tools
-it produces to the toolbox of a subsequent completion step - so preparation runs only in
-`Agent.generative(...)` and `Agent.from_skill(...)`.
+implicitly - compose the predefined memory steps (`memory.recall_step()`, `memory.remember_step()`)
+into the pipeline where needed; `Agent.generative(...)` and `Agent.from_skill(...)` invoke
+`memory.prepare`, `memory.recall`, and `memory.remember` directly within their step bodies instead.
+There is no `prepare` step - a step cannot contribute the tools it produces to the toolbox of a
+subsequent completion step - so preparation runs only in `Agent.generative(...)` and
+`Agent.from_skill(...)`.
 
 ```python
 from draive import Agent, AgentMemory
@@ -222,8 +221,8 @@ worker: Agent = Agent.steps(
 ```
 
 `recall_step()` replaces `StepState.context` with the recalled context, `remember_step()` persists
-the current `StepState.context` and leaves state unchanged. Running recall twice within one
-pipeline duplicates stored history; that is a composition error.
+the current `StepState.context` and leaves state unchanged. Running recall twice within one pipeline
+duplicates stored history; that is a composition error.
 
 Memory operations receive the active `AgentThread` - the executing agent's URI together with the
 conversation thread identifier - so one memory instance can serve multiple agents and multiple
@@ -237,17 +236,17 @@ to compact, summarize, or replace the context freely.
     An entry's usage is refreshed by `prepare` and `remember`, but not by `recall`; intended for
     local development, tests, and single-process deployments.
 - `PostgresAgentMemory.instance()` (from `draive.postgres`) persists immutable snapshots in
-    PostgreSQL, keyed by executing agent URI and thread; run `PostgresAgentMemory.migrate()` once
-    to create its schema.
-- `AgentMemory(recalling=..., remembering=...)` wraps custom async callables for any other
-    backend; each receives the executing `AgentThread`, and an optional `preparing=` callable runs
-    before each recall to set up state based on the agent's instructions (it must be idempotent
-    per agent and thread).
+    PostgreSQL, keyed by executing agent URI and thread; run `PostgresAgentMemory.migrate()` once to
+    create its schema.
+- `AgentMemory(recalling=..., remembering=...)` wraps custom async callables for any other backend;
+    each receives the executing `AgentThread`, and an optional `preparing=` callable runs before
+    each recall to set up state based on the agent's instructions (it must be idempotent per agent
+    and thread).
 
 Three behavioral notes:
 
-- Context is remembered only when a turn completes and its output stream is fully consumed;
-    turns abandoned mid-stream or failing with an error are not persisted.
+- Context is remembered only when a turn completes and its output stream is fully consumed; turns
+    abandoned mid-stream or failing with an error are not persisted.
 - Memory steps (`recall_step`, `remember_step`) require an `AgentThread` bound in the current
     context and raise `AgentException` otherwise. Agents bind one stamped with their own URI
     automatically; when running memory steps outside an agent, enter a scope with an `AgentThread`
@@ -289,14 +288,14 @@ async def preparing(
 ```
 
 - Prepared tools live for one turn and stay available across all of its tool-calling iterations.
-- They are merged into the toolbox passed to the agent and **replace** provided tools using the
-    same names, so prefix memory tool names to avoid shadowing agent tools by accident.
+- They are merged into the toolbox passed to the agent and **replace** provided tools using the same
+    names, so prefix memory tool names to avoid shadowing agent tools by accident.
 - They participate in the toolbox suggestion strategy; with `Toolbox.of(..., suggesting=True)` the
     model may be required to call one of them.
 - Returning `None` or an empty sequence contributes nothing and leaves the toolbox untouched.
-- Requests and responses of prepared tools are part of the context passed to `remember`, so a
-    stored turn may reference a tool that a later turn no longer offers. Keep tool names stable, or
-    drop those context elements before remembering.
+- Requests and responses of prepared tools are part of the context passed to `remember`, so a stored
+    turn may reference a tool that a later turn no longer offers. Keep tool names stable, or drop
+    those context elements before remembering.
 
 ## 3. Preserve Thread And Metadata
 
@@ -380,10 +379,10 @@ The generated tool takes:
 - `agent`: selected agent name,
 - `task`: plain-text request sent to that agent.
 
-Agents are stored once, indexed by their identity URI. Direct `group.call(...)` accepts either a
-URI or a name; generated tools select agents by name. Names and URIs must be unique, and a name
-cannot match another agent's URI. `AgentsGroup.of(...)` raises `ValueError` for these conflicts.
-The `AgentsGroup(agents)` constructor requires a mapping keyed by identity URI.
+Agents are stored once, indexed by their identity URI. Direct `group.call(...)` accepts either a URI
+or a name; generated tools select agents by name. Names and URIs must be unique, and a name cannot
+match another agent's URI. `AgentsGroup.of(...)` raises `ValueError` for these conflicts. The
+`AgentsGroup(agents)` constructor requires a mapping keyed by identity URI.
 
 Pass an `AgentIdentity` to reserve an entry with a placeholder. Calling it raises `AgentUnavailable`
 until `group.bind(agent)` supplies an implementation with the same URI. Binding also replaces an
@@ -424,8 +423,8 @@ Both `Agent.as_tool(...)` and `AgentsGroup.as_tool(...)` support two delegation 
 
 ### `handling="response"`
 
-Use `handling="response"` when the delegated agent result should come back as a normal tool
-response and be fed into the caller's model loop.
+Use `handling="response"` when the delegated agent result should come back as a normal tool response
+and be fed into the caller's model loop.
 
 ```python
 from draive.tools import Tool
@@ -502,8 +501,10 @@ clear role and the coordinator can select among them by name from the generated 
 - Use `Agent.from_skill(...)` to turn a loaded `Skill` into a model-backed agent with access to its
     bundled resources - see [Skills](./Skills.md).
 - Expose one concrete agent via `Agent.as_tool(...)` when a model should call it directly.
-- Delegate using `AgentsGroup.as_tool(handling="response")` when the caller should continue reasoning after delegation.
-- Delegate using `AgentsGroup.as_tool(handling="output")` when the delegated agent should take over visible output.
+- Delegate using `AgentsGroup.as_tool(handling="response")` when the caller should continue
+    reasoning after delegation.
+- Delegate using `AgentsGroup.as_tool(handling="output")` when the delegated agent should take over
+    visible output.
 
 Avoid using `Agent.generative(...)` as a substitute for persistent chat history. By design it loops
 only within one request while tools are being resolved; use `memory=` when prior turns should be

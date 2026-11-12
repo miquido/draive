@@ -1,8 +1,8 @@
 # Advanced State
 
-Draive models are typed `State` classes. Schema and JSON support is derived from the declared
-field types. Adding `State, serializable=True` turns that into a requirement, so a class whose
-fields cannot produce a JSON schema fails at declaration time instead of silently losing it.
+Draive models are typed `State` classes. Schema and JSON support is derived from the declared field
+types. Adding `State, serializable=True` turns that into a requirement, so a class whose fields
+cannot produce a JSON schema fails at declaration time instead of silently losing it.
 
 ## Serialization And Schema
 

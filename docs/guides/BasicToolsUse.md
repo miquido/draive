@@ -1,7 +1,7 @@
 # Basic Tools Use
 
-Tools are async Python callables wrapped with `@tool` and exposed to models through
-`TextGeneration` or `ModelGeneration`.
+Tools are async Python callables wrapped with `@tool` and exposed to models through `TextGeneration`
+or `ModelGeneration`.
 
 ## 1. Define A Tool
 
@@ -15,8 +15,8 @@ async def current_time(location: str) -> str:
     return f"Time in {location} is 09:53:22"
 ```
 
-You can call a tool directly like a regular async function. A context scope is required only
-when the tool itself uses context state, logging or observability.
+You can call a tool directly like a regular async function. A context scope is required only when
+the tool itself uses context state, logging or observability.
 
 ```python
 from draive import ctx
@@ -93,12 +93,12 @@ result = await TextGeneration.generate(
 
 - `name=...` and `description=...` to override the model facing tool identity
 - `parameters=...` to provide an explicit arguments JSON schema instead of the inferred one
-- `handling="response" | "output"` to control whether the tool result only goes back to the
-    model or is also streamed to the output as it is produced
+- `handling="response" | "output"` to control whether the tool result only goes back to the model or
+    is also streamed to the output as it is produced
 - `meta=...` to attach metadata to the tool specification
-- `meta={"strict_parameters": True}` to have the provider enforce the argument schema, which
-    makes the model always pass every argument rather than relying on its default. A tool taking
-    a mapping argument keeps its arguments unenforced, since enforcement would drop the mapping
+- `meta={"strict_parameters": True}` to have the provider enforce the argument schema, which makes
+    the model always pass every argument rather than relying on its default. A tool taking a mapping
+    argument keeps its arguments unenforced, since enforcement would drop the mapping
 
 A tool function can also be an async generator yielding content parts and `ProcessingEvent` values,
 which allows streaming partial results while the tool is still running. Streaming tools have to be

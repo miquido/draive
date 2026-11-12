@@ -37,8 +37,8 @@ context.
 The `postgres` extra (`pip install draive[postgres]`) pulls in `haiway[postgres]` and `asyncpg`,
 which is everything the adapters need. pgvector-backed components require only the `vector`
 **extension installed in the database** - no additional Python package. asyncpg ships no codec for
-the `VECTOR` type, so `PostgresVectorIndex` binds every vector in pgvector's own text
-representation and casts it in the statement, which needs no client-side registration.
+the `VECTOR` type, so `PostgresVectorIndex` binds every vector in pgvector's own text representation
+and casts it in the statement, which needs no client-side registration.
 
 If your deployment does need per-connection setup for unrelated reasons,
 `PostgresConnectionPool.of(...)` accepts an `initialize` callback invoked for each new connection:
@@ -213,16 +213,16 @@ CREATE INDEX IF NOT EXISTS chunk_embedding_idx
     WITH (lists = 100);
 ```
 
-The helper stores the serialized `State` instance inside `payload`, so the JSON schema mirrors
-the model definition - including declared attribute aliases, which `AttributeRequirement` filters
-resolve automatically (`Chunk._.identifier` filters the stored `id` key). It writes monotonically increasing `created` timestamps to preserve insertion
-order for non-similarity queries.
+The helper stores the serialized `State` instance inside `payload`, so the JSON schema mirrors the
+model definition - including declared attribute aliases, which `AttributeRequirement` filters
+resolve automatically (`Chunk._.identifier` filters the stored `id` key). It writes monotonically
+increasing `created` timestamps to preserve insertion order for non-similarity queries.
 
 ### Wiring the index
 
 Construct the index with `PostgresVectorIndex.prepare()` and reuse the shared `Postgres` state
-inside an active context scope. The optional `mmr_multiplier` argument controls how many rows are fetched
-before applying Maximal Marginal Relevance re-ranking when `rerank=True`.
+inside an active context scope. The optional `mmr_multiplier` argument controls how many rows are
+fetched before applying Maximal Marginal Relevance re-ranking when `rerank=True`.
 
 ```python
 from collections.abc import Sequence
@@ -266,10 +266,9 @@ pgvector. Set `rerank=False` to return rows ordered solely by the database simil
 ### Payload filtering and requirements
 
 Build requirements with typed `AttributePath` objects, for example
-`AttributeRequirement.equal("doc-1", Chunk._.identifier)`. String paths are not
-supported. Aliases are resolved through nested models, optional fields, mapping
-values, and sequence elements such as `Chunk._.sections[0].title`. The same typed
-path convention applies to Qdrant and SurrealDB filters.
+`AttributeRequirement.equal("doc-1", Chunk._.identifier)`. String paths are not supported. Aliases
+are resolved through nested models, optional fields, mapping values, and sequence elements such as
+`Chunk._.sections[0].title`. The same typed path convention applies to Qdrant and SurrealDB filters.
 
 Search and deletion accept `AttributeRequirement` instances which are evaluated against the stored
 payload JSON. Requirements are translated to SQL expressions with both the attribute path and the
@@ -281,10 +280,10 @@ surface explicit.
 
 ## AgentMemory implementation
 
-`PostgresAgentMemory` persists agent conversation context across turns, keyed by the executing
-agent URI and the conversation thread identifier - both carried on the `AgentThread` passed to
-each memory operation. See the [Agents](./Agents.md) guide for how `AgentMemory` participates in
-agent execution.
+`PostgresAgentMemory` persists agent conversation context across turns, keyed by the executing agent
+URI and the conversation thread identifier - both carried on the `AgentThread` passed to each memory
+operation. See the [Agents](./Agents.md) guide for how `AgentMemory` participates in agent
+execution.
 
 Run the schema migration once with an acquired connection bound in context:
 
@@ -318,9 +317,9 @@ assistant = Agent.generative(
 
 Storage semantics:
 
-- Context is stored as immutable snapshots: every remember inserts the full context as a new row
-    and recall reads back the latest one whole, so steps may compact, summarize, or replace the
-    context freely between turns.
+- Context is stored as immutable snapshots: every remember inserts the full context as a new row and
+    recall reads back the latest one whole, so steps may compact, summarize, or replace the context
+    freely between turns.
 - Persistence is lock-free and write-only: previous snapshots are never modified or deleted and
     remain available for tracking and verification. Snapshot history grows without bound over the
     lifetime of a thread.

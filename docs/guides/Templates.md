@@ -105,8 +105,8 @@ await TemplatesRepository.resolve_str(
 )
 ```
 
-- Nested templates inherit the arguments of the outer resolution, so shared values such as
-    `user` need to be provided only once.
+- Nested templates inherit the arguments of the outer resolution, so shared values such as `user`
+    need to be provided only once.
 - Arguments bound by the nested `Template` itself take precedence over the inherited ones.
 - A template used as an argument of itself is reported as `TemplateInvalid` instead of recursing.
 
