@@ -1,11 +1,12 @@
 import re
 from collections.abc import Callable, MutableSequence, Sequence
-from typing import Any, Final
+from typing import Any, Final, final
 
-from haiway import Immutable, ctx
+from haiway import ctx
 
 from draive.guardrails.safety.types import GuardrailsSafetyException, GuardrailsSafetySanitization
 from draive.multimodal import MultimodalContent, MultimodalContentPart, TextContent
+from draive.utils.record import ImmutableRecord
 
 __all__ = (
     "RegexSanitizationRule",
@@ -13,7 +14,8 @@ __all__ = (
 )
 
 
-class RegexSanitizationRule(Immutable):
+@final
+class RegexSanitizationRule(ImmutableRecord):
     """
     Immutable regular-expression safety rule definition.
 
@@ -32,11 +34,33 @@ class RegexSanitizationRule(Immutable):
         action. When ``False`` the match is ignored.
     """
 
+    __slots__ = (
+        "identifier",
+        "mask",
+        "pattern",
+        "reason",
+        "validator",
+    )
+
     identifier: str
     pattern: re.Pattern[str]
     reason: str
     mask: str | None
-    validator: Callable[[re.Match[str], str], bool] | None = None
+    validator: Callable[[re.Match[str], str], bool] | None
+
+    def __init__(
+        self,
+        identifier: str,
+        pattern: re.Pattern[str],
+        reason: str,
+        mask: str | None,
+        validator: Callable[[re.Match[str], str], bool] | None = None,
+    ) -> None:
+        object.__setattr__(self, "identifier", identifier)
+        object.__setattr__(self, "pattern", pattern)
+        object.__setattr__(self, "reason", reason)
+        object.__setattr__(self, "mask", mask)
+        object.__setattr__(self, "validator", validator)
 
 
 _NEGATING_PREFIX: Final[re.Pattern[str]] = re.compile(

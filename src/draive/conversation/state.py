@@ -1,9 +1,10 @@
 from collections.abc import Iterable, MutableSequence, Sequence
 from itertools import chain
-from typing import Any, ClassVar, Self
+from typing import Any, Self
 
 from haiway import Meta, MetaValues, Paginated, Pagination, State
 
+from draive._constant import class_constant
 from draive.conversation.types import (
     ConversationMemoryFetching,
     ConversationMemoryRecalling,
@@ -16,7 +17,9 @@ __all__ = ("ConversationMemory",)
 
 
 class ConversationMemory(State):
-    disabled: ClassVar[Self]  # defined after the class
+    disabled = class_constant(
+        lambda: ConversationMemory(fetching=_fetch, recalling=_recall, remembering=_remember)
+    )
 
     @classmethod
     def constant(
@@ -42,7 +45,7 @@ class ConversationMemory(State):
             else:
                 raise ValueError("Volatile conversation memory does not support pagination tokens")
 
-            return Paginated[ConversationTurn].of(
+            return Paginated[ConversationTurn](
                 page_items,
                 pagination=pagination.with_token(None),
             )
@@ -100,7 +103,7 @@ class ConversationMemory(State):
             else:
                 raise ValueError("Volatile conversation memory does not support pagination tokens")
 
-            return Paginated[ConversationTurn].of(
+            return Paginated[ConversationTurn](
                 page_items,
                 pagination=pagination.with_token(None),
             )
@@ -183,7 +186,7 @@ async def _fetch(
     pagination: Pagination,
     **extra: Any,
 ) -> Paginated[ConversationTurn]:
-    return Paginated[ConversationTurn].of(
+    return Paginated[ConversationTurn](
         (),
         pagination=pagination.with_token(None),
     )
@@ -202,10 +205,3 @@ async def _remember(
     **extra: Any,
 ) -> None:
     pass
-
-
-ConversationMemory.disabled = ConversationMemory(
-    fetching=_fetch,
-    recalling=_recall,
-    remembering=_remember,
-)

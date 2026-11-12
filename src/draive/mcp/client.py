@@ -311,7 +311,7 @@ class MCPClient:
             )
         )
         if pagination.limit <= 0:
-            return Paginated[ResourceReference].of(
+            return Paginated[ResourceReference](
                 (),
                 pagination=pagination.with_token(None),
             )
@@ -369,7 +369,7 @@ class MCPClient:
             offset = 0
             next_token = cursor
 
-        return Paginated[ResourceReference].of(
+        return Paginated[ResourceReference](
             tuple(references),
             pagination=pagination.with_token(next_token),
         )
@@ -846,7 +846,7 @@ class MCPClients:
             )
 
         else:
-            return Paginated[ResourceReference].of(
+            return Paginated[ResourceReference](
                 (),
                 pagination=pagination.with_token(None),
             )
@@ -934,7 +934,7 @@ class MCPClients:
                 }
             )
 
-        return Paginated[ResourceReference].of(
+        return Paginated[ResourceReference](
             tuple(references[: pagination.limit]),
             pagination=pagination.with_token(next_token),
         )

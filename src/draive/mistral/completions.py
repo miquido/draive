@@ -2,7 +2,7 @@ import json
 from collections.abc import Generator, Iterable
 from typing import Any, cast
 
-from haiway import Meta, ctx, unwrap_missing
+from haiway import Meta, Missing, ctx
 from mistralai.client.errors import MistralError
 from mistralai.client.models import (
     ChatCompletionStreamRequestMessageTypedDict,
@@ -229,9 +229,9 @@ class MistralCompletions(MistralAPI):
                             raise ModelOutputLimit(
                                 provider="mistral",
                                 model=config.model,
-                                max_output_tokens=unwrap_missing(
-                                    config.max_output_tokens, default=0
-                                ),
+                                max_output_tokens=0
+                                if config.max_output_tokens is Missing
+                                else config.max_output_tokens,
                             )
 
                 if tool_accumulator is not None:

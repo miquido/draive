@@ -1,7 +1,7 @@
 from collections.abc import MutableMapping
 from typing import Any
 
-from boto3 import Session  # pyright: ignore[reportMissingTypeStubs]
+from boto3 import Session
 from haiway import asynchronous, ctx
 
 __all__ = ("AWSAPI",)
@@ -73,25 +73,25 @@ class AWSAPI:
 
     @asynchronous
     def _prepare_s3_client(self) -> None:
-        self._s3_client = self._session.client(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        self._s3_client = self._session.client(  # pyright: ignore[reportUnknownMemberType]
             service_name="s3",
         )
 
     @asynchronous
     def _prepare_sqs_client(self) -> None:
-        self._sqs_client = self._session.client(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        self._sqs_client = self._session.client(  # pyright: ignore[reportUnknownMemberType]
             service_name="sqs",
         )
 
     @asynchronous
     def _prepare_cloudwatch_clients(self) -> None:
-        self._cloudwatch_client = self._session.client(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        self._cloudwatch_client = self._session.client(  # pyright: ignore[reportUnknownMemberType]
             service_name="cloudwatch",
         )
-        self._cloudwatch_logs_client = self._session.client(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        self._cloudwatch_logs_client = self._session.client(  # pyright: ignore[reportUnknownMemberType]
             service_name="logs",
         )
-        self._eventbridge_client = self._session.client(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        self._eventbridge_client = self._session.client(  # pyright: ignore[reportUnknownMemberType]
             service_name="events",
         )
 
@@ -125,4 +125,4 @@ class AWSAPI:
     def region(self) -> str | None:
         """Currently configured AWS region for the session."""
 
-        return self._session.region_name  # pyright: ignore[reportUnknownMemberType, reportReturnType, reportUnknownVariableType]
+        return self._session.region_name  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]

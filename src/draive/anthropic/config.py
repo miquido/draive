@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from typing import Literal
 
-from haiway import MISSING, Configuration, Missing
+from haiway import Configuration, Missing
 
 __all__ = ("AnthropicConfig",)
 
@@ -13,7 +13,7 @@ class AnthropicConfig(Configuration):
     max_output_tokens: int = 16384
     # thinking runs in adaptive mode unless explicitly disabled, which not every
     # model allows; its content is never exposed, only its signature is reported
-    thinking: Literal["adaptive", "disabled"] | Missing = MISSING
+    thinking: Literal["adaptive", "disabled"] | Missing = Missing
     # depth of both thinking and the answer itself
-    effort: Literal["low", "medium", "high", "xhigh", "max"] | Missing = MISSING
-    stop_sequences: Sequence[str] | Missing = MISSING
+    effort: Literal["low", "medium", "high", "xhigh", "max"] | Missing = Missing
+    stop_sequences: Sequence[str] | Missing = Missing

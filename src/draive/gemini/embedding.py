@@ -4,7 +4,7 @@ from itertools import chain
 from typing import Any, cast
 
 from google.genai.types import EmbedContentConfigDict, EmbedContentResponse
-from haiway import State, as_list, as_tuple, ctx, not_missing
+from haiway import Missing, State, as_list, as_tuple, ctx
 
 from draive.embedding import Embedded
 from draive.gemini.api import GeminiAPI
@@ -58,7 +58,7 @@ class GeminiEmbedding(GeminiAPI):
                 return ()  # empty
 
             config_dict: EmbedContentConfigDict | None
-            if not_missing(config.dimensions):
+            if config.dimensions is not Missing:
                 config_dict = {"output_dimensionality": config.dimensions}
 
             else:

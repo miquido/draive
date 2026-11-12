@@ -3,7 +3,6 @@ from collections.abc import Sequence
 
 import pytest
 from haiway import (
-    MISSING,
     Default,
     Meta,
     Missing,
@@ -17,9 +16,6 @@ from haiway import (
     getenv_float,
     getenv_int,
     getenv_str,
-    is_missing,
-    not_missing,
-    unwrap_missing,
     without_missing,
 )
 
@@ -35,7 +31,7 @@ import draive
         "Default",
         "Validator",
         "Disposables",
-        "MISSING",
+        "Missing",
         "as_dict",
         "as_list",
         "as_tuple",
@@ -137,14 +133,11 @@ def test_meta_of_and_updates() -> None:
     assert meta.updating(b=2) == Meta.of({"a": 1, "b": 2})
 
 
-def test_missing_helpers() -> None:
-    value: str | Missing = MISSING
+def test_missing_sentinel() -> None:
+    value: str | Missing = Missing
 
-    assert is_missing(value)
-    assert not not_missing(value)
-    assert unwrap_missing(value, default="fallback") == "fallback"
-    assert unwrap_missing("set", default="fallback") == "set"
-    assert without_missing({"a": 1, "b": MISSING}) == {"a": 1}
+    assert value is Missing
+    assert without_missing({"a": 1, "b": Missing}) == {"a": 1}
 
 
 def test_collection_helpers() -> None:

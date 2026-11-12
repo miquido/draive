@@ -16,7 +16,7 @@ from haiway import Disposable, Disposables, State, as_dict, ctx
 from mcp.server import NotificationOptions, Server, ServerRequestContext
 
 # private module - the only route to the stream protocols in mcp 2.1, fragile across patches
-from mcp.shared._stream_protocols import (  # pyright: ignore[reportPrivateUsage]
+from mcp.shared._stream_protocols import (
     ReadStream,
     WriteStream,
 )

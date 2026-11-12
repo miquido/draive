@@ -20,7 +20,7 @@ from google.genai.types import (
     MediaResolution,
     Modality,
 )
-from haiway import MISSING, as_list, ctx
+from haiway import Missing, as_list, ctx
 
 from draive.gemini.api import GeminiAPI
 from draive.gemini.config import (
@@ -33,7 +33,6 @@ from draive.gemini.utils import (
     quota_limit,
     speech_config,
     thinking_config,
-    unwrap_missing,
 )
 from draive.models import (
     ModelContext,
@@ -194,10 +193,9 @@ class GeminiGenerating(GeminiAPI):
                         raise ModelOutputLimit(
                             provider="gemini",
                             model=config.model,
-                            max_output_tokens=unwrap_missing(
-                                config.max_output_tokens,
-                                default=0,
-                            ),
+                            max_output_tokens=0
+                            if config.max_output_tokens is Missing
+                            else config.max_output_tokens,
                         )
 
                     else:
@@ -370,15 +368,16 @@ def _request_config(  # noqa: C901, PLR0912
     config: GeminiConfig,
 ) -> GenerateContentConfigDict:
     configuration: GenerateContentConfigDict = {
-        "temperature": unwrap_missing(config.temperature),
-        "top_p": unwrap_missing(config.top_p),
-        "top_k": unwrap_missing(config.top_k),
-        "seed": unwrap_missing(config.seed),
-        "max_output_tokens": unwrap_missing(config.max_output_tokens),
-        "stop_sequences": unwrap_missing(
-            config.stop_sequences,
-            transform=as_list,
-        ),
+        "temperature": None if config.temperature is Missing else config.temperature,
+        "top_p": None if config.top_p is Missing else config.top_p,
+        "top_k": None if config.top_k is Missing else config.top_k,
+        "seed": None if config.seed is Missing else config.seed,
+        "max_output_tokens": None
+        if config.max_output_tokens is Missing
+        else config.max_output_tokens,
+        "stop_sequences": None
+        if config.stop_sequences is Missing
+        else as_list(config.stop_sequences),
         "candidate_count": 1,
     }
 
@@ -448,7 +447,7 @@ def _request_config(  # noqa: C901, PLR0912
             }
         }
 
-    if config.safety is not MISSING:
+    if config.safety is not Missing:
         configuration["safety_settings"] = [
             {
                 "category": HarmCategory.HARM_CATEGORY_HATE_SPEECH,
@@ -486,7 +485,7 @@ def _request_config(  # noqa: C901, PLR0912
             },
         ]
 
-    if config.media_resolution is MISSING:
+    if config.media_resolution is Missing:
         pass  # not specified - use defaults through missing
 
     elif config.media_resolution == "low":

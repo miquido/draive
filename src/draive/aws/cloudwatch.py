@@ -3,8 +3,8 @@ from datetime import UTC, datetime
 from time import time_ns
 from typing import Any, Final
 
-from botocore.exceptions import ClientError  # pyright: ignore[reportMissingModuleSource]
-from haiway import MISSING, ObservabilityAttribute, asynchronous
+from botocore.exceptions import ClientError
+from haiway import Missing, ObservabilityAttribute, asynchronous
 
 from draive.aws.api import AWSAPI
 from draive.aws.types import (
@@ -252,7 +252,7 @@ def format_metric_dimensions(
 def _render_dimension_value(
     value: ObservabilityAttribute,
 ) -> str | None:
-    if value is None or value is MISSING:
+    if value is None or value is Missing:
         return None
 
     if isinstance(value, str):
@@ -276,7 +276,7 @@ def _sanitize_attributes(
 ) -> Mapping[str, ObservabilityAttribute]:
     sanitized: dict[str, ObservabilityAttribute] = {}
     for key, value in attributes.items():
-        if value is None or value is MISSING:
+        if value is None or value is Missing:
             continue
 
         if isinstance(value, str):

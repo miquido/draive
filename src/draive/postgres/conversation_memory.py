@@ -248,7 +248,7 @@ async def _fetch_turns(
     pagination: Pagination,
 ) -> Paginated[ConversationTurn]:
     if pagination.limit <= 0:
-        return Paginated[ConversationTurn].of(
+        return Paginated[ConversationTurn](
             (),
             pagination=pagination.with_token(None),
         )
@@ -367,7 +367,7 @@ async def _fetch_turns(
     if len(rows) >= pagination.limit:
         next_token = rows[0].get_uuid("identifier", required=True)
 
-    return Paginated[ConversationTurn].of(
+    return Paginated[ConversationTurn](
         (_turn_from_row(row) for row in rows),
         pagination=pagination.with_token(next_token),
     )

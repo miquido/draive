@@ -447,7 +447,7 @@ def _process_statement_result(  # noqa: C901, PLR0912
                         continue
 
                     case {**elements}:
-                        yield {key: surreal_value(element) for key, element in elements.items()}  # pyright: ignore[reportUnknownVariableType]
+                        yield {key: surreal_value(element) for key, element in elements.items()}
 
                     case _:
                         # SELECT VALUE and similar projections can return scalar list items.

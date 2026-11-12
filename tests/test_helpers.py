@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterable, Iterable, Sequence
+from collections.abc import AsyncIterable, Callable, Iterable, Sequence
 from typing import Any
 
 import pytest
@@ -200,6 +200,7 @@ def _text_embedding() -> TextEmbedding:
     async def embedding(
         values: Iterable[str],
         /,
+        attribute: Callable[[str], str] | None = None,
         **extra: Any,
     ) -> Sequence[Embedded[str]]:
         return [

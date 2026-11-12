@@ -216,7 +216,7 @@ async def _fetch_turns(
     pagination: Pagination,
 ) -> Paginated[ConversationTurn]:
     if pagination.limit <= 0:
-        return Paginated[ConversationTurn].of(
+        return Paginated[ConversationTurn](
             (),
             pagination=pagination.with_token(None),
         )
@@ -262,7 +262,7 @@ async def _fetch_turns(
             cursor=cursor,
         )
         if not cursor_rows:
-            return Paginated[ConversationTurn].of(
+            return Paginated[ConversationTurn](
                 (),
                 pagination=pagination.with_token(None),
             )
@@ -305,7 +305,7 @@ async def _fetch_turns(
         next_token = f"conversation_memory:cursor:{cast(str, page_rows[-1]['identifier'])}"
 
     turns: Sequence[ConversationTurn] = tuple(_turn_from_record(row) for row in reversed(page_rows))
-    return Paginated[ConversationTurn].of(
+    return Paginated[ConversationTurn](
         turns,
         pagination=pagination.with_token(next_token),
     )

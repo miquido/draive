@@ -101,7 +101,7 @@ async def test_realtime_memory_completed_event_is_remembered_and_not_forwarded()
         **extra: Any,
     ) -> Paginated[ConversationTurn]:
         _ = extra
-        return Paginated[ConversationTurn].of(
+        return Paginated[ConversationTurn](
             remembered_turns,
             pagination=pagination.with_token(None),
         )

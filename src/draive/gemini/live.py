@@ -21,7 +21,7 @@ from google.genai.types import (
     Transcription,
     TurnCompleteReason,
 )
-from haiway import MISSING, ctx
+from haiway import Missing, ctx
 
 from draive.gemini.api import GeminiAPI
 from draive.gemini.config import GeminiConfig
@@ -37,7 +37,6 @@ from draive.gemini.utils import (
     quota_limit,
     speech_config,
     thinking_config,
-    unwrap_missing,
 )
 from draive.models import (
     ModelContext,
@@ -453,7 +452,7 @@ class GeminiLive(GeminiAPI):
 
 
 def _resolve_media_resolution(config: GeminiConfig) -> MediaResolution | None:
-    if config.media_resolution is MISSING:
+    if config.media_resolution is Missing:
         return None
     elif config.media_resolution == "low":
         return MediaResolution.MEDIA_RESOLUTION_LOW
@@ -473,14 +472,16 @@ def _live_connect_config(
     config: GeminiConfig,
 ) -> LiveConnectConfigDict:
     live_config: LiveConnectConfigDict = {
-        "temperature": unwrap_missing(config.temperature),
-        "top_p": unwrap_missing(config.top_p),
-        "top_k": unwrap_missing(config.top_k),
-        "max_output_tokens": unwrap_missing(config.max_output_tokens),
+        "temperature": None if config.temperature is Missing else config.temperature,
+        "top_p": None if config.top_p is Missing else config.top_p,
+        "top_k": None if config.top_k is Missing else config.top_k,
+        "max_output_tokens": None
+        if config.max_output_tokens is Missing
+        else config.max_output_tokens,
         "history_config": {
             "initial_history_in_client_content": True,
         },
-        "seed": unwrap_missing(config.seed),
+        "seed": None if config.seed is Missing else config.seed,
     }
 
     if config.context_window_compression is True:

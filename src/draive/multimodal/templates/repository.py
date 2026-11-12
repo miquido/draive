@@ -3,17 +3,7 @@ from collections.abc import Mapping, MutableMapping, Sequence
 from pathlib import Path
 from typing import Any, Self, cast, final, overload
 
-from haiway import (
-    File,
-    Files,
-    Immutable,
-    Meta,
-    Paginated,
-    Pagination,
-    State,
-    ctx,
-    statemethod,
-)
+from haiway import File, Files, Meta, Paginated, Pagination, State, ctx, statemethod
 
 from draive.multimodal.content import Multimodal, MultimodalContent
 from draive.multimodal.templates.types import (
@@ -30,6 +20,7 @@ from draive.multimodal.templates.variables import (
     resolve_multimodal_template,
     resolve_text_template,
 )
+from draive.utils.record import ImmutableRecord
 
 __all__ = ("TemplatesRepository",)
 
@@ -39,7 +30,7 @@ async def _empty_listing(
     **extra: Any,
 ) -> Paginated[TemplateDeclaration]:
     _ = extra
-    return Paginated[TemplateDeclaration].of(
+    return Paginated[TemplateDeclaration](
         (),
         pagination=Pagination.of(limit=0),
     )
@@ -552,7 +543,7 @@ def _paginate_declarations(
     pagination = pagination or Pagination.of(limit=32)
 
     if pagination.limit <= 0:
-        return Paginated[TemplateDeclaration].of(
+        return Paginated[TemplateDeclaration](
             (),
             pagination=pagination.with_token(None),
         )
@@ -582,15 +573,29 @@ def _paginate_declarations(
     if end < len(declarations):
         next_token = f"templates:{end}"
 
-    return Paginated[TemplateDeclaration].of(
+    return Paginated[TemplateDeclaration](
         declarations[start:end],
         pagination=pagination.with_token(next_token),
     )
 
 
-class VolatileStorage(Immutable):
+@final
+class VolatileStorage(ImmutableRecord):
+    __slots__ = (
+        "_contents",
+        "_declarations",
+    )
+
     _declarations: MutableMapping[str, TemplateDeclaration]
     _contents: MutableMapping[str, str]
+
+    def __init__(
+        self,
+        _declarations: MutableMapping[str, TemplateDeclaration],
+        _contents: MutableMapping[str, str],
+    ) -> None:
+        object.__setattr__(self, "_declarations", _declarations)
+        object.__setattr__(self, "_contents", _contents)
 
     async def listing(
         self,
@@ -630,7 +635,14 @@ class VolatileStorage(Immutable):
         self._contents[identifier] = content
 
 
-class FileStorage(Immutable):
+@final
+class FileStorage(ImmutableRecord):
+    __slots__ = (
+        "_contents",
+        "_declarations",
+        "_path",
+    )
+
     _path: Path
     _declarations: MutableMapping[str, TemplateDeclaration] | None
     _contents: MutableMapping[str, str] | None

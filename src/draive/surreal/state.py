@@ -205,7 +205,7 @@ class SurrealSession(State):
     ) -> Paginated[Model]:
         pagination = pagination or Pagination.of(limit=32)
         if pagination.limit <= 0:
-            return Paginated[Model].of(
+            return Paginated[Model](
                 (),
                 pagination=pagination.with_token(None),
             )
@@ -235,7 +235,7 @@ class SurrealSession(State):
         if len(records) > pagination.limit:
             next_token = start_at + pagination.limit
 
-        return Paginated[Model].of(
+        return Paginated[Model](
             tuple(model.from_mapping(record) for record in records[: pagination.limit]),
             pagination=pagination.with_token(next_token),
         )
@@ -535,7 +535,7 @@ class SurrealSession(State):
     ) -> Paginated[Model]:
         pagination = pagination or Pagination.of(limit=32)
         if pagination.limit <= 0:
-            return Paginated[Model].of(
+            return Paginated[Model](
                 (),
                 pagination=pagination.with_token(None),
             )
@@ -578,7 +578,7 @@ class SurrealSession(State):
         if len(rows) > pagination.limit:
             next_token = start_at + pagination.limit
 
-        return Paginated[Model].of(
+        return Paginated[Model](
             tuple(
                 target.from_mapping(cast(Mapping[str, object], record["value"]))
                 for record in page_records

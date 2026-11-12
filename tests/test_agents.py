@@ -1,4 +1,4 @@
-from collections.abc import AsyncGenerator, AsyncIterable, Collection, Sequence
+from collections.abc import AsyncGenerator, AsyncIterable, Sequence
 from typing import Any
 from uuid import uuid4
 
@@ -68,11 +68,11 @@ async def test_generative_agent_groups_interleaved_tool_output(
         ModelToolRequest.of("r2", tool="shared", arguments={}),
     )
 
-    async def handle(
-        self: Toolbox,
-        pending: Collection[ModelToolRequest],
+    async def merging(
+        stream: AsyncGenerator[Any],
+        /,
     ) -> AsyncGenerator[TextContent | ModelToolResponse]:
-        assert tuple(pending) == requests
+        await stream.aclose()  # the real execution is replaced by the interleaved output
         yield TextContent.of("a1", meta={"request": "r2"})
         yield TextContent.of("b1", meta={"request": "r1"})
         yield TextContent.of("a2", meta={"request": "r2"})
@@ -85,7 +85,7 @@ async def test_generative_agent_groups_interleaved_tool_output(
                 content=MultimodalContent.empty,
             )
 
-    monkeypatch.setattr(Toolbox, "handle", handle)
+    monkeypatch.setattr("draive.tools.toolbox._merging_output", merging)
 
     async def generating(
         *,

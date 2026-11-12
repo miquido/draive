@@ -3,7 +3,7 @@ from typing import Any, cast, overload
 
 from google.genai.errors import APIError
 from google.genai.types import SpeechConfigDict, ThinkingConfigDict, ThinkingLevel
-from haiway import MISSING, BasicValue, Missing
+from haiway import BasicValue, Missing
 
 from draive.gemini.config import GeminiConfig
 
@@ -62,7 +62,7 @@ def unwrap_missing[Value, Result](
     *,
     transform: Callable[[Value], Result] | None = None,
 ) -> Result | Value | None:
-    if value is MISSING:
+    if value is Missing:
         return default
 
     elif transform is not None:
@@ -91,19 +91,19 @@ def speech_config(
     config: GeminiConfig,
     /,
 ) -> SpeechConfigDict | None:
-    if config.speech_voice_name is MISSING and config.speech_language_code is MISSING:
+    if config.speech_voice_name is Missing and config.speech_language_code is Missing:
         return None
 
     speech_config: SpeechConfigDict = {}
-    if config.speech_voice_name is not MISSING:
+    if config.speech_voice_name is not Missing:
         speech_config["voice_config"] = {
             "prebuilt_voice_config": {
-                "voice_name": cast(str, config.speech_voice_name),
+                "voice_name": config.speech_voice_name,
             },
         }
 
-    if config.speech_language_code is not MISSING:
-        speech_config["language_code"] = cast(str, config.speech_language_code)
+    if config.speech_language_code is not Missing:
+        speech_config["language_code"] = config.speech_language_code
 
     return speech_config
 
@@ -113,16 +113,16 @@ def thinking_config(
     /,
 ) -> ThinkingConfigDict | None:
     # thinking level is the current API, thinking budget is kept for older models
-    if config.thinking_level is not MISSING:
+    if config.thinking_level is not Missing:
         return {
             "include_thoughts": True,
-            "thinking_level": _resolve_thinking_level(cast(str, config.thinking_level)),
+            "thinking_level": _resolve_thinking_level(config.thinking_level),
         }
 
-    if config.thinking_budget is not MISSING:
+    if config.thinking_budget is not Missing:
         return {
             "include_thoughts": True,
-            "thinking_budget": cast(int, config.thinking_budget),
+            "thinking_budget": config.thinking_budget,
         }
 
     return None
