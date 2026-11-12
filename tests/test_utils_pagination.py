@@ -6,7 +6,7 @@ def test_paginated_sequence_behavior() -> None:
         token="cursor-2",
         limit=32,
     )
-    page = Paginated[int].of(
+    page = Paginated[int](
         [1, 2, 3],
         pagination=pagination,
     )
@@ -25,7 +25,7 @@ def test_paginated_preserves_items_and_pagination_metadata() -> None:
         token="cursor-3",
         limit=32,
     )
-    page = Paginated[str].of(
+    page = Paginated[str](
         ["a", "b"],
         pagination=pagination,
     )

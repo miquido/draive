@@ -7,7 +7,7 @@ from collections.abc import (
     MutableSet,
     Sequence,
 )
-from typing import ClassVar, Self, final, overload
+from typing import Self, final, overload
 
 from haiway import (
     BasicValue,
@@ -19,6 +19,7 @@ from haiway import (
     stream_concurrently,
 )
 
+from draive._constant import class_constant
 from draive.models import (
     ModelToolHandling,
     ModelToolRequest,
@@ -38,7 +39,13 @@ __all__ = ("Toolbox",)
 class Toolbox(State):
     """Immutable registry of tools with selection and execution helpers."""
 
-    empty: ClassVar[Self]  # defined after the class
+    empty = class_constant(
+        lambda: Toolbox(
+            tools={},
+            suggesting=_no_suggestion,
+            meta=Meta.empty,
+        )
+    )
 
     @overload
     @classmethod
@@ -597,13 +604,6 @@ def _no_suggestion(
     iteration: int,
 ) -> ModelToolSpecification | bool:
     return False
-
-
-Toolbox.empty = Toolbox(
-    tools={},
-    suggesting=_no_suggestion,
-    meta=Meta.empty,
-)
 
 
 async def _merging_output(  # noqa: C901, PLR0912

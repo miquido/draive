@@ -4,7 +4,7 @@ from collections.abc import Callable, Collection, Coroutine, Mapping, Sequence, 
 from typing import Any, Protocol, cast, final, runtime_checkable
 from urllib.parse import ParseResult, parse_qs, quote, unquote, urlencode, urlparse
 
-from haiway import MISSING, Function, Meta, MetaValues, TypeSpecification
+from haiway import Function, Meta, MetaValues, Missing, TypeSpecification
 from haiway.attributes import Attribute
 
 from draive.resources.types import (
@@ -388,7 +388,7 @@ class ResourceTemplate[**Args](
             else:
                 raw_value = argument.default()
 
-            if raw_value is MISSING:
+            if raw_value is Missing:
                 continue
 
             converted: Any = self._coerce_parameter_value(argument, raw_value)

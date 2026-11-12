@@ -1,6 +1,5 @@
 # exporting haiway symbols for easier usage
 from haiway import (
-    MISSING,
     Alias,
     AsyncQueue,
     AsyncQueueEmpty,
@@ -47,7 +46,6 @@ from haiway import (
     HTTPResponse,
     HTTPStatusCode,
     HTTPTimeoutError,
-    Immutable,
     JSONLogFormatter,
     LoggerObservability,
     Map,
@@ -89,9 +87,7 @@ from haiway import (
     getenv_float,
     getenv_int,
     getenv_str,
-    is_missing,
     load_env,
-    not_missing,
     process_concurrently,
     retry,
     setup_logging,
@@ -102,7 +98,6 @@ from haiway import (
     stream_concurrently,
     throttle,
     timeout,
-    unwrap_missing,
     without_missing,
 )
 
@@ -301,7 +296,6 @@ from draive.utils import ProcessingEvent
 
 # annotated - the list is past the length pyright infers a literal tuple type for
 __all__: tuple[str, ...] = (
-    "MISSING",
     "Agent",
     "AgentException",
     "AgentExecuting",
@@ -395,7 +389,6 @@ __all__: tuple[str, ...] = (
     "ImageEmbedding",
     "ImageGenerating",
     "ImageGeneration",
-    "Immutable",
     "JSONLogFormatter",
     "LoggerObservability",
     "MQMessage",
@@ -553,10 +546,8 @@ __all__: tuple[str, ...] = (
     "getenv_int",
     "getenv_str",
     "guardrails_regex_sanitizer",
-    "is_missing",
     "load_env",
     "mmr_vector_similarity_search",
-    "not_missing",
     "process_concurrently",
     "resource",
     "retry",
@@ -571,7 +562,6 @@ __all__: tuple[str, ...] = (
     "throttle",
     "timeout",
     "tool",
-    "unwrap_missing",
     "vector_similarity_score",
     "vector_similarity_search",
     "without_missing",

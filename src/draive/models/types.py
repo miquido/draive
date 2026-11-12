@@ -11,7 +11,6 @@ from collections.abc import (
 from types import TracebackType
 from typing import (
     Any,
-    ClassVar,
     Literal,
     NotRequired,
     Protocol,
@@ -31,6 +30,7 @@ from haiway import (
     ctx,
 )
 
+from draive._constant import class_constant
 from draive.multimodal import Multimodal, MultimodalContent, TextContent
 from draive.multimodal.content import MultimodalContentPart
 
@@ -385,7 +385,7 @@ class ModelTools(State, serializable=True):
         Provider-specific tool choice policy.
     """
 
-    none: ClassVar[Self]  # defined after the class
+    none = class_constant(lambda: ModelTools(specification=(), selection="none"))
 
     @classmethod
     def of(
@@ -417,12 +417,6 @@ class ModelTools(State, serializable=True):
 
     def __bool__(self) -> bool:
         return bool(self.specification)
-
-
-ModelTools.none = ModelTools(
-    specification=(),
-    selection="none",
-)
 
 
 ModelToolHandling = Literal["response", "output"]

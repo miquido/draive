@@ -1,11 +1,10 @@
 import re
 from collections.abc import Callable, Collection, Sequence
-from typing import Annotated, Literal, Protocol, Self, cast, overload, runtime_checkable
+from typing import Annotated, Literal, Protocol, Self, cast, final, overload, runtime_checkable
 
 from haiway import (
     AttributePath,
     Description,
-    Immutable,
     Meta,
     MetaValues,
     State,
@@ -22,6 +21,7 @@ from draive.evaluation.value import (
     evaluation_score_value,
     evaluation_score_verifier,
 )
+from draive.utils.record import ImmutableRecord
 
 __all__ = (
     "Evaluator",
@@ -210,7 +210,7 @@ class EvaluatorResult(State, serializable=True):
 
     def __eq__(
         self,
-        other: Self,
+        other: object,
     ) -> bool:
         assert isinstance(other, self.__class__)  # nosec: B101
         if self.evaluator != other.evaluator or self.threshold != other.threshold:
@@ -260,7 +260,8 @@ class PreparedEvaluator[Value](Protocol):
     ) -> EvaluatorResult: ...
 
 
-class Evaluator[Value, **Args](Immutable):
+@final
+class Evaluator[Value, **Args](ImmutableRecord):
     """
     Configurable evaluator for assessing values against criteria.
 
@@ -431,6 +432,14 @@ class Evaluator[Value, **Args](Immutable):
             )
 
         return evaluate
+
+    __slots__ = (
+        "_definition",
+        "_state",
+        "meta",
+        "name",
+        "threshold",
+    )
 
     name: str
     threshold: float

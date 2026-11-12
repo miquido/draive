@@ -3,13 +3,12 @@ import random
 from asyncio import Lock
 from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
-from typing import Annotated, Protocol, Self, cast, runtime_checkable
+from typing import Annotated, Protocol, Self, cast, final, runtime_checkable
 from uuid import uuid4
 
 from haiway import (
     Default,
     Description,
-    Immutable,
     Meta,
     MetaValues,
     State,
@@ -20,6 +19,7 @@ from haiway import (
 
 from draive.evaluation.evaluator import EvaluatorResult
 from draive.evaluation.scenario import EvaluatorScenarioResult
+from draive.utils.record import ImmutableRecord
 
 __all__ = (
     "EvaluatorSuite",
@@ -323,7 +323,8 @@ class PreparedEvaluatorSuite[Parameters: State](Protocol):
     ) -> EvaluatorSuiteResult: ...
 
 
-class EvaluatorSuite[**Args, Parameters: State](Immutable):
+@final
+class EvaluatorSuite[**Args, Parameters: State](ImmutableRecord):
     """
     Comprehensive test suite for systematic evaluation.
 
@@ -359,6 +360,18 @@ class EvaluatorSuite[**Args, Parameters: State](Immutable):
     >>> # Run 50% of cases
     >>> results = await validate(0.5)
     """
+
+    __slots__ = (
+        "_cases_cache",
+        "_cases_storage",
+        "_definition",
+        "_lock",
+        "_parameters",
+        "_state",
+        "concurrent_evaluations",
+        "meta",
+        "name",
+    )
 
     name: str
     concurrent_evaluations: int
@@ -844,7 +857,10 @@ class EvaluatorSuiteData[Parameters: State](State, serializable=True):
     cases: Sequence[EvaluatorSuiteCase[Parameters]] = ()
 
 
-class _EvaluatorSuiteMemoryStorage[Parameters: State](Immutable):
+@final
+class _EvaluatorSuiteMemoryStorage[Parameters: State](ImmutableRecord):
+    __slots__ = ("_cases_store",)
+
     _cases_store: Sequence[EvaluatorSuiteCase[Parameters]]
 
     def __init__(
@@ -873,7 +889,13 @@ class _EvaluatorSuiteMemoryStorage[Parameters: State](Immutable):
         )
 
 
-class _EvaluatorSuiteFileStorage[Parameters: State](Immutable):
+@final
+class _EvaluatorSuiteFileStorage[Parameters: State](ImmutableRecord):
+    __slots__ = (
+        "_data_type",
+        "_path",
+    )
+
     _path: Path
     _data_type: type[EvaluatorSuiteCase[Parameters]]
 

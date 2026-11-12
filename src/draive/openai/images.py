@@ -1,6 +1,6 @@
 from typing import Any
 
-from haiway import ctx, unwrap_missing
+from haiway import Missing, ctx
 from openai import omit
 from openai.types.image import Image
 from openai.types.images_response import ImagesResponse
@@ -53,10 +53,9 @@ class OpenAIImageGeneration(OpenAIAPI):
                 size=generation_config.size,
                 background=generation_config.background,
                 output_format=generation_config.output_format,
-                output_compression=unwrap_missing(
-                    generation_config.output_compression,
-                    default=omit,
-                ),
+                output_compression=omit
+                if generation_config.output_compression is Missing
+                else generation_config.output_compression,
                 moderation=generation_config.moderation,
             )
 

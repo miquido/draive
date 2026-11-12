@@ -1,7 +1,7 @@
 from collections.abc import Generator, Sequence
 from typing import Any, Final
 
-from haiway import Missing, ctx, not_missing
+from haiway import Missing, ctx
 from openai.types import ModerationCreateResponse, ModerationMultiModalInputParam
 
 from draive.guardrails import GuardrailsModerationException
@@ -68,7 +68,7 @@ class OpenAIContentModeration(OpenAIAPI):
                     )
                     # a configured threshold replaces the model provided category flag,
                     # the flag is used only when no threshold was configured
-                    if not_missing(threshold):
+                    if threshold is not Missing:
                         if score >= threshold:
                             violations[category] = score
 

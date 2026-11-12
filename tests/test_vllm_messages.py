@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from typing import Any
 
-from haiway import MISSING
+from haiway import Missing
 
 from draive.models import (
     ModelInput,
@@ -20,7 +20,7 @@ def _messages(
         _context_messages(
             instructions="instructions",
             context=elements,
-            vision_details=MISSING,
+            vision_details=Missing,
         )
     )
 

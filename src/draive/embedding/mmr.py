@@ -111,7 +111,7 @@ def mmr_vector_similarity_search(  # noqa: C901
         selected_indices.append(best_index)
         selected = np.append(
             selected,
-            [values[best_index]],  # pyright: ignore[reportUnknownArgumentType]
+            [values[best_index]],
             axis=0,
         )
 

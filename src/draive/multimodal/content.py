@@ -1,8 +1,9 @@
 from collections.abc import Callable, Collection, Generator, Mapping, Sequence
-from typing import ClassVar, Literal, Self, cast, final, overload
+from typing import Literal, Self, cast, final, overload
 
-from haiway import MISSING, BasicValue, Meta, MetaValues, Missing, State
+from haiway import BasicValue, Meta, MetaValues, Missing, State
 
+from draive._constant import class_constant
 from draive.multimodal.artifact import ArtifactContent
 from draive.multimodal.text import TextContent
 from draive.resources import MimeType, ResourceContent, ResourceReference
@@ -39,7 +40,7 @@ class MultimodalContent(State, serializable=True):
         The ordered, immutable parts of this content.
     """
 
-    empty: ClassVar[Self]  # defined after the class
+    empty = class_constant(lambda: MultimodalContent(parts=()))
 
     @classmethod
     def of(
@@ -61,7 +62,7 @@ class MultimodalContent(State, serializable=True):
             ``MultimodalContent`` is provided, it is returned as-is.
         """
         if not elements:
-            return cls.empty
+            return cast(Self, cls.empty)
 
         if len(elements) == 1 and isinstance(elements[0], MultimodalContent):
             return cast(Self, elements[0])
@@ -370,12 +371,12 @@ class MultimodalContent(State, serializable=True):
 
         result: list[Self] = []
         current_group: list[MultimodalContentPart] = []
-        current_value: BasicValue | Missing = MISSING
+        current_value: BasicValue | Missing = Missing
 
         for part in self.parts:
             # Get metadata value for this part
-            part_value: BasicValue | Missing = part.meta.get(key, MISSING)
-            if part_value is MISSING:
+            part_value: BasicValue | Missing = part.meta.get(key, Missing)
+            if part_value is Missing:
                 continue  # skip elements without explicit value
 
             # If this is the first part or value changed, start new group
@@ -593,9 +594,6 @@ class MultimodalContent(State, serializable=True):
             ``True`` when ``parts`` is non-empty and any part is truthy.
         """
         return bool(self.parts) and any(self.parts)
-
-
-MultimodalContent.empty = MultimodalContent(parts=())
 
 
 @final

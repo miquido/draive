@@ -90,7 +90,7 @@ class SurrealTemplatesRepository:
             ctx.log_info("Listing templates...")
             pagination = pagination or Pagination.of(limit=32)
             if pagination.limit <= 0:
-                return Paginated[TemplateDeclaration].of(
+                return Paginated[TemplateDeclaration](
                     (),
                     pagination=pagination.with_token(None),
                 )
@@ -122,7 +122,7 @@ class SurrealTemplatesRepository:
             if len(results) > pagination.limit:
                 next_token = f"{cast(str, page_results[-1]['identifier'])}"
 
-            return Paginated[TemplateDeclaration].of(
+            return Paginated[TemplateDeclaration](
                 tuple(
                     TemplateDeclaration(
                         identifier=cast(str, result["identifier"]),

@@ -4,12 +4,12 @@ from typing import Any, cast
 from uuid import uuid4
 
 import pytest
-from haiway import Pagination
+from haiway import Pagination, ctx
 
-import draive.surreal.conversation_memory as surreal_memory
 from draive.conversation.types import ConversationTurn, ConversationUserTurn
 from draive.multimodal import MultimodalContent
 from draive.surreal import SurrealConversationMemory, SurrealObject
+from tests._surreal_session import surreal_session
 
 
 def _row(
@@ -91,24 +91,23 @@ async def test_surrealdb_conversation_memory_fetch_uses_cursor_lookup_without_mu
             case _:
                 raise AssertionError(f"Unexpected query variables: {variables!r}")
 
-    monkeypatch.setattr(surreal_memory.Surreal, "execute", fake_execute)
+    async with ctx.scope("test", surreal_session(fake_execute)):
+        memory = SurrealConversationMemory.prepare(thread="thread-1")
 
-    memory = SurrealConversationMemory.prepare(thread="thread-1")
+        page_1 = await memory.fetch(Pagination.of(limit=2))
+        assert [turn.content[0].to_str() for turn in page_1.items] == ["second", "third"]
+        assert page_1.pagination.token == f"conversation_memory:cursor:{turns[1].identifier}"
 
-    page_1 = await memory.fetch(Pagination.of(limit=2))
-    assert [turn.content[0].to_str() for turn in page_1.items] == ["second", "third"]
-    assert page_1.pagination.token == f"conversation_memory:cursor:{turns[1].identifier}"
-
-    page_2 = await memory.fetch(page_1.pagination)
-    assert [turn.content[0].to_str() for turn in page_2.items] == ["first"]
-    assert page_2.pagination.token is None
-    assert execution_calls == [
-        {"thread_id": "thread-1", "limit": 3},
-        {"thread_id": "thread-1", "cursor": str(turns[1].identifier)},
-        {
-            "thread_id": "thread-1",
-            "cursor_created": turns[1].created,
-            "cursor_identifier": str(turns[1].identifier),
-            "limit": 3,
-        },
-    ]
+        page_2 = await memory.fetch(page_1.pagination)
+        assert [turn.content[0].to_str() for turn in page_2.items] == ["first"]
+        assert page_2.pagination.token is None
+        assert execution_calls == [
+            {"thread_id": "thread-1", "limit": 3},
+            {"thread_id": "thread-1", "cursor": str(turns[1].identifier)},
+            {
+                "thread_id": "thread-1",
+                "cursor_created": turns[1].created,
+                "cursor_identifier": str(turns[1].identifier),
+                "limit": 3,
+            },
+        ]

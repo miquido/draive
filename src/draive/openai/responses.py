@@ -3,7 +3,7 @@ from collections.abc import Generator, Mapping, Sequence
 from typing import Any, Final, Literal, cast
 from uuid import uuid4
 
-from haiway import MISSING, Meta, Missing, as_dict, ctx, unwrap_missing
+from haiway import Meta, Missing, as_dict, ctx
 from openai import Omit, omit
 from openai import RateLimitError as OpenAIRateLimitError
 from openai.types import ReasoningEffort
@@ -138,21 +138,18 @@ class OpenAIResponses(OpenAIAPI):
                     parallel_tool_calls=True if tools else omit,
                     text=text_config,
                     reasoning=_reasoning(config),
-                    max_output_tokens=unwrap_missing(
-                        config.max_output_tokens,
-                        default=omit,
-                    ),
+                    max_output_tokens=omit
+                    if config.max_output_tokens is Missing
+                    else config.max_output_tokens,
                     service_tier=config.service_tier,
                     truncation=config.truncation,
-                    safety_identifier=unwrap_missing(
-                        config.safety_identifier,
-                        default=omit,
-                    ),
+                    safety_identifier=omit
+                    if config.safety_identifier is Missing
+                    else config.safety_identifier,
                     prompt_cache_key=cache_key or omit,
-                    prompt_cache_retention=unwrap_missing(
-                        config.prompt_cache_retention,
-                        default=omit,
-                    ),
+                    prompt_cache_retention=omit
+                    if config.prompt_cache_retention is Missing
+                    else config.prompt_cache_retention,
                     # responses are never stored, encrypted reasoning is what carries
                     # the reasoning state across turns without any server side copy.
                     # OpenAI compatible servers reachable through a custom base url
@@ -295,10 +292,9 @@ class OpenAIResponses(OpenAIAPI):
                                         raise ModelOutputLimit(
                                             provider="openai",
                                             model=config.model,
-                                            max_output_tokens=unwrap_missing(
-                                                config.max_output_tokens,
-                                                default=0,
-                                            ),
+                                            max_output_tokens=0
+                                            if config.max_output_tokens is Missing
+                                            else config.max_output_tokens,
                                         )
 
                                     else:
@@ -352,21 +348,21 @@ def _text_output(
     output: ModelOutputSelection,
     /,
     *,
-    verbosity: Literal["low", "medium", "high"] | Missing = MISSING,
+    verbosity: Literal["low", "medium", "high"] | Missing = Missing,
 ) -> ResponseTextConfigParam | Omit:
     text_format: ResponseFormatTextConfigParam | None = _text_format(output)
-    if verbosity is MISSING:
+    if verbosity is Missing:
         if text_format is None:
             return omit
 
         return {"format": text_format}
 
     if text_format is None:
-        return {"verbosity": cast(Literal["low", "medium", "high"], verbosity)}
+        return {"verbosity": verbosity}
 
     return {
         "format": text_format,
-        "verbosity": cast(Literal["low", "medium", "high"], verbosity),
+        "verbosity": verbosity,
     }
 
 

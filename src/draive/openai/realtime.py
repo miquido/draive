@@ -8,7 +8,7 @@ from types import TracebackType
 from typing import Any, Literal
 from uuid import UUID, uuid4
 
-from haiway import MISSING, Meta, Missing, State, ctx, without_missing
+from haiway import Meta, Missing, State, ctx, without_missing
 from openai.resources.realtime.realtime import (
     AsyncRealtimeConnection,
     AsyncRealtimeConnectionManager,
@@ -761,8 +761,8 @@ def _prepare_session_config(
                 {
                     "type": "function",
                     "name": tool.name,
-                    "description": tool.description or MISSING,
-                    "parameters": tool.parameters or MISSING,
+                    "description": tool.description or Missing,
+                    "parameters": tool.parameters or Missing,
                 },
                 typed=RealtimeFunctionToolParam,
             )
@@ -770,21 +770,21 @@ def _prepare_session_config(
         ]
 
     else:
-        session_tools = MISSING
+        session_tools = Missing
 
     return without_missing(
         {
             "type": "realtime",
             "model": config.model,
             # an empty string would override the model's own default instructions
-            "instructions": instructions or MISSING,
+            "instructions": instructions or Missing,
             "audio": {
                 "input": config.input_parameters,
                 "output": config.output_parameters,
             },
             "output_modalities": modalities,
             "tools": session_tools,
-            "tool_choice": tool_choice if session_tools is not MISSING else MISSING,
+            "tool_choice": tool_choice if session_tools is not Missing else Missing,
         },
         typed=RealtimeSessionCreateRequestParam,
     )

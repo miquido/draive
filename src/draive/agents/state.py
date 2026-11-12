@@ -1,10 +1,11 @@
 from collections import OrderedDict
 from collections.abc import Collection, Sequence
-from typing import Any, ClassVar, Self, final
+from typing import Any, Self, final
 from uuid import UUID
 
 from haiway import Disposable, Meta, MetaValues, State, ctx
 
+from draive._constant import class_constant
 from draive.agents.types import (
     AgentException,
     AgentMemoryPreparing,
@@ -42,7 +43,9 @@ class AgentMemory(State):
         Additional metadata attached to the memory instance.
     """
 
-    disabled: ClassVar[Self]  # defined after the class
+    disabled = class_constant(
+        lambda: AgentMemory(preparing=_prepare, recalling=_recall, remembering=_remember)
+    )
 
     @classmethod
     def volatile(
@@ -448,10 +451,3 @@ async def _remember(
     **extra: Any,
 ) -> None:
     pass
-
-
-AgentMemory.disabled = AgentMemory(
-    preparing=_prepare,
-    recalling=_recall,
-    remembering=_remember,
-)

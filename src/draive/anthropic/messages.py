@@ -36,14 +36,7 @@ from anthropic.types import (
 from anthropic.types.output_config_param import OutputConfigParam
 from anthropic.types.redacted_thinking_block_param import RedactedThinkingBlockParam
 from anthropic.types.thinking_block_param import ThinkingBlockParam
-from haiway import (
-    MISSING,
-    BasicValue,
-    Missing,
-    as_dict,
-    ctx,
-    unwrap_missing,
-)
+from haiway import BasicValue, Missing, as_dict, ctx
 
 from draive.anthropic.api import AnthropicAPI
 from draive.anthropic.config import AnthropicConfig
@@ -136,10 +129,9 @@ class AnthropicMessages(AnthropicAPI):
                         output,
                         effort=config.effort,
                     ),
-                    stop_sequences=unwrap_missing(
-                        cast(Any, config.stop_sequences),
-                        default=omit,
-                    ),
+                    stop_sequences=omit
+                    if cast(Any, config.stop_sequences) is Missing
+                    else cast(Any, config.stop_sequences),
                 ) as stream:
                     async for event in stream:
                         match event.type:
@@ -305,9 +297,9 @@ class AnthropicMessages(AnthropicAPI):
                                         raise ModelOutputLimit(
                                             provider=self._provider,
                                             model=config.model,
-                                            max_output_tokens=unwrap_missing(
-                                                config.max_output_tokens, default=0
-                                            ),
+                                            max_output_tokens=0
+                                            if config.max_output_tokens is Missing
+                                            else config.max_output_tokens,
                                         )
 
                                     case "model_context_window_exceeded":
@@ -627,8 +619,8 @@ def _output_config(
         # silently answering with text would not match the requested modality
         raise NotImplementedError(f"{output} output is not supported by Anthropic")
 
-    if effort is not MISSING:
-        config["effort"] = cast(Literal["low", "medium", "high", "xhigh", "max"], effort)
+    if effort is not Missing:
+        config["effort"] = effort
 
     return config or omit
 
@@ -639,7 +631,7 @@ def _thinking_config(
 ) -> ThinkingConfigParam | Omit:
     # thinking is adaptive unless requested otherwise, omitting it keeps that default
     # instead of sending a mode which some models refuse
-    if thinking is MISSING:
+    if thinking is Missing:
         return omit
 
     if thinking == "disabled":

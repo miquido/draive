@@ -69,7 +69,7 @@ class Cohere(
     async def __aenter__(self) -> Iterable[State]:
         assert not hasattr(self, "_client")  # nosec: B101
         self._client = self._prepare_client()
-        await self._client.__aenter__()  # pyright: ignore[reportUnknownMemberType]
+        await self._client.__aenter__()
         state: list[State] = []
 
         if TextEmbedding in self._features:

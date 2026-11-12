@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import ParseResult, urlparse
 
-from botocore.exceptions import ClientError  # pyright: ignore[reportMissingModuleSource]
+from botocore.exceptions import ClientError
 from haiway import BasicValue, Meta, Paginated, Pagination, asynchronous
 
 from draive.aws.api import AWSAPI
@@ -49,7 +49,7 @@ class AWSS3Mixin(AWSAPI):
             else:
                 next_token = None
 
-            return Paginated[ResourceReference].of(
+            return Paginated[ResourceReference](
                 references[start:end],
                 pagination=pagination.with_token(next_token),
             )
@@ -68,7 +68,7 @@ class AWSS3Mixin(AWSAPI):
             **extra,
         )
 
-        return Paginated[ResourceReference].of(
+        return Paginated[ResourceReference](
             references,
             pagination=pagination.with_token(token),
         )

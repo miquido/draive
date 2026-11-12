@@ -2,7 +2,7 @@ import json
 from collections.abc import Iterable, Mapping, MutableMapping, MutableSequence, Sequence
 from typing import Any, Literal, cast, overload
 
-from haiway import MISSING, Missing, as_list, ctx
+from haiway import Missing, as_list, ctx
 from openai import AsyncStream, Omit, omit
 from openai import RateLimitError as OpenAIRateLimitError
 from openai.types.chat import (
@@ -120,7 +120,7 @@ class VLLMMessages(VLLMAPI):
                     response_format=_response_format(output),
                     seed=unwrap_missing(config.seed),
                     stop=as_list(cast(Iterable[str], config.stop_sequences))
-                    if config.stop_sequences is not MISSING
+                    if config.stop_sequences is not Missing
                     else omit,
                     stream=True,
                     # usage is only reported within the stream when explicitly requested
@@ -207,8 +207,8 @@ class VLLMMessages(VLLMAPI):
                             provider=self._provider,
                             model=config.model,
                             max_output_tokens=(
-                                cast(int, config.max_output_tokens)
-                                if config.max_output_tokens is not MISSING
+                                config.max_output_tokens
+                                if config.max_output_tokens is not Missing
                                 else 0
                             ),
                         )
@@ -441,7 +441,7 @@ def _content_parts(  # noqa: C901, PLR0912
             if not part.mime_type.startswith("image"):
                 raise ValueError(f"Unsupported message content mime type: {part.mime_type}")
 
-            if vision_details is MISSING:
+            if vision_details is Missing:
                 yield ChatCompletionContentPartImageParam(
                     type="image_url",
                     image_url=ImageURL(
@@ -454,7 +454,7 @@ def _content_parts(  # noqa: C901, PLR0912
                     type="image_url",
                     image_url=ImageURL(
                         url=part.uri,
-                        detail=cast(Literal["auto", "low", "high"], vision_details),
+                        detail=vision_details,
                     ),
                 )
 
@@ -465,7 +465,7 @@ def _content_parts(  # noqa: C901, PLR0912
             if not part.mime_type.startswith("image"):
                 raise ValueError(f"Unsupported message content mime type: {part.mime_type}")
 
-            if vision_details is MISSING:
+            if vision_details is Missing:
                 yield ChatCompletionContentPartImageParam(
                     type="image_url",
                     image_url=ImageURL(
@@ -478,7 +478,7 @@ def _content_parts(  # noqa: C901, PLR0912
                     type="image_url",
                     image_url=ImageURL(
                         url=part.to_data_uri(),
-                        detail=cast(Literal["auto", "low", "high"], vision_details),
+                        detail=vision_details,
                     ),
                 )
 

@@ -7,11 +7,11 @@ from time import monotonic, time_ns
 from typing import Any, Self, cast
 from uuid import UUID, uuid4
 
-from boto3 import Session  # pyright: ignore[reportMissingTypeStubs]
-from botocore.exceptions import ClientError  # pyright: ignore[reportMissingModuleSource]
+from boto3 import Session
+from botocore.exceptions import ClientError
 from haiway import (
-    MISSING,
     ContextIdentifier,
+    Missing,
     Observability,
     ObservabilityAttribute,
     ObservabilityLevel,
@@ -629,13 +629,13 @@ def _sanitized_attributes(
 ) -> Mapping[str, Any]:
     sanitized: dict[str, Any] = {}
     for key, value in attributes.items():
-        if value is None or value is MISSING:
+        if value is None or value is Missing:
             continue  # skip missing/empty
 
         if isinstance(value, Sequence) and not isinstance(value, str | bytes | bytearray):
             elements: list[Any] = []
             for item in cast(Sequence[Any], value):
-                if item is None or item is MISSING:
+                if item is None or item is Missing:
                     continue  # skip missing/empty
 
                 assert isinstance(item, str | float | int | bool)  # nosec: B101
@@ -648,7 +648,7 @@ def _sanitized_attributes(
 
         elif isinstance(value, Mapping):
             for name, item in cast(Mapping[str, Any], value).items():
-                if item is None or item is MISSING:
+                if item is None or item is Missing:
                     continue  # skip missing/empty
 
                 assert isinstance(item, str | float | int | bool)  # nosec: B101

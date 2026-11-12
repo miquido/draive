@@ -4,12 +4,13 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
-from haiway import Pagination
+from haiway import Pagination, ctx
 
-import draive.postgres.conversation_memory as postgres_memory
 from draive.conversation.types import ConversationTurn, ConversationUserTurn
 from draive.multimodal import MultimodalContent
 from draive.postgres.conversation_memory import PostgresConversationMemory
+
+from ._postgres_connection import postgres_states
 
 
 @dataclass(frozen=True)
@@ -107,17 +108,16 @@ async def test_postgres_conversation_memory_fetch_uses_pagination_token(
             case _:
                 raise AssertionError(f"Unexpected fetch arguments: {args!r}")
 
-    monkeypatch.setattr(postgres_memory.Postgres, "fetch", fake_fetch)
+    async with ctx.scope("test", *postgres_states(fetch=fake_fetch)):
+        memory = PostgresConversationMemory.prepare(thread="thread-1")
 
-    memory = PostgresConversationMemory.prepare(thread="thread-1")
+        page_1 = await memory.fetch(Pagination.of(limit=2))
+        assert [turn.content[0].to_str() for turn in page_1.items] == ["second", "third"]
+        assert page_1.pagination.token == turns[1].identifier
 
-    page_1 = await memory.fetch(Pagination.of(limit=2))
-    assert [turn.content[0].to_str() for turn in page_1.items] == ["second", "third"]
-    assert page_1.pagination.token == turns[1].identifier
-
-    page_2 = await memory.fetch(page_1.pagination)
-    assert [turn.content[0].to_str() for turn in page_2.items] == ["first"]
-    assert page_2.pagination.token is None
+        page_2 = await memory.fetch(page_1.pagination)
+        assert [turn.content[0].to_str() for turn in page_2.items] == ["first"]
+        assert page_2.pagination.token is None
 
 
 @pytest.mark.asyncio
@@ -157,10 +157,9 @@ async def test_postgres_conversation_memory_recall_uses_latest_turns_in_order(
             case _:
                 raise AssertionError(f"Unexpected fetch arguments: {args!r}")
 
-    monkeypatch.setattr(postgres_memory.Postgres, "fetch", fake_fetch)
+    async with ctx.scope("test", *postgres_states(fetch=fake_fetch)):
+        memory = PostgresConversationMemory.prepare(thread="thread-1")
 
-    memory = PostgresConversationMemory.prepare(thread="thread-1")
+        context = await memory.recall(Pagination.of(limit=2))
 
-    context = await memory.recall(Pagination.of(limit=2))
-
-    assert [element.content.to_str() for element in context] == ["second", "third"]
+        assert [element.content.to_str() for element in context] == ["second", "third"]

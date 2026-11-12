@@ -3,7 +3,7 @@ from collections.abc import Callable, Sequence
 from itertools import chain
 from typing import Any, cast
 
-from haiway import State, as_list, ctx, unwrap_missing
+from haiway import Missing, State, as_list, ctx
 from openai import omit
 from openai.types.create_embedding_response import CreateEmbeddingResponse
 
@@ -64,10 +64,9 @@ class OpenAIEmbedding(OpenAIAPI):
                     self._client.embeddings.create(
                         input=attributes[index : index + embedding_config.batch_size],
                         model=embedding_config.model,
-                        dimensions=unwrap_missing(
-                            embedding_config.dimensions,
-                            default=omit,
-                        ),
+                        dimensions=omit
+                        if embedding_config.dimensions is Missing
+                        else embedding_config.dimensions,
                         encoding_format="float",
                     )
                     for index in range(0, len(attributes), embedding_config.batch_size)
