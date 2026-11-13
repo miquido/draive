@@ -72,8 +72,8 @@ from draive.models import (
 from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
 from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIResponsesConfig
+from draive.openai.schema import strict_schema
 from draive.resources import ResourceContent, ResourceReference
-from draive.utils.schema import strict_schema
 
 __all__ = ("OpenAIResponses",)
 

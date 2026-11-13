@@ -1,5 +1,6 @@
 from base64 import b64encode
 from collections.abc import Mapping
+from types import SimpleNamespace
 from typing import Any, cast
 from uuid import UUID
 
@@ -481,3 +482,39 @@ async def test_send_context_uses_short_item_identifiers() -> None:
 
     assert connection.conversation.item.created_ids
     assert all(len(item_id) <= 32 for item_id in connection.conversation.item.created_ids)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "event",
+    (
+        SimpleNamespace(
+            type="response.done",
+            response=SimpleNamespace(
+                usage=None,
+                status="failed",
+                status_details=SimpleNamespace(
+                    type="failed",
+                    reason=None,
+                    error=SimpleNamespace(type="server_error", code="x"),
+                ),
+            ),
+        ),
+        SimpleNamespace(
+            type="error",
+            error=SimpleNamespace(type="invalid_request_error", message="bad event"),
+        ),
+    ),
+)
+async def test_realtime_failure_events_raise_model_output_failed(event: Any) -> None:
+    from draive.models import ModelOutputFailed
+
+    connection = _MockConnection()
+    connection._events.append(event)
+    scope = await _prepared_session(connection)
+
+    session = await scope.__aenter__()
+    with pytest.raises(ModelOutputFailed):
+        await session._reading()  # pyright: ignore[reportPrivateUsage]
+
+    await scope.__aexit__(None, None, None)

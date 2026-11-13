@@ -25,7 +25,7 @@ from draive.models import (
     ModelToolSpecification,
     ModelToolsSelection,
 )
-from draive.models.metrics import record_model_invocation, record_usage_metrics
+from draive.models.metrics import provider_rate_limit, record_model_invocation, record_usage_metrics
 from draive.multimodal import MultimodalContent, TextContent
 from draive.ollama.api import OllamaAPI
 from draive.ollama.config import OllamaChatConfig
@@ -160,6 +160,15 @@ class OllamaChat(OllamaAPI):
                 raise exc
 
             except Exception as exc:
+                if (
+                    rate_limit := provider_rate_limit(
+                        provider="ollama",
+                        model=config.model,
+                        error=exc,
+                    )
+                ) is not None:
+                    raise rate_limit from exc
+
                 raise ModelOutputFailed(
                     provider="ollama",
                     model=config.model,
@@ -249,6 +258,12 @@ def _context_messages(
             if responses := element.tool_responses:
                 # Include any tool responses that follow the user message
                 for tool_resp in responses:
+                    if tool_resp.content.contains_resources:
+                        ctx.log_warning(
+                            "Ollama tool messages carry text only, skipping media content"
+                            f" of `{tool_resp.tool}` response"
+                        )
+
                     yield Message(
                         role="tool",
                         tool_name=tool_resp.tool,

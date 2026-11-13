@@ -490,14 +490,12 @@ _THROTTLING_ERROR_CODES: Final[frozenset[str]] = frozenset(
         "ThrottlingException",
         "TooManyRequestsException",
         "ServiceQuotaExceededException",
-    )
-)
-_INPUT_ERROR_CODES: Final[frozenset[str]] = frozenset(
-    (
-        "ValidationException",
+        # temporary capacity failures are retryable, same as throttling
         "ServiceUnavailableException",
+        "ModelNotReadyException",
     )
 )
+_INPUT_ERROR_CODES: Final[frozenset[str]] = frozenset(("ValidationException",))
 
 
 def _request_failure(
@@ -527,6 +525,7 @@ def _request_failure(
         return ModelInputInvalid(
             provider="bedrock",
             model=model,
+            reason=str(exception),
         )
 
     return ModelOutputFailed(

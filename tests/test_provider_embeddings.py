@@ -113,3 +113,61 @@ async def test_mistral_embedding_records_token_usage_and_translates_failures(
                 ["a"],
                 config=MistralEmbeddingConfig(model="mistral-embed"),
             )
+
+
+@pytest.mark.asyncio
+async def test_openai_image_generation_records_invocation_and_usage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from draive.openai.config import OpenAIImageGenerationConfig
+    from draive.openai.images import OpenAIImageGeneration
+
+    recorder = _Recorder()
+    monkeypatch.setattr(ctx, "record_info", recorder)
+
+    async def generate(**_: Any) -> Any:
+        return SimpleNamespace(
+            data=[SimpleNamespace(b64_json="aGVsbG8=", url=None)],
+            usage=SimpleNamespace(input_tokens=11, output_tokens=22),
+        )
+
+    model = object.__new__(OpenAIImageGeneration)
+    model._client = SimpleNamespace(images=SimpleNamespace(generate=generate))  # pyright: ignore[reportAttributeAccessIssue]
+
+    async with ctx.scope("test"):
+        image = await model.generate_image(
+            instructions="style",
+            input="a cat",
+            config=OpenAIImageGenerationConfig(size="1024x1024"),
+        )
+
+    assert image.mime_type == "image/png"
+    assert {
+        record["metric"]: record["value"]
+        for record in recorder.records
+        if record.get("metric") in ("model.input_tokens", "model.output_tokens")
+    } == {"model.input_tokens": 11, "model.output_tokens": 22}
+    invocations = [
+        record for record in recorder.records if "attributes" in record and "metric" not in record
+    ]
+    assert invocations[0]["attributes"]["image.size"] == "1024x1024"
+
+
+@pytest.mark.asyncio
+async def test_openai_image_generation_failure_is_translated() -> None:
+    from draive.openai.config import OpenAIImageGenerationConfig
+    from draive.openai.images import OpenAIImageGeneration
+
+    async def generate(**_: Any) -> Any:
+        raise RuntimeError("boom")
+
+    model = object.__new__(OpenAIImageGeneration)
+    model._client = SimpleNamespace(images=SimpleNamespace(generate=generate))  # pyright: ignore[reportAttributeAccessIssue]
+
+    async with ctx.scope("test"):
+        with pytest.raises(ModelOutputFailed, match="image generation request failed"):
+            await model.generate_image(
+                instructions="",
+                input="a cat",
+                config=OpenAIImageGenerationConfig(),
+            )
