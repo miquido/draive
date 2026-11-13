@@ -1,7 +1,7 @@
 import json
 from collections.abc import Mapping, MutableMapping, Sequence
 from pathlib import Path
-from typing import Any, Self, cast, final, overload
+from typing import Any, NamedTuple, Self, cast, final, overload
 
 from haiway import File, Files, Meta, Paginated, Pagination, State, ctx, statemethod
 from haiway.types.frozen import refuse_assignment, refuse_deletion, same_copy, same_deepcopy
@@ -640,13 +640,34 @@ class VolatileStorage:
         self._contents[identifier] = content
 
 
+class _StoredTemplate(NamedTuple):
+    # declaration and content live together, they can't go out of sync
+    declaration: TemplateDeclaration
+    content: str
+
+
+@final
+class _WritableTemplates:
+    __slots__ = ("templates",)
+
+    def __init__(self, templates: MutableMapping[str, _StoredTemplate]) -> None:
+        self.templates: MutableMapping[str, _StoredTemplate] = templates
+
+
+@final
+class _ReadOnlyTemplates:
+    # contents of a file which could not be fully read - there is no way to modify it
+    __slots__ = ("templates",)
+
+    def __init__(self, templates: Mapping[str, _StoredTemplate]) -> None:
+        self.templates: Mapping[str, _StoredTemplate] = templates
+
+
 @final
 class FileStorage:
     __slots__ = (
-        "_contents",
-        "_declarations",
         "_path",
-        "_unreadable",
+        "_state",
     )
 
     __setattr__ = refuse_assignment
@@ -655,36 +676,19 @@ class FileStorage:
     __deepcopy__ = same_deepcopy
 
     _path: Path
-    _declarations: MutableMapping[str, TemplateDeclaration] | None
-    _contents: MutableMapping[str, str] | None
-    # set when the stored file could not be fully read, saving would destroy its contents
-    _unreadable: bool
+    # single source of truth for everything read from the file - none until loaded
+    _state: _WritableTemplates | _ReadOnlyTemplates | None
 
     def __init__(
         self,
         path: Path | str,
     ) -> None:
-        if isinstance(path, str):
-            object.__setattr__(
-                self,
-                "_path",
-                Path(path),
-            )
-
-        else:
-            object.__setattr__(
-                self,
-                "_path",
-                path,
-            )
-
         object.__setattr__(
             self,
-            "_declarations",
-            None,
+            "_path",
+            Path(path) if isinstance(path, str) else path,
         )
-        object.__setattr__(self, "_contents", None)
-        object.__setattr__(self, "_unreadable", False)
+        object.__setattr__(self, "_state", None)
 
     async def listing(
         self,
@@ -692,12 +696,9 @@ class FileStorage:
         **extra: Any,
     ) -> Paginated[TemplateDeclaration]:
         _ = extra
-        if self._declarations is None:
-            await self._load_file()
-
-        assert self._declarations is not None  # nosec: B101
+        loaded: _WritableTemplates | _ReadOnlyTemplates = await self._loaded()
         return _paginate_declarations(
-            tuple(self._declarations.values()),
+            tuple(stored.declaration for stored in loaded.templates.values()),
             pagination=pagination,
             source="file",
         )
@@ -708,11 +709,9 @@ class FileStorage:
         meta: Meta,
         **extra: Any,
     ) -> str | None:
-        if self._contents is None:
-            await self._load_file()
-
-        assert self._contents is not None  # nosec: B101
-        return self._contents.get(identifier)
+        loaded: _WritableTemplates | _ReadOnlyTemplates = await self._loaded()
+        stored: _StoredTemplate | None = loaded.templates.get(identifier)
+        return stored.content if stored is not None else None
 
     async def defining(
         self,
@@ -723,28 +722,39 @@ class FileStorage:
         meta: Meta,
         **extra: Any,
     ) -> None:
-        if self._contents is None or self._declarations is None:
-            await self._load_file()
+        loaded: _WritableTemplates | _ReadOnlyTemplates = await self._loaded()
+        match loaded:
+            case _ReadOnlyTemplates():
+                # saving would destroy whatever could not be read
+                raise TemplateInvalid(
+                    identifier=identifier,
+                    description=(
+                        f"Templates file storage {self._path} is invalid or partially unreadable, "
+                        "refusing to overwrite it"
+                    ),
+                )
 
-        if self._unreadable:
-            raise TemplateInvalid(
-                identifier=identifier,
-                description=(
-                    f"Templates file storage {self._path} is invalid or partially unreadable, "
-                    "refusing to overwrite it"
-                ),
-            )
+            case _WritableTemplates() as writable:
+                writable.templates[identifier] = _StoredTemplate(
+                    declaration=TemplateDeclaration(
+                        identifier=identifier,
+                        description=description,
+                        variables=variables,
+                        meta=meta,
+                    ),
+                    content=content,
+                )
+                await self._save_file(writable)
 
-        self._declarations[identifier] = TemplateDeclaration(  # pyright: ignore[reportOptionalSubscript]
-            identifier=identifier,
-            description=description,
-            variables=variables,
-            meta=meta,
-        )
-        self._contents[identifier] = content  # pyright: ignore[reportOptionalSubscript]
-        await self._save_file()
+    async def _loaded(self) -> _WritableTemplates | _ReadOnlyTemplates:
+        state: _WritableTemplates | _ReadOnlyTemplates | None = self._state
+        if state is None:
+            state = await self._load_file()
+            object.__setattr__(self, "_state", state)
 
-    async def _load_file(self) -> None:
+        return state
+
+    async def _load_file(self) -> _WritableTemplates | _ReadOnlyTemplates:
         file_contents: bytes
         async with ctx.disposables(Files.access(self._path, create=True)):
             file_contents = await File.read()
@@ -752,9 +762,8 @@ class FileStorage:
         if not file_contents.strip():
             file_contents = b"[]"
 
-        declarations: MutableMapping[str, TemplateDeclaration] = {}
-        contents: MutableMapping[str, str] = {}
-        unreadable: bool = False
+        templates: MutableMapping[str, _StoredTemplate] = {}
+        complete: bool = True  # anything skipped makes the file unsafe to overwrite
         try:
             match json.loads(file_contents):
                 case [*elements]:
@@ -768,65 +777,57 @@ class FileStorage:
                                     "content": str() as content,
                                     "meta": {**meta},
                                 }:
-                                    declarations[identifier] = TemplateDeclaration(
-                                        identifier=identifier,
-                                        variables=variables,
-                                        description=description,
-                                        meta=Meta.of(meta),
+                                    templates[identifier] = _StoredTemplate(
+                                        declaration=TemplateDeclaration(
+                                            identifier=identifier,
+                                            variables=variables,
+                                            description=description,
+                                            meta=Meta.of(meta),
+                                        ),
+                                        content=content,
                                     )
-                                    contents[identifier] = content
 
                                 case _:  # skip with warning
-                                    unreadable = True
+                                    complete = False
                                     ctx.log_warning(
                                         "Invalid templates file storage element, skipping..."
                                     )
 
                         except Exception as exc:
-                            unreadable = True
+                            complete = False
                             ctx.log_warning(
                                 "Invalid templates file storage element, skipping...",
                                 exception=exc,
                             )
 
                 case _:  # empty storage with error
-                    unreadable = True
+                    complete = False
                     ctx.log_error("Invalid templates file storage, using empty...")
 
         except Exception as exc:
-            unreadable = True
+            complete = False
             ctx.log_error(
                 "Invalid templates file storage, using empty...",
                 exception=exc,
             )
 
-        object.__setattr__(
-            self,
-            "_declarations",
-            declarations,
-        )
+        return _WritableTemplates(templates) if complete else _ReadOnlyTemplates(templates)
 
-        object.__setattr__(
-            self,
-            "_contents",
-            contents,
-        )
-        object.__setattr__(self, "_unreadable", unreadable)
-
-    async def _save_file(self) -> None:
-        if self._declarations is None or self._contents is None:
-            return  # nothing to save
-
+    async def _save_file(
+        self,
+        writable: _WritableTemplates,
+        /,
+    ) -> None:
         file_contents: bytes = json.dumps(
             [
                 {
-                    "identifier": declaration.identifier,
-                    "description": declaration.description,
-                    "variables": declaration.variables,
-                    "content": self._contents[declaration.identifier],
-                    "meta": declaration.meta,
+                    "identifier": stored.declaration.identifier,
+                    "description": stored.declaration.description,
+                    "variables": stored.declaration.variables,
+                    "content": stored.content,
+                    "meta": stored.declaration.meta,
                 }
-                for declaration in self._declarations.values()
+                for stored in writable.templates.values()
             ]
         ).encode()
 

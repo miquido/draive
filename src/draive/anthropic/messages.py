@@ -34,6 +34,7 @@ from anthropic.types import (
     ToolResultBlockParam,
     ToolUseBlock,
     ToolUseBlockParam,
+    Usage,
 )
 from anthropic.types.output_config_param import OutputConfigParam
 from anthropic.types.redacted_thinking_block_param import RedactedThinkingBlockParam
@@ -117,8 +118,7 @@ class AnthropicMessages(AnthropicAPI):
                 tool_accumulator: _ToolAccumulator | None = None
                 # input usage is reported with the message start, the message delta carries
                 # the final totals and may repeat or omit it - usage is recorded only once
-                started_input_tokens: int | None = None
-                started_cached_tokens: int | None = None
+                started_usage: Usage | None = None
                 # kind of the reasoning block currently open, it has to be closed on
                 # its `content_block_stop` to keep its signature from merging into the
                 # next block within the same message
@@ -292,10 +292,14 @@ class AnthropicMessages(AnthropicAPI):
                                     model=config.model,
                                     input_tokens=event.usage.input_tokens
                                     if event.usage.input_tokens is not None
-                                    else started_input_tokens,
+                                    else (started_usage.input_tokens if started_usage else None),
                                     cached_input_tokens=event.usage.cache_read_input_tokens
                                     if event.usage.cache_read_input_tokens is not None
-                                    else started_cached_tokens,
+                                    else (
+                                        started_usage.cache_read_input_tokens
+                                        if started_usage
+                                        else None
+                                    ),
                                     output_tokens=event.usage.output_tokens,
                                 )
 
@@ -341,8 +345,7 @@ class AnthropicMessages(AnthropicAPI):
 
                             case "message_start":
                                 assert isinstance(event, RawMessageStartEvent)  # nosec: B101
-                                started_input_tokens = event.message.usage.input_tokens
-                                started_cached_tokens = event.message.usage.cache_read_input_tokens
+                                started_usage = event.message.usage
 
                             case "message_stop":
                                 continue  # let it finish

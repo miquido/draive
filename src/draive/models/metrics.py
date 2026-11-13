@@ -471,30 +471,34 @@ def provider_rate_limit(
     ModelRateLimit | ModelQuotaLimit | None
         Exception to raise when the error is a rate limit, otherwise ``None``.
     """
-    rate_limited, retry_after = _rate_limiting(error)
-    if not rate_limited:
+    if not _is_rate_limited(error):
         return None
 
     return model_rate_limit(
         provider=provider,
         model=model,
-        retry_after=retry_after,
+        retry_after=_retry_after(error),
     )
 
 
-def _rate_limiting(
+def _is_rate_limited(
     error: Exception,
     /,
-) -> tuple[bool, str | None]:
+) -> bool:
     # provider SDKs share no common error type, they all expose the status of a failed
-    # request, as `status_code` or `code`, and the response headers directly or by response
+    # request though, as `status_code` or `code`
     status: object = getattr(error, "status_code", None)
     if status is None:
         status = getattr(error, "code", None)
 
-    if status != _RATE_LIMIT_STATUS:
-        return False, None
+    return status == _RATE_LIMIT_STATUS
 
+
+def _retry_after(
+    error: Exception,
+    /,
+) -> str | None:
+    # response headers are exposed directly or by the response depending on the SDK
     headers: object = getattr(error, "headers", None)
     if headers is None:
         headers = getattr(getattr(error, "response", None), "headers", None)
@@ -502,6 +506,6 @@ def _rate_limiting(
     if isinstance(headers, Mapping):
         for key, value in cast(Mapping[object, object], headers).items():
             if str(key).lower() == "retry-after" and isinstance(value, str):
-                return True, value
+                return value
 
-    return True, None
+    return None

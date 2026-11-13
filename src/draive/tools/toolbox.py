@@ -8,7 +8,7 @@ from collections.abc import (
     Sequence,
 )
 from itertools import chain
-from typing import ClassVar, Self, final, overload
+from typing import ClassVar, Literal, Self, final, overload
 
 from haiway import (
     BasicValue,
@@ -604,11 +604,14 @@ async def _merging_output(  # noqa: C901, PLR0912
             yield part
 
 
+type _ToolInvocationStatus = Literal["success", "error", "call_error", "unknown"]
+
+
 def _record_tool_invocation(
     tool: str,
     /,
     *,
-    status: str,
+    status: _ToolInvocationStatus,
 ) -> None:
     # failures are handled within the tool scope, so the scope itself never
     # reports them - the counter makes them visible next to the scope duration

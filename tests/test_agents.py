@@ -609,3 +609,13 @@ async def test_generative_agent_stops_endless_tool_loop() -> None:
     async with ctx.scope("test", GenerativeModel(generating=generating)):
         with pytest.raises(AgentException, match="exceeded the limit of 3"):
             _ = [chunk async for chunk in agent.call(thread=uuid4(), input="hello")]
+
+
+@pytest.mark.parametrize("max_iterations", [0, -1])
+def test_generative_agent_rejects_non_positive_iteration_limit(max_iterations: int) -> None:
+    with pytest.raises(ValueError, match="max_iterations"):
+        Agent.generative("helper", instructions="Use tools", max_iterations=max_iterations)
+
+
+def test_generative_agent_accepts_unlimited_iterations() -> None:
+    Agent.generative("helper", instructions="Use tools", max_iterations=None)
