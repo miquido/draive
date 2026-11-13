@@ -7,6 +7,7 @@ from draive.conversation.state import ConversationMemory
 from draive.conversation.types import (
     ConversationAssistantTurn,
     ConversationEvent,
+    ConversationException,
     ConversationOutputStream,
     ConversationUserTurn,
 )
@@ -29,6 +30,8 @@ from draive.utils import ProcessingEvent
 
 __all__ = ("conversation_completion",)
 
+_MAX_ITERATIONS: int = 32
+
 
 async def conversation_completion(  # noqa: C901, PLR0912, PLR0915
     *,
@@ -47,6 +50,11 @@ async def conversation_completion(  # noqa: C901, PLR0912, PLR0915
 
     iteration: int = 0
     while True:  # loop until we get ModelOutput without tools
+        if iteration >= _MAX_ITERATIONS:
+            raise ConversationException(
+                f"Conversation completion exceeded the limit of {_MAX_ITERATIONS} iterations"
+            )
+
         async with ctx.scope(f"conversation.loop_{iteration}"):
             content_accumulator: MutableSequence[MultimodalContentPart] = []
             reasoning_accumulator: MutableSequence[ModelReasoningChunk] = []
