@@ -16,10 +16,10 @@ from haiway import (
     ctx,
     execute_concurrently,
 )
+from haiway.types.frozen import refuse_assignment, refuse_deletion, same_copy, same_deepcopy
 
 from draive.evaluation.evaluator import EvaluatorResult
 from draive.evaluation.scenario import EvaluatorScenarioResult
-from draive.utils.record import ImmutableRecord
 
 __all__ = (
     "EvaluatorSuite",
@@ -324,7 +324,7 @@ class PreparedEvaluatorSuite[Parameters: State](Protocol):
 
 
 @final
-class EvaluatorSuite[**Args, Parameters: State](ImmutableRecord):
+class EvaluatorSuite[**Args, Parameters: State]:
     """
     Comprehensive test suite for systematic evaluation.
 
@@ -372,6 +372,11 @@ class EvaluatorSuite[**Args, Parameters: State](ImmutableRecord):
         "meta",
         "name",
     )
+
+    __setattr__ = refuse_assignment
+    __delattr__ = refuse_deletion
+    __copy__ = same_copy
+    __deepcopy__ = same_deepcopy
 
     name: str
     concurrent_evaluations: int
@@ -858,8 +863,13 @@ class EvaluatorSuiteData[Parameters: State](State, serializable=True):
 
 
 @final
-class _EvaluatorSuiteMemoryStorage[Parameters: State](ImmutableRecord):
+class _EvaluatorSuiteMemoryStorage[Parameters: State]:
     __slots__ = ("_cases_store",)
+
+    __setattr__ = refuse_assignment
+    __delattr__ = refuse_deletion
+    __copy__ = same_copy
+    __deepcopy__ = same_deepcopy
 
     _cases_store: Sequence[EvaluatorSuiteCase[Parameters]]
 
@@ -890,11 +900,16 @@ class _EvaluatorSuiteMemoryStorage[Parameters: State](ImmutableRecord):
 
 
 @final
-class _EvaluatorSuiteFileStorage[Parameters: State](ImmutableRecord):
+class _EvaluatorSuiteFileStorage[Parameters: State]:
     __slots__ = (
         "_data_type",
         "_path",
     )
+
+    __setattr__ = refuse_assignment
+    __delattr__ = refuse_deletion
+    __copy__ = same_copy
+    __deepcopy__ = same_deepcopy
 
     _path: Path
     _data_type: type[EvaluatorSuiteCase[Parameters]]

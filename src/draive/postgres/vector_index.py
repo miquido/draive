@@ -19,7 +19,6 @@ from draive.embedding import (
 )
 from draive.multimodal import TextContent
 from draive.resources import ResourceContent
-from draive.utils.attributes import attribute_path_segments
 
 __all__ = (
     "PostgresVectorIndex",
@@ -511,7 +510,7 @@ def _path_segments(
     /,
 ) -> Sequence[str]:
     # the payload is stored serialized, attribute aliases have to be applied
-    segments: Sequence[str] = attribute_path_segments(path)
+    segments: Sequence[str] = tuple(str(component) for component in path.serialized_components)
     if not segments or any(
         _PATH_SEGMENT_PATTERN.fullmatch(segment) is None for segment in segments
     ):

@@ -12,6 +12,7 @@ from haiway import (
     concurrently,
     ctx,
 )
+from haiway.types.frozen import refuse_assignment, refuse_deletion, same_copy, same_deepcopy
 
 from draive.evaluation.reference import EvaluationReference, reference_conformance
 from draive.evaluation.score import EvaluationScore
@@ -21,7 +22,6 @@ from draive.evaluation.value import (
     evaluation_score_value,
     evaluation_score_verifier,
 )
-from draive.utils.record import ImmutableRecord
 
 __all__ = (
     "Evaluator",
@@ -261,7 +261,7 @@ class PreparedEvaluator[Value](Protocol):
 
 
 @final
-class Evaluator[Value, **Args](ImmutableRecord):
+class Evaluator[Value, **Args]:
     """
     Configurable evaluator for assessing values against criteria.
 
@@ -440,6 +440,11 @@ class Evaluator[Value, **Args](ImmutableRecord):
         "name",
         "threshold",
     )
+
+    __setattr__ = refuse_assignment
+    __delattr__ = refuse_deletion
+    __copy__ = same_copy
+    __deepcopy__ = same_deepcopy
 
     name: str
     threshold: float

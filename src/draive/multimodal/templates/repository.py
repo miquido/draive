@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, Self, cast, final, overload
 
 from haiway import File, Files, Meta, Paginated, Pagination, State, ctx, statemethod
+from haiway.types.frozen import refuse_assignment, refuse_deletion, same_copy, same_deepcopy
 
 from draive.multimodal.content import Multimodal, MultimodalContent
 from draive.multimodal.templates.types import (
@@ -20,7 +21,6 @@ from draive.multimodal.templates.variables import (
     resolve_multimodal_template,
     resolve_text_template,
 )
-from draive.utils.record import ImmutableRecord
 
 __all__ = ("TemplatesRepository",)
 
@@ -580,11 +580,16 @@ def _paginate_declarations(
 
 
 @final
-class VolatileStorage(ImmutableRecord):
+class VolatileStorage:
     __slots__ = (
         "_contents",
         "_declarations",
     )
+
+    __setattr__ = refuse_assignment
+    __delattr__ = refuse_deletion
+    __copy__ = same_copy
+    __deepcopy__ = same_deepcopy
 
     _declarations: MutableMapping[str, TemplateDeclaration]
     _contents: MutableMapping[str, str]
@@ -636,12 +641,17 @@ class VolatileStorage(ImmutableRecord):
 
 
 @final
-class FileStorage(ImmutableRecord):
+class FileStorage:
     __slots__ = (
         "_contents",
         "_declarations",
         "_path",
     )
+
+    __setattr__ = refuse_assignment
+    __delattr__ = refuse_deletion
+    __copy__ = same_copy
+    __deepcopy__ = same_deepcopy
 
     _path: Path
     _declarations: MutableMapping[str, TemplateDeclaration] | None

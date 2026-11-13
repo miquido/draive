@@ -29,7 +29,6 @@ from draive.surreal.types import (
     SurrealValue,
 )
 from draive.surreal.utils import pagination_offset, surreal_identifier
-from draive.utils.attributes import attribute_path_segments
 
 __all__ = (
     "Surreal",
@@ -968,7 +967,7 @@ def _ordering_reference(
     /,
 ) -> str:
     # stored documents use attribute aliases, ordering has to follow them
-    return ".".join(attribute_path_segments(path))
+    return ".".join(str(component) for component in path.serialized_components)
 
 
 def _surreal_content(

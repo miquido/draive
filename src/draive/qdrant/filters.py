@@ -15,8 +15,6 @@ from qdrant_client.models import (
     Range,
 )
 
-from draive.utils.attributes import attribute_path_components
-
 __all__ = (
     "prepare_filter",
     "qdrant_payload_key",
@@ -149,7 +147,7 @@ def qdrant_payload_key(
         If the argument is not an AttributePath.
     """
     resolved: str = ""
-    for component in attribute_path_components(path):
+    for component in path.serialized_components:
         if isinstance(component, int):
             resolved += f"[{component}]"
 

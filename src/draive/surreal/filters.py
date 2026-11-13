@@ -5,7 +5,6 @@ from haiway import AttributePath, AttributeRequirement, State
 
 from draive.surreal.types import SurrealValue
 from draive.surreal.utils import surreal_value
-from draive.utils.attributes import attribute_path_components
 
 __all__ = ("prepare_filter",)
 
@@ -144,7 +143,7 @@ def _field_reference(
 ) -> str:
     # stored documents use attribute aliases, filters have to follow them
     resolved: str = ""
-    for component in attribute_path_components(path):
+    for component in path.serialized_components:
         if isinstance(component, int):
             resolved += f"[{component}]"
         else:
