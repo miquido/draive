@@ -9,7 +9,11 @@ alongside your workflows without wiring the SDK yourself.
 Start by binding `QdrantClient` inside a `ctx.scope(...)`. The client lazily opens an
 `AsyncQdrantClient` using the `QDRANT_HOST`/`QDRANT_PORT` environment variables (defaults:
 `localhost:6333`, with gRPC on `QDRANT_GRPC_PORT`, default `6334`) and exposes a `Qdrant` state that
-wraps all collection, storage, search, and delete helpers.
+wraps all collection, storage, search, and delete helpers. The environment is read when the client
+is created, an `api_key` (or `QDRANT_API_KEY`) can be provided for secured deployments, and each
+explicit `host`, `port`, `grpc_port` and `api_key` argument takes precedence over the environment.
+`QdrantVectorIndex.prepare(mmr_multiplier=8)` controls how many candidates are fetched, as a
+multiple of `limit`, before reranking selects the final results.
 
 ```python
 from draive import ctx, Pagination, State
