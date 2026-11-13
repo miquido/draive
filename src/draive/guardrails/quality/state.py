@@ -39,8 +39,18 @@ class GuardrailsQualityVerification(State):
             if result.passed:
                 return  # verification passed
 
+            # an evaluation that errored is an infrastructure failure, not a quality verdict
+            for evaluated in (result,) if isinstance(result, EvaluatorResult) else result.results:
+                if (error := evaluated.meta.error) is not None:
+                    raise GuardrailsFailure(
+                        f"Quality guardrails failed: {error}",
+                        cause=error,
+                        meta={"error_type": error.__class__.__name__},
+                    ) from error
+
             if isinstance(result, EvaluatorResult):
                 raise GuardrailsQualityException(
+                    f"Quality guardrails triggered: {result.evaluator}",
                     reason=result.evaluator,
                     content=content,
                     meta={
@@ -51,6 +61,7 @@ class GuardrailsQualityVerification(State):
 
             else:
                 raise GuardrailsQualityException(
+                    f"Quality guardrails triggered: {result.scenario}",
                     reason=result.scenario,
                     content=content,
                     meta={
@@ -92,7 +103,7 @@ class GuardrailsQualityVerification(State):
                 **extra,
             )
 
-        except GuardrailsQualityException:
+        except GuardrailsQualityException, GuardrailsFailure:
             raise
 
         except GuardrailsException as exc:

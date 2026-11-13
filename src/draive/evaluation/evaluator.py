@@ -212,9 +212,11 @@ class EvaluatorResult(State, serializable=True):
         self,
         other: object,
     ) -> bool:
-        assert isinstance(other, self.__class__)  # nosec: B101
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+
         if self.evaluator != other.evaluator or self.threshold != other.threshold:
-            raise ValueError("Can't compare different evaluator results")
+            return False
 
         return self.score == other.score
 
@@ -312,19 +314,15 @@ class Evaluator[Value, **Args]:
         async def evaluate(
             value: Value,
         ) -> EvaluatorResult:
-            # Placeholder for the lowest result
-            lowest: EvaluatorResult = EvaluatorResult(
-                evaluator="lowest",
-                score=1.0,
-                threshold=0,
-                meta=Meta.empty,
-            )
-
-            for result in await concurrently(
+            results: Sequence[EvaluatorResult] = await concurrently(
                 (evaluator(value), *(evaluator(value) for evaluator in evaluators)),
                 concurrent_tasks=concurrent_tasks,
                 return_exceptions=False,
-            ):
+            )
+
+            # keep the last of equally low results to preserve previous tie-breaking
+            lowest: EvaluatorResult = results[0]
+            for result in results[1:]:
                 if result.performance <= lowest.performance:
                     lowest = result
 

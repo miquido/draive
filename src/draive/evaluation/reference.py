@@ -120,7 +120,10 @@ class EvaluationReference(State, serializable=True):
         """
         low: float = evaluation_score_value(lower)
         high: float = evaluation_score_value(upper)
-        assert low > high  # nosec: B101
+        if low > high:
+            raise ValueError(
+                f"Reference lower bound ({low}) must not be greater than upper bound ({high})"
+            )
 
         return cls(
             lower=low,
