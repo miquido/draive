@@ -2,6 +2,7 @@ from typing import Any, overload
 
 from haiway import State, statemethod
 
+from draive.guardrails.metrics import guardrails_verdict
 from draive.guardrails.safety.regex import guardrails_regex_sanitizer
 from draive.guardrails.safety.types import (
     GuardrailsSafetyException,
@@ -32,6 +33,7 @@ class GuardrailsSafety(State):
     ) -> MultimodalContent: ...
 
     @statemethod
+    @guardrails_verdict("safety")
     async def sanitize(
         self,
         content: Multimodal,

@@ -1,6 +1,7 @@
 from asyncio import Lock
 from collections.abc import Generator, Mapping, MutableMapping, Sequence
 from importlib.util import find_spec
+from time import monotonic
 from types import TracebackType
 from typing import Any, final
 from uuid import UUID, uuid4
@@ -540,6 +541,7 @@ async def _execute(
     variables: Mapping[str, SurrealValue],
 ) -> Sequence[SurrealObject]:
     params: Mapping[str, Any] = surreal_variable(variables)
+    started: float = monotonic()
     response: Mapping[str, Any]
     try:
         response = await connection._send(  # pyright: ignore[reportPrivateUsage]
@@ -562,9 +564,18 @@ async def _execute(
         )
 
     except Exception as exc:
+        _record_query(started, outcome="error", rows=None)
         raise SurrealException(f"Surreal execution error for: {statement}") from exc
 
-    return tuple(_process_response(response))
+    try:
+        rows: Sequence[SurrealObject] = tuple(_process_response(response))
+
+    except BaseException:
+        _record_query(started, outcome="error", rows=None)
+        raise
+
+    _record_query(started, outcome="success", rows=len(rows))
+    return rows
 
 
 async def _execute_embedded(
@@ -574,6 +585,7 @@ async def _execute_embedded(
     *,
     variables: Mapping[str, SurrealValue],
 ) -> Sequence[SurrealObject]:
+    started: float = monotonic()
     response: Mapping[str, Any]
     try:
         response = await connection._send(  # pyright: ignore[reportPrivateUsage]
@@ -587,6 +599,35 @@ async def _execute_embedded(
         )
 
     except Exception as exc:
+        _record_query(started, outcome="error", rows=None)
         raise SurrealException(f"Surreal execution error for: {statement}") from exc
 
-    return tuple(_process_response(response))
+    try:
+        rows: Sequence[SurrealObject] = tuple(_process_response(response))
+
+    except BaseException:
+        _record_query(started, outcome="error", rows=None)
+        raise
+
+    _record_query(started, outcome="success", rows=len(rows))
+    return rows
+
+
+def _record_query(
+    started: float,
+    /,
+    *,
+    outcome: str,
+    rows: int | None,
+) -> None:
+    # statements and variables are never recorded, they may contain user data
+    ctx.record_info(
+        metric="surreal.query.duration",
+        value=(monotonic() - started) * 1000,
+        unit="ms",
+        kind="histogram",
+        attributes={
+            "surreal.outcome": outcome,
+            "surreal.rows": rows,
+        },
+    )

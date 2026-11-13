@@ -798,6 +798,8 @@ class Evaluator[Value, **Args]:
                     "passed": result.passed,
                     "threshold": result.threshold,
                     "score": result.score,
+                    # an errored evaluation scores zero, make it distinguishable
+                    "errored": result.meta.error is not None,
                 },
             )
             return result

@@ -496,7 +496,7 @@ class EvaluatorSuite[**Args, Parameters: State]:
                     **kwargs,
                 )
 
-            return EvaluatorSuiteResult(
+            suite_result: EvaluatorSuiteResult = EvaluatorSuiteResult(
                 suite=self.name,
                 results=await execute_concurrently(
                     evaluate_case,
@@ -504,6 +504,18 @@ class EvaluatorSuite[**Args, Parameters: State]:
                     concurrent_tasks=self.concurrent_evaluations,
                 ),
             )
+            ctx.record_info(
+                metric=f"evaluator.suite.{self.name}.performance",
+                value=suite_result.performance,
+                unit="%",
+                kind="histogram",
+                attributes={
+                    "passed": suite_result.passed,
+                    "cases": len(suite_result.results),
+                    "cases.passed": sum(1 for case in suite_result.results if case.passed),
+                },
+            )
+            return suite_result
 
     async def _evaluate_case(
         self,
@@ -523,6 +535,13 @@ class EvaluatorSuite[**Args, Parameters: State]:
             ctx.log_error(
                 f"Evaluator suite `{self.name}` case failed due to an error",
                 exception=exc,
+            )
+            ctx.record_info(
+                metric="evaluator.suite.case_errors",
+                value=1,
+                unit="count",
+                kind="counter",
+                attributes={"suite": self.name},
             )
             # keep the error within a failed result instead of aborting the whole suite
             results = (

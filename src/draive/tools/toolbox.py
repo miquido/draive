@@ -319,6 +319,7 @@ class Toolbox(State):
         tool: Tool | None = self.tools.get(request.tool)
         if tool is None:
             ctx.log_error(f"Requested unknown tool `{request.tool}` [{request.identifier}]")
+            _record_tool_invocation(request.tool, status="unknown")
             yield ModelToolResponse(
                 identifier=request.identifier,
                 tool=request.tool,
@@ -340,6 +341,7 @@ class Toolbox(State):
                     f" due to a call error: {exc}",
                     exception=exc,
                 )
+                _record_tool_invocation(request.tool, status="call_error")
                 yield ModelToolResponse(
                     identifier=request.identifier,
                     tool=request.tool,
@@ -394,6 +396,7 @@ class Toolbox(State):
                                     )
                                 )
 
+                _record_tool_invocation(request.tool, status="success")
                 yield ModelToolResponse(
                     identifier=request.identifier,
                     tool=request.tool,
@@ -407,6 +410,7 @@ class Toolbox(State):
                     f" due to an error: {exc}",
                     exception=exc,
                 )
+                _record_tool_invocation(request.tool, status="error")
                 yield ModelToolResponse(
                     identifier=request.identifier,
                     tool=request.tool,
@@ -657,3 +661,23 @@ async def _merging_output(  # noqa: C901, PLR0912
     for output in pending.values():
         for part in output:
             yield part
+
+
+def _record_tool_invocation(
+    tool: str,
+    /,
+    *,
+    status: str,
+) -> None:
+    # failures are handled within the tool scope, so the scope itself never
+    # reports them - the counter makes them visible next to the scope duration
+    ctx.record_info(
+        metric="tool.invocations",
+        value=1,
+        unit="count",
+        kind="counter",
+        attributes={
+            "tool.name": tool,
+            "tool.status": status,
+        },
+    )

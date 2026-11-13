@@ -8,6 +8,7 @@ from draive.evaluation import (
     PreparedEvaluator,
     PreparedEvaluatorScenario,
 )
+from draive.guardrails.metrics import guardrails_verdict
 from draive.guardrails.quality.types import GuardrailsQualityException, GuardrailsQualityVerifying
 from draive.guardrails.types import GuardrailsException, GuardrailsFailure
 from draive.multimodal import Multimodal, MultimodalContent
@@ -90,6 +91,7 @@ class GuardrailsQualityVerification(State):
     ) -> None: ...
 
     @statemethod
+    @guardrails_verdict("quality")
     async def verify(
         self,
         content: Multimodal,
