@@ -188,7 +188,8 @@ class EvaluatorSuiteResult(State, serializable=True):
 
     @property
     def passed(self) -> bool:
-        return all(result.passed for result in self.results)
+        # no results is equivalent of failure, nothing was verified
+        return len(self.results) > 0 and all(result.passed for result in self.results)
 
     def report(
         self,
@@ -481,45 +482,10 @@ class EvaluatorSuite[**Args, Parameters: State]:
             async with self._lock:
                 available_cases = await self._available_cases()
 
-            selected_cases: Sequence[EvaluatorSuiteCase[Parameters]]
-            if cases is None:
-                selected_cases = available_cases
-
-            elif isinstance(cases, int):
-                selected_cases = random.sample(  # nosec: B311
-                    available_cases,
-                    min(len(available_cases), cases),
-                )
-
-            elif isinstance(cases, float):
-                assert 0 < cases <= 1  # nosec: B101
-                selected_cases = random.sample(  # nosec: B311
-                    available_cases,
-                    min(len(available_cases), int(len(available_cases) * cases)),
-                )
-
-            else:
-                selected_cases = []
-                for case in cases:
-                    if isinstance(case, str):
-                        if evaluation_case := next(
-                            iter(
-                                available
-                                for available in available_cases
-                                if available.identifier == case
-                            ),
-                            None,
-                        ):
-                            selected_cases.append(evaluation_case)
-
-                        else:
-                            raise ValueError(f"Evaluation case with ID {case} does not exists.")
-
-                    elif isinstance(case, EvaluatorSuiteCase):
-                        selected_cases.append(cast(EvaluatorSuiteCase[Parameters], case))
-
-                    else:
-                        selected_cases.append(EvaluatorSuiteCase(parameters=case))
+            selected_cases: Sequence[EvaluatorSuiteCase[Parameters]] = _select_cases(
+                available_cases,
+                cases,
+            )
 
             async def evaluate_case(
                 case: EvaluatorSuiteCase[Parameters],
@@ -545,11 +511,28 @@ class EvaluatorSuite[**Args, Parameters: State]:
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> EvaluatorSuiteCaseResult:
-        results: Sequence[EvaluatorScenarioResult | EvaluatorResult] = await self._definition(
-            case.parameters,
-            *args,
-            **kwargs,
-        )
+        results: Sequence[EvaluatorScenarioResult | EvaluatorResult]
+        try:
+            results = await self._definition(
+                case.parameters,
+                *args,
+                **kwargs,
+            )
+
+        except Exception as exc:
+            ctx.log_error(
+                f"Evaluator suite `{self.name}` case failed due to an error",
+                exception=exc,
+            )
+            # keep the error within a failed result instead of aborting the whole suite
+            results = (
+                EvaluatorResult.of(
+                    self.name,
+                    score=0.0,
+                    threshold=1.0,
+                    meta=Meta.empty.with_error(exc),
+                ),
+            )
 
         return EvaluatorSuiteCaseResult(
             case_identifier=case.identifier,
@@ -984,3 +967,49 @@ class _EvaluatorSuiteFileStorage[Parameters: State]:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         with open(self._path, mode="wb+") as file:
             file.write(json.dumps([case.to_basic_object() for case in cases]).encode("utf-8"))
+
+
+def _select_cases[Parameters: State](
+    available_cases: Sequence[EvaluatorSuiteCase[Parameters]],
+    cases: Sequence[EvaluatorSuiteCase[Parameters] | Parameters | str] | float | int | None,
+) -> Sequence[EvaluatorSuiteCase[Parameters]]:
+    if cases is None:
+        return available_cases
+
+    if isinstance(cases, int):
+        if cases <= 0:
+            raise ValueError("Number of selected cases must be greater than zero")
+
+        return random.sample(  # nosec: B311
+            available_cases,
+            min(len(available_cases), cases),
+        )
+
+    if isinstance(cases, float):
+        if not 0 < cases <= 1:
+            raise ValueError("Fraction of selected cases must be within (0, 1]")
+
+        return random.sample(  # nosec: B311
+            available_cases,
+            min(len(available_cases), max(1, int(len(available_cases) * cases))),
+        )
+
+    selected_cases: list[EvaluatorSuiteCase[Parameters]] = []
+    for case in cases:
+        if isinstance(case, str):
+            if evaluation_case := next(
+                iter(available for available in available_cases if available.identifier == case),
+                None,
+            ):
+                selected_cases.append(evaluation_case)
+
+            else:
+                raise ValueError(f"Evaluation case with ID {case} does not exists.")
+
+        elif isinstance(case, EvaluatorSuiteCase):
+            selected_cases.append(cast(EvaluatorSuiteCase[Parameters], case))
+
+        else:
+            selected_cases.append(EvaluatorSuiteCase(parameters=case))
+
+    return selected_cases

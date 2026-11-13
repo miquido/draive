@@ -53,6 +53,9 @@ async def required_keywords_evaluator(
             meta={"comment": "Keywords list was empty!"},
         )
 
+    if any(not keyword.strip() for keyword in keywords):
+        raise ValueError("Keywords must not be blank")
+
     text_normalization: Callable[[str], str]
     if normalization is not None:
         text_normalization = normalization
@@ -110,6 +113,9 @@ async def required_keywords_context_evaluator(
             0.0,
             meta={"comment": "Keywords list was empty!"},
         )
+
+    if any(not keyword.strip() for keyword in keywords):
+        raise ValueError("Keywords must not be blank")
 
     text_normalization: Callable[[str], str]
     if normalization is not None:
@@ -169,6 +175,9 @@ async def forbidden_keywords_evaluator(
             meta={"comment": "Keywords list was empty - no forbidden keywords to check."},
         )
 
+    if any(not keyword.strip() for keyword in keywords):
+        raise ValueError("Keywords must not be blank")
+
     text_normalization: Callable[[str], str]
     if normalization is not None:
         text_normalization = normalization
@@ -226,6 +235,9 @@ async def forbidden_keywords_context_evaluator(
             1.0,
             meta={"comment": "Keywords list was empty - no forbidden keywords to check."},
         )
+
+    if any(not keyword.strip() for keyword in keywords):
+        raise ValueError("Keywords must not be blank")
 
     text_normalization: Callable[[str], str]
     if normalization is not None:

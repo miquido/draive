@@ -135,7 +135,10 @@ class ModelGeneration(State):
                 )
 
             elif instruction_arguments:
-                instructions = instructions.format_map(instruction_arguments)
+                # replace only known placeholders, any other braces within
+                # the instructions (i.e. json examples) have to stay untouched
+                for key, value in instruction_arguments.items():
+                    instructions = instructions.replace(f"{{{key}}}", str(value))
 
             if isinstance(input, Template):
                 ctx.record_info(
