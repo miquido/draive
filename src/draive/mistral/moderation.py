@@ -7,7 +7,7 @@ from mistralai.client.models import ModerationResponse
 from draive.guardrails import GuardrailsModerationException
 from draive.mistral.api import MistralAPI
 from draive.mistral.config import MistralModerationConfig
-from draive.models import record_guardrails_invocation
+from draive.models import provider_failure, record_guardrails_invocation
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.multimodal.artifact import ArtifactContent
 from draive.multimodal.text import TextContent
@@ -44,11 +44,8 @@ class MistralContentModeration(MistralAPI):
                     moderated_content.append(part.to_str(include_data=False))
 
                 elif isinstance(part, ResourceReference):
-                    ctx.log_warning(
-                        f"Mistral moderation: unsupported media {part.mime_type}; "
-                        "verifying as text."
-                    )
-                    moderated_content.append(part.to_str())
+                    # the uri is omitted, it can carry credentials within its userinfo or query
+                    ctx.log_warning("Mistral moderation: unsupported resource reference; skipping.")
 
                 else:
                     assert isinstance(part, ArtifactContent)  # nosec: B101
@@ -57,10 +54,16 @@ class MistralContentModeration(MistralAPI):
 
                     moderated_content.append(part.to_str())
 
-            response: ModerationResponse = await self._client.classifiers.moderate_async(
+            response: ModerationResponse
+            with provider_failure(
+                provider="mistral",
                 model=moderation_config.model,
-                inputs=moderated_content,
-            )
+                operation="moderation",
+            ):
+                response = await self._client.classifiers.moderate_async(
+                    model=moderation_config.model,
+                    inputs=moderated_content,
+                )
 
             violations: dict[str, float] = {}
             for result in response.results:

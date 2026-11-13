@@ -421,7 +421,14 @@ class _FakeAnthropicStream:
 
 
 @pytest.mark.asyncio
-async def test_anthropic_stream_emits_text_and_tool_request() -> None:
+async def test_anthropic_stream_emits_text_and_tool_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    usage: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        "draive.anthropic.messages.record_usage_metrics",
+        lambda **kwargs: usage.append(kwargs),
+    )
     events = [
         RawMessageStartEvent(
             type="message_start",
@@ -512,6 +519,16 @@ async def test_anthropic_stream_emits_text_and_tool_request() -> None:
     assert tool_requests[0].identifier == "call-1"
     assert tool_requests[0].tool == "echo"
     assert tool_requests[0].arguments == {"x": 1}
+    # input usage from the message start is merged with the output usage of the delta
+    assert usage == [
+        {
+            "provider": "anthropic",
+            "model": "claude-test",
+            "input_tokens": 3,
+            "cached_input_tokens": 1,
+            "output_tokens": 2,
+        }
+    ]
 
 
 @pytest.mark.asyncio

@@ -1,3 +1,4 @@
+import sys
 from collections import deque
 from collections.abc import AsyncIterator, MutableSequence
 from contextlib import AbstractAsyncContextManager
@@ -118,30 +119,47 @@ class GeminiLive(GeminiAPI):
             # enter scope
             scope = ctx.scope("model.session")
             await scope.__aenter__()
-            record_model_invocation(
-                provider="gemini",
-                model=config.model,
-                temperature=config.temperature,
-                max_output_tokens=config.max_output_tokens,
-                tools=tools,
-                output=output,
-                # stop sequences are not supported within live sessions
-                top_p=config.top_p,
-                top_k=config.top_k,
-                seed=config.seed,
-                thinking_budget=config.thinking_budget,
-                thinking_level=config.thinking_level,
-            )
-
-            session: AsyncSession = await connection_manager.__aenter__()
-
-            # seed the session with prior context as an incomplete turn - the api rejects
-            # a completed client content turn, realtime input starts the turn instead
-            if context:
-                await session.send_client_content(
-                    turns=_request_content(context),
-                    turn_complete=False,
+            try:
+                record_model_invocation(
+                    provider="gemini",
+                    model=config.model,
+                    temperature=config.temperature,
+                    max_output_tokens=config.max_output_tokens,
+                    tools=tools,
+                    output=output,
+                    # stop sequences are not supported within live sessions
+                    top_p=config.top_p,
+                    top_k=config.top_k,
+                    seed=config.seed,
+                    thinking_budget=config.thinking_budget,
+                    thinking_level=config.thinking_level,
                 )
+
+                session: AsyncSession = await connection_manager.__aenter__()
+
+            except BaseException:
+                # close is never called when opening fails, release the scope here
+                await scope.__aexit__(*sys.exc_info())
+                raise
+
+            try:
+                # seed the session with prior context as an incomplete turn - the api rejects
+                # a completed client content turn, realtime input starts the turn instead
+                if context:
+                    await session.send_client_content(
+                        turns=_request_content(context),
+                        turn_complete=False,
+                    )
+
+            except BaseException:
+                # close is never called when opening fails, release everything here
+                try:
+                    await connection_manager.__aexit__(*sys.exc_info())
+
+                finally:
+                    await scope.__aexit__(*sys.exc_info())
+
+                raise
 
             read_stream: AsyncIterator[LiveServerMessage] = session.receive()
             read_buffer: deque[ModelSessionOutputChunk] = deque()

@@ -1,4 +1,3 @@
-from asyncio import gather
 from collections.abc import Callable, Sequence
 from itertools import chain
 from typing import Any, cast
@@ -9,7 +8,11 @@ from haiway import Missing, State, as_list, as_tuple, ctx
 from draive.embedding import Embedded
 from draive.gemini.api import GeminiAPI
 from draive.gemini.config import GeminiEmbeddingConfig
-from draive.models.metrics import record_embedding_invocation, record_embedding_metrics
+from draive.models.metrics import (
+    provider_gather,
+    record_embedding_invocation,
+    record_embedding_metrics,
+)
 
 __all__ = ("GeminiEmbedding",)
 
@@ -64,7 +67,7 @@ class GeminiEmbedding(GeminiAPI):
             else:
                 config_dict = None
 
-            responses: Sequence[EmbedContentResponse] = await gather(
+            responses: Sequence[EmbedContentResponse] = await provider_gather(
                 *[
                     self._client.aio.models.embed_content(  # pyright: ignore[reportUnknownMemberType]
                         model=config.model,
@@ -74,7 +77,10 @@ class GeminiEmbedding(GeminiAPI):
                         ),
                     )
                     for index in range(0, len(attributes), config.batch_size)
-                ]
+                ],
+                provider="gemini",
+                model=config.model,
+                operation="embedding",
             )
 
             vectors: Sequence[Sequence[float]] = [

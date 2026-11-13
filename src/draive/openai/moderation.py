@@ -5,7 +5,7 @@ from haiway import Missing, ctx
 from openai.types import ModerationCreateResponse, ModerationMultiModalInputParam
 
 from draive.guardrails import GuardrailsModerationException
-from draive.models import record_guardrails_invocation
+from draive.models import provider_failure, record_guardrails_invocation
 from draive.multimodal import ArtifactContent, Multimodal, MultimodalContent, TextContent
 from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIModerationConfig
@@ -53,10 +53,16 @@ class OpenAIContentModeration(OpenAIAPI):
                 _moderated_parts(content)
             )
 
-            response: ModerationCreateResponse = await self._client.moderations.create(
+            response: ModerationCreateResponse
+            with provider_failure(
+                provider="openai",
                 model=moderation_config.model,
-                input=moderated_content,
-            )
+                operation="moderation",
+            ):
+                response = await self._client.moderations.create(
+                    model=moderation_config.model,
+                    input=moderated_content,
+                )
 
             violations: dict[str, float] = {}
             for result in response.results:

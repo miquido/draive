@@ -5,7 +5,7 @@ from openai import omit
 from openai.types.image import Image
 from openai.types.images_response import ImagesResponse
 
-from draive.models import ModelInstructions
+from draive.models import ModelInstructions, provider_failure
 from draive.multimodal import Multimodal, MultimodalContent, Template, TemplatesRepository
 from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIImageGenerationConfig
@@ -45,19 +45,25 @@ class OpenAIImageGeneration(OpenAIAPI):
                 if element
             )
 
-            response: ImagesResponse = await self._client.images.generate(
+            response: ImagesResponse
+            with provider_failure(
+                provider="openai",
                 model=generation_config.model,
-                n=1,
-                prompt=prompt,
-                quality=generation_config.quality,
-                size=generation_config.size,
-                background=generation_config.background,
-                output_format=generation_config.output_format,
-                output_compression=omit
-                if generation_config.output_compression is Missing
-                else generation_config.output_compression,
-                moderation=generation_config.moderation,
-            )
+                operation="image generation",
+            ):
+                response = await self._client.images.generate(
+                    model=generation_config.model,
+                    n=1,
+                    prompt=prompt,
+                    quality=generation_config.quality,
+                    size=generation_config.size,
+                    background=generation_config.background,
+                    output_format=generation_config.output_format,
+                    output_compression=omit
+                    if generation_config.output_compression is Missing
+                    else generation_config.output_compression,
+                    moderation=generation_config.moderation,
+                )
 
             if not response.data:
                 raise ValueError("Invalid OpenAI response - missing image content")

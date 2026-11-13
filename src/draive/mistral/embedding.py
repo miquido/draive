@@ -1,4 +1,3 @@
-from asyncio import gather
 from collections.abc import Callable, Sequence
 from typing import Any, cast
 
@@ -8,7 +7,11 @@ from mistralai.client.models import EmbeddingResponse
 from draive.embedding import Embedded
 from draive.mistral.api import MistralAPI
 from draive.mistral.config import MistralEmbeddingConfig
-from draive.models.metrics import record_embedding_invocation, record_embedding_metrics
+from draive.models.metrics import (
+    provider_gather,
+    record_embedding_invocation,
+    record_embedding_metrics,
+)
 
 __all__ = ("MistralEmbedding",)
 
@@ -56,14 +59,17 @@ class MistralEmbedding(MistralAPI):
             if not attributes:
                 return ()  # empty
 
-            responses: list[EmbeddingResponse] = await gather(
+            responses: Sequence[EmbeddingResponse] = await provider_gather(
                 *[
                     self._client.embeddings.create_async(
                         model=embedding_config.model,
                         inputs=attributes[index : index + embedding_config.batch_size],
                     )
                     for index in range(0, len(attributes), embedding_config.batch_size)
-                ]
+                ],
+                provider="mistral",
+                model=embedding_config.model,
+                operation="embedding",
             )
 
             # the api documents no ordering guarantee, the index within each entry

@@ -34,6 +34,7 @@ from draive.models import (
     ModelContext,
     ModelException,
     ModelInput,
+    ModelInputInvalid,
     ModelInstructions,
     ModelOutput,
     ModelOutputFailed,
@@ -98,16 +99,31 @@ class VLLMMessages(VLLMAPI):
                 tool_selection=tools.selection,
             )
 
+            # prepare the request outside of the request handling, errors
+            # of building it are input errors instead of output failures
+            try:
+                request_messages = list(
+                    _context_messages(
+                        instructions=instructions,
+                        context=context,
+                        vision_details=config.vision_details,
+                    )
+                )
+                request_response_format = _response_format(output)
+
+            except Exception as exc:
+                raise ModelInputInvalid(
+                    provider=self._provider,
+                    model=config.model,
+                    reason=str(exc),
+                ) from exc
+
             # Start streaming request
             stream: AsyncStream[ChatCompletionChunk]
             try:
                 stream = await self._client.chat.completions.create(
                     model=config.model,
-                    messages=_context_messages(
-                        instructions=instructions,
-                        context=context,
-                        vision_details=config.vision_details,
-                    ),
+                    messages=request_messages,
                     temperature=unwrap_missing(config.temperature),
                     top_p=unwrap_missing(config.top_p),
                     frequency_penalty=unwrap_missing(config.frequency_penalty),
@@ -117,7 +133,7 @@ class VLLMMessages(VLLMAPI):
                     if tools_list is not omit
                     else omit,
                     max_tokens=unwrap_missing(config.max_output_tokens),
-                    response_format=_response_format(output),
+                    response_format=request_response_format,
                     seed=unwrap_missing(config.seed),
                     stop=as_list(cast(Iterable[str], config.stop_sequences))
                     if config.stop_sequences is not Missing
