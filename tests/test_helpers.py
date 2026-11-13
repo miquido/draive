@@ -259,6 +259,35 @@ async def test_volatile_vector_index_lists_all_without_query() -> None:
 
 
 @pytest.mark.asyncio
+async def test_volatile_vector_index_zero_limit_returns_nothing_without_query() -> None:
+    async with ctx.scope("test", VolatileVectorIndex(), _text_embedding()):
+        await VectorIndex.index(_Document, attribute=_Document._.text, values=_DOCUMENTS)
+
+        assert await VectorIndex.search(_Document, query=None, limit=0) == []
+        assert await VectorIndex.search(_Document, query="alpha", limit=0) == []
+
+
+@pytest.mark.asyncio
+async def test_volatile_vector_index_rejects_score_threshold_without_query() -> None:
+    async with ctx.scope("test", VolatileVectorIndex(), _text_embedding()):
+        await VectorIndex.index(_Document, attribute=_Document._.text, values=_DOCUMENTS)
+
+        with pytest.raises(ValueError, match="score_threshold"):
+            await VectorIndex.search(_Document, query=None, score_threshold=0.5)
+
+
+@pytest.mark.asyncio
+async def test_volatile_vector_index_rejects_plain_value_attribute() -> None:
+    async with ctx.scope("test", VolatileVectorIndex(), _text_embedding()):
+        with pytest.raises(ValueError, match="path"):
+            await VectorIndex.index(
+                _Document,
+                attribute="text",  # pyright: ignore[reportArgumentType]
+                values=_DOCUMENTS,
+            )
+
+
+@pytest.mark.asyncio
 async def test_volatile_vector_index_filters_by_requirements() -> None:
     async with ctx.scope("test", VolatileVectorIndex(), _text_embedding()):
         await VectorIndex.index(_Document, attribute=_Document._.text, values=_DOCUMENTS)
