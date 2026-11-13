@@ -22,6 +22,14 @@ from draive.tools import Tool
 __all__ = ("AgentMemory",)
 
 
+def _disabled_memory() -> AgentMemory:
+    return AgentMemory(
+        preparing=_prepare,
+        recalling=_recall,
+        remembering=_remember,
+    )
+
+
 @final
 class AgentMemory(State):
     """Pluggable prepare/recall/remember behavior for agent execution.
@@ -43,9 +51,7 @@ class AgentMemory(State):
         Additional metadata attached to the memory instance.
     """
 
-    disabled: ClassVar[AgentMemory] = class_constant(
-        lambda: AgentMemory(preparing=_prepare, recalling=_recall, remembering=_remember)
-    )
+    disabled: ClassVar[AgentMemory] = class_constant(_disabled_memory)
 
     @classmethod
     def volatile(

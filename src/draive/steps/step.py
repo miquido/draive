@@ -83,6 +83,10 @@ __all__ = (
 )
 
 
+def _noop_step() -> Step:
+    return _noop
+
+
 @final  # consider immutable
 class Step:
     """Composable asynchronous processing unit operating on ``StepState``.
@@ -98,7 +102,7 @@ class Step:
     context-aware while staying easy to compose.
     """
 
-    noop: ClassVar[Step] = class_constant(lambda: _noop)
+    noop: ClassVar[Step] = class_constant(_noop_step)
 
     @classmethod
     def emitting(

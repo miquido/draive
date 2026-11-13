@@ -374,6 +374,13 @@ ModelToolsSelection = Literal["auto", "required", "none"] | ModelToolSpecificati
 """Strategy controlling whether and how a model may call tools."""
 
 
+def _tools(
+    specification: Sequence[ModelToolSpecification],
+    selection: ModelToolsSelection,
+) -> ModelTools:
+    return ModelTools(specification=specification, selection=selection)
+
+
 @final
 class ModelTools(State, serializable=True):
     """Toolset and selection strategy passed to model generation.
@@ -386,9 +393,7 @@ class ModelTools(State, serializable=True):
         Provider-specific tool choice policy.
     """
 
-    none: ClassVar[ModelTools] = class_constant(
-        lambda: ModelTools(specification=(), selection="none")
-    )
+    none: ClassVar[ModelTools] = class_constant(_tools, specification=(), selection="none")
 
     @classmethod
     def of(

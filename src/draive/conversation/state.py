@@ -16,10 +16,16 @@ from draive.models import ModelContext
 __all__ = ("ConversationMemory",)
 
 
-class ConversationMemory(State):
-    disabled: ClassVar[ConversationMemory] = class_constant(
-        lambda: ConversationMemory(fetching=_fetch, recalling=_recall, remembering=_remember)
+def _disabled_memory() -> ConversationMemory:
+    return ConversationMemory(
+        fetching=_fetch,
+        recalling=_recall,
+        remembering=_remember,
     )
+
+
+class ConversationMemory(State):
+    disabled: ClassVar[ConversationMemory] = class_constant(_disabled_memory)
 
     @classmethod
     def constant(
