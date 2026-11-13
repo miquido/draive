@@ -652,7 +652,7 @@ requires-dist = [
     { name = "cohere", marker = "extra == 'cohere-bedrock'", specifier = "~=7.0" },
     { name = "fastapi", marker = "extra == 'fastapi'", specifier = "~=0.162" },
     { name = "google-genai", marker = "extra == 'gemini'", specifier = "~=3.0" },
-    { name = "haiway", specifier = "~=0.61.0" },
+    { name = "haiway", specifier = "~=0.61.1" },
     { name = "haiway", extras = ["fastapi"], marker = "extra == 'fastapi'" },
     { name = "haiway", extras = ["httpx"], marker = "extra == 'httpx'" },
     { name = "haiway", extras = ["opentelemetry"], marker = "extra == 'opentelemetry'" },
@@ -888,19 +888,19 @@ wheels = [
 
 [[package]]
 name = "haiway"
-version = "0.61.0"
+version = "0.61.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d9/7b/158bff3a3e2b25f571ea5d922149b85cea51a8134a2d14c9b225c948dcf2/haiway-0.61.0.tar.gz", hash = "sha256:503cbb773da4d80cfb16ea987c910107c89b3257e72d6f32ea1d2522a1c81248", size = 293361, upload-time = "2026-11-12T17:51:34.512Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ce/e5/3788c429a52506ccd9f7544dde8fc49b13cdbf5e6863e9a71f09132523af/haiway-0.61.1.tar.gz", hash = "sha256:f8b4abd0c6c5cb6e1bf67e27eaccda698b2d3450f0f0e85c7a5ac832b7a00dcd", size = 293312, upload-time = "2026-11-13T10:26:36Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0d/75/ef7bb35002ddb6c75bd8baef74a7b4538db7008a4fdea39dd2ebe2615c1a/haiway-0.61.0-cp315-cp315-macosx_11_0_arm64.whl", hash = "sha256:b2168b22a3f868d81f1b96ec12081cad3468b5da81a07ac1bf9ea3e3b9cef44a", size = 328160, upload-time = "2026-11-12T17:51:26.969Z" },
-    { url = "https://files.pythonhosted.org/packages/b2/43/ead04f52c0faaf7c757c3488dda93a1303874e1edd9747fc64cb0f1eaeed/haiway-0.61.0-cp315-cp315-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:c8a6c0575dfb38564e8724cc998cc1b053a98cc967235cc6b2c7b155db93f8ab", size = 522238, upload-time = "2026-11-12T17:51:28.885Z" },
-    { url = "https://files.pythonhosted.org/packages/b0/dd/1bfc7c1e4814bc4b1ca80438b793eb5dbb215c7cdc16bfd2c4a35b50244a/haiway-0.61.0-cp315-cp315-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:e8b07b7901abb7ee8d0df82909bbdf325585142fa2399b5de81904350bae6ace", size = 524720, upload-time = "2026-11-12T17:51:30.058Z" },
-    { url = "https://files.pythonhosted.org/packages/5c/f5/4693b0549c54c820bb38c2a7b147d234deef64665ece78cdc90a0f3af4af/haiway-0.61.0-cp315-cp315-musllinux_1_2_aarch64.whl", hash = "sha256:6b5974d9f5a75cd8807d8e06397f731fa8c16fe0da8b88dd0e7522d4c70c7357", size = 518246, upload-time = "2026-11-12T17:51:31.271Z" },
-    { url = "https://files.pythonhosted.org/packages/07/cc/1d61bf90006dfb1be5b67c094a8416f1673ef68ffbf8df44c75a56a023c1/haiway-0.61.0-cp315-cp315-musllinux_1_2_x86_64.whl", hash = "sha256:968df0e4c03196361894bf1d6abee166f52565138ee2e4b42dabbace6d8a5f54", size = 521383, upload-time = "2026-11-12T17:51:32.469Z" },
-    { url = "https://files.pythonhosted.org/packages/71/ec/3664de36d4e0e99a0904d5a1d09cc7c9910c4bd601a5a9f088dd8c8e9f07/haiway-0.61.0-cp315-cp315-win_amd64.whl", hash = "sha256:0c4837524ea0060208603d23b1b90770a1bb48821a8b21cdeba546e84127b5a8", size = 328060, upload-time = "2026-11-12T17:51:33.574Z" },
+    { url = "https://files.pythonhosted.org/packages/37/df/b42b9b1aa55cf2dc58dc68992f7163b02eb067912ade03c4241ee7b3c7fe/haiway-0.61.1-cp315-cp315-macosx_11_0_arm64.whl", hash = "sha256:f6542ac49792a1067d6e72928287e7ceabe01c0eb15de82399a4231922f999c4", size = 328015, upload-time = "2026-11-13T10:26:28.795Z" },
+    { url = "https://files.pythonhosted.org/packages/7f/54/614c175f4ad3ce4a8e7dc63f12331d1873607207da55710ac8fe7cf6b816/haiway-0.61.1-cp315-cp315-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:46a49994047d4111340c712b5419e98c6c1ae1f91cd35b69063463ce3ef484b5", size = 522089, upload-time = "2026-11-13T10:26:30.165Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/91/123cfdc4374997557a9bb18ee268fef28a348974edf2ac4458167cd9e051/haiway-0.61.1-cp315-cp315-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:6c15bbba234d509ef4cbba2997569175cfa847c329bb06ea5110080a228fdc2b", size = 524572, upload-time = "2026-11-13T10:26:31.522Z" },
+    { url = "https://files.pythonhosted.org/packages/85/ed/227310ead785182244700ab8b3c0c89408ebc49237121e25c3ef77d1f3f9/haiway-0.61.1-cp315-cp315-musllinux_1_2_aarch64.whl", hash = "sha256:57e369e0ec3ddf1c22b77da20da6f2f66333a7f27bf63cff8081d5bbb33b7f3a", size = 518100, upload-time = "2026-11-13T10:26:32.636Z" },
+    { url = "https://files.pythonhosted.org/packages/d1/6f/f3a8c040279072002ebf9aea2af40d5e3c222198fd364f5ae574c34e85bd/haiway-0.61.1-cp315-cp315-musllinux_1_2_x86_64.whl", hash = "sha256:e3471a51c33c211cfeca98de2232ffa32640916a1ac0360724178e447d651b56", size = 521236, upload-time = "2026-11-13T10:26:33.903Z" },
+    { url = "https://files.pythonhosted.org/packages/b9/af/0c799ebd2bf0aaf52ef9a9e6980a579134bbdaa20bb1b1c6a41406dfeb25/haiway-0.61.1-cp315-cp315-win_amd64.whl", hash = "sha256:a1452abd934f49867ea9a1dc883255380f1ed453072178ebfbe700cdbf9d48a6", size = 327913, upload-time = "2026-11-13T10:26:35.036Z" },
 ]
 
 [package.optional-dependencies]
