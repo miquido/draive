@@ -25,6 +25,12 @@ artifacts.
 """
 
 
+def _content(
+    parts: Sequence[MultimodalContentPart],
+) -> MultimodalContent:
+    return MultimodalContent(parts=parts)
+
+
 @final
 class MultimodalContent(State, serializable=True):
     """
@@ -40,7 +46,7 @@ class MultimodalContent(State, serializable=True):
         The ordered, immutable parts of this content.
     """
 
-    empty: ClassVar[MultimodalContent] = class_constant(lambda: MultimodalContent(parts=()))
+    empty: ClassVar[MultimodalContent] = class_constant(_content, parts=())
 
     @classmethod
     def of(

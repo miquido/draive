@@ -7,6 +7,13 @@ from draive._constant import class_constant
 __all__ = ("TextContent",)
 
 
+def _text(
+    text: str,
+    meta: Meta,
+) -> TextContent:
+    return TextContent(text=text, meta=meta)
+
+
 @final
 class TextContent(State, serializable=True):
     """
@@ -26,7 +33,7 @@ class TextContent(State, serializable=True):
         grouping operations. Defaults to an empty metadata object.
     """
 
-    empty: ClassVar[TextContent] = class_constant(lambda: TextContent(text="", meta=Meta.empty))
+    empty: ClassVar[TextContent] = class_constant(_text, text="", meta=Meta.empty)
 
     @classmethod
     def of(

@@ -35,17 +35,19 @@ from draive.utils import ProcessingEvent
 __all__ = ("Toolbox",)
 
 
+def _empty_toolbox() -> Toolbox:
+    return Toolbox(
+        tools={},
+        suggesting=_no_suggestion,
+        meta=Meta.empty,
+    )
+
+
 @final
 class Toolbox(State):
     """Immutable registry of tools with selection and execution helpers."""
 
-    empty: ClassVar[Toolbox] = class_constant(
-        lambda: Toolbox(
-            tools={},
-            suggesting=_no_suggestion,
-            meta=Meta.empty,
-        )
-    )
+    empty: ClassVar[Toolbox] = class_constant(_empty_toolbox)
 
     @overload
     @classmethod
