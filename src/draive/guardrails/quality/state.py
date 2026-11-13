@@ -98,6 +98,22 @@ class GuardrailsQualityVerification(State):
         /,
         **extra: Any,
     ) -> None:
+        """Verify the quality of the content.
+
+        Parameters
+        ----------
+        content : Multimodal
+            Content to verify.
+        **extra : Any
+            Additional options forwarded to the guardrails implementation.
+
+        Raises
+        ------
+        GuardrailsQualityException
+            When the content does not meet the quality requirements.
+        GuardrailsFailure
+            When the verification itself fails, i.e. the evaluator errors.
+        """
         content = MultimodalContent.of(content)
         try:
             await self._verifying(

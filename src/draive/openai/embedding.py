@@ -79,6 +79,13 @@ class OpenAIEmbedding(OpenAIAPI):
                 operation="embedding",
             )
 
+            record_embedding_metrics(
+                provider="openai",
+                model=embedding_config.model,
+                embedding_type="text",
+                input_tokens=sum(response.usage.prompt_tokens for response in responses),
+            )
+
             return cast(
                 Sequence[Embedded[Value]] | Sequence[Embedded[str]],
                 [
