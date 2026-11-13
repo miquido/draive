@@ -19,6 +19,7 @@ from surrealdb import RecordID, Table
 from draive.surreal.filters import prepare_filter
 from draive.surreal.schema import SurrealTableKind, surreal_field_definitions
 from draive.surreal.types import (
+    SurrealException,
     SurrealID,
     SurrealObject,
     SurrealSessionContext,
@@ -635,7 +636,7 @@ class Surreal(State):
         access: str | None = None,
     ) -> SurrealSessionContext:
         if ctx.contains_state(SurrealSession):
-            raise RuntimeError("Recursive Surreal session acquiring is forbidden")
+            raise SurrealException("Recursive Surreal session acquiring is forbidden")
 
         return self._session_preparing(
             namespace=namespace,

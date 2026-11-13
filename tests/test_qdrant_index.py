@@ -599,3 +599,42 @@ async def test_qdrant_rerank_overfetches_candidates(
 
     assert len(results) == 2
     assert fetched_limits == [expected_limit]
+
+
+def test_qdrant_session_reads_environment_when_created(monkeypatch: pytest.MonkeyPatch) -> None:
+    from draive.qdrant import QdrantClient as Client
+
+    monkeypatch.setenv("QDRANT_HOST", "qdrant.internal")
+    monkeypatch.setenv("QDRANT_PORT", "7001")
+    monkeypatch.setenv("QDRANT_GRPC_PORT", "7002")
+    monkeypatch.setenv("QDRANT_API_KEY", "from-env")
+
+    from_env = Client()
+    assert (from_env._host, from_env._port, from_env._grpc_port) == (  # pyright: ignore[reportPrivateUsage]
+        "qdrant.internal",
+        7001,
+        7002,
+    )
+    assert from_env._api_key == "from-env"  # pyright: ignore[reportPrivateUsage]
+
+    explicit = Client(host="explicit", port=1, grpc_port=2, api_key="explicit-key")
+    assert (explicit._host, explicit._port, explicit._grpc_port) == (  # pyright: ignore[reportPrivateUsage]
+        "explicit",
+        1,
+        2,
+    )
+    assert explicit._api_key == "explicit-key"  # pyright: ignore[reportPrivateUsage]
+
+
+@pytest.mark.asyncio
+async def test_qdrant_index_rejects_invalid_inputs_with_value_errors() -> None:
+    async with _measurement_scope():
+        with pytest.raises(ValueError, match="score_threshold"):
+            await VectorIndex.search(_Measurement, query=None, score_threshold=0.5)
+
+        with pytest.raises(ValueError, match="path"):
+            await VectorIndex.index(
+                _Measurement,
+                attribute="label",  # pyright: ignore[reportArgumentType]
+                values=[],
+            )

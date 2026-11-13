@@ -1,8 +1,8 @@
 from typing import Literal, overload
 
+from haiway import getenv_int, getenv_str
 from qdrant_client import AsyncQdrantClient
 
-from draive.qdrant.config import QDRANT_GRPC_PORT, QDRANT_HOST, QDRANT_PORT
 from draive.qdrant.utils import qdrant_operation
 
 __all__ = ("QdrantSession",)
@@ -10,6 +10,7 @@ __all__ = ("QdrantSession",)
 
 class QdrantSession:
     __slots__ = (
+        "_api_key",
         "_client",
         "_grpc_port",
         "_host",
@@ -30,9 +31,10 @@ class QdrantSession:
     def __init__(
         self,
         *,
-        host: str = QDRANT_HOST,
-        port: int = QDRANT_PORT,
-        grpc_port: int = QDRANT_GRPC_PORT,
+        host: str | None = None,
+        port: int | None = None,
+        grpc_port: int | None = None,
+        api_key: str | None = None,
         ssl: bool = False,
         timeout: int = 5,
         in_memory: Literal[False] = False,
@@ -41,16 +43,21 @@ class QdrantSession:
     def __init__(
         self,
         *,
-        host: str = QDRANT_HOST,
-        port: int = QDRANT_PORT,
-        grpc_port: int = QDRANT_GRPC_PORT,
+        host: str | None = None,
+        port: int | None = None,
+        grpc_port: int | None = None,
+        api_key: str | None = None,
         ssl: bool = False,
         timeout: int = 5,
         in_memory: bool = False,
     ) -> None:
-        self._host: str = host
-        self._port: int = port
-        self._grpc_port: int = grpc_port
+        # environment is read when the session is created, not when the module is imported
+        self._host: str = host if host is not None else getenv_str("QDRANT_HOST", "localhost")
+        self._port: int = port if port is not None else getenv_int("QDRANT_PORT", 6333)
+        self._grpc_port: int = (
+            grpc_port if grpc_port is not None else getenv_int("QDRANT_GRPC_PORT", 6334)
+        )
+        self._api_key: str | None = api_key if api_key is not None else getenv_str("QDRANT_API_KEY")
         self._ssl: bool = ssl
         self._timeout: int = timeout
         self._in_memory: bool = in_memory
@@ -73,6 +80,7 @@ class QdrantSession:
                 port=self._port,
                 grpc_port=self._grpc_port,
                 https=self._ssl,
+                api_key=self._api_key,
                 timeout=self._timeout,
                 prefer_grpc=True,
             )
