@@ -66,7 +66,7 @@ class _DummyRepository:
         references = tuple(
             ResourceReference.of(f"mcp://{item}", mime_type="text/plain") for item in items
         )
-        return Paginated[ResourceReference].of(
+        return Paginated[ResourceReference](
             references,
             pagination=pagination.with_token(next_token),
         )
@@ -206,7 +206,7 @@ class _FixedPageRepository:
             ResourceReference.of(f"mcp://{self._prefix}/{index}", mime_type="text/plain")
             for index in range(start, end)
         )
-        return Paginated[ResourceReference].of(
+        return Paginated[ResourceReference](
             references,
             pagination=pagination.with_token(str(end) if end < self._count else None),
         )

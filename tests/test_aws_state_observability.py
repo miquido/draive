@@ -309,3 +309,46 @@ async def test_scope_exception_emitted_once_on_exit(
 
     exception_events = [event for event in recorded_events if event["detail_type"] == "exception"]
     assert len(exception_events) == 1
+
+
+@pytest.mark.asyncio
+async def test_cloudwatch_observability_supports_concurrent_root_scopes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FakeSession:
+        def __init__(self, **kwargs: object) -> None:
+            _ = kwargs
+
+        def client(self, service_name: str) -> object:
+            _ = service_name
+            return object()
+
+    monkeypatch.setattr(aws_observability, "Session", _FakeSession)
+    monkeypatch.setattr(ctx, "spawn_background", lambda *args, **kwargs: None)
+
+    observability = aws_observability.CloudwatchObservability(
+        log_level=ObservabilityLevel.INFO,
+        log_group="group",
+        log_stream="stream",
+        event_bus="default",
+        event_source="draive",
+        metrics_namespace="metrics",
+    )
+
+    def root(name: str) -> _FakeIdentifier:
+        identifier = uuid4()
+        scope = _FakeIdentifier(name, scope_id=identifier, parent_id=identifier, is_root=True)
+        scope.path = (identifier,)  # type: ignore[attr-defined]
+        return scope
+
+    first = root("first")
+    second = root("second")
+    observability.scope_entering(first)
+    observability.scope_entering(second)  # used to fail while the first root was running
+
+    assert observability.trace_identifying(first) != observability.trace_identifying(second)
+
+    observability.scope_exiting(first, exception=None)
+    # the second root keeps working after the first one completed
+    assert observability.trace_identifying(second)
+    observability.scope_exiting(second, exception=None)

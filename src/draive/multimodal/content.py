@@ -1,8 +1,9 @@
 from collections.abc import Callable, Collection, Generator, Mapping, Sequence
 from typing import ClassVar, Literal, Self, cast, final, overload
 
-from haiway import MISSING, BasicValue, Meta, MetaValues, Missing, State
+from haiway import BasicValue, Meta, MetaValues, Missing, State
 
+from draive._constant import class_constant
 from draive.multimodal.artifact import ArtifactContent
 from draive.multimodal.text import TextContent
 from draive.resources import MimeType, ResourceContent, ResourceReference
@@ -24,6 +25,12 @@ artifacts.
 """
 
 
+def _content(
+    parts: Sequence[MultimodalContentPart],
+) -> MultimodalContent:
+    return MultimodalContent(parts=parts)
+
+
 @final
 class MultimodalContent(State, serializable=True):
     """
@@ -39,7 +46,7 @@ class MultimodalContent(State, serializable=True):
         The ordered, immutable parts of this content.
     """
 
-    empty: ClassVar[Self]  # defined after the class
+    empty: ClassVar[MultimodalContent] = class_constant(_content, parts=())
 
     @classmethod
     def of(
@@ -61,7 +68,7 @@ class MultimodalContent(State, serializable=True):
             ``MultimodalContent`` is provided, it is returned as-is.
         """
         if not elements:
-            return cls.empty
+            return cast(Self, cls.empty)
 
         if len(elements) == 1 and isinstance(elements[0], MultimodalContent):
             return cast(Self, elements[0])
@@ -370,12 +377,12 @@ class MultimodalContent(State, serializable=True):
 
         result: list[Self] = []
         current_group: list[MultimodalContentPart] = []
-        current_value: BasicValue | Missing = MISSING
+        current_value: BasicValue | Missing = Missing
 
         for part in self.parts:
             # Get metadata value for this part
-            part_value: BasicValue | Missing = part.meta.get(key, MISSING)
-            if part_value is MISSING:
+            part_value: BasicValue | Missing = part.meta.get(key, Missing)
+            if part_value is Missing:
                 continue  # skip elements without explicit value
 
             # If this is the first part or value changed, start new group
@@ -593,9 +600,6 @@ class MultimodalContent(State, serializable=True):
             ``True`` when ``parts`` is non-empty and any part is truthy.
         """
         return bool(self.parts) and any(self.parts)
-
-
-MultimodalContent.empty = MultimodalContent(parts=())
 
 
 @final
@@ -1330,16 +1334,12 @@ def _parts_from_elements(  # noqa: C901, PLR0912, PLR0915
                         last_text = part
 
                 else:
-                    assert isinstance(  # nosec: B101
-                        part,
-                        ResourceReference | ResourceContent | ArtifactContent,
-                    )
-
+                    verified: MultimodalContentPart = _verified_part(part)
                     if last_text is not None:
                         yield last_text
                         last_text = None
 
-                    yield part
+                    yield verified
 
         elif isinstance(element, MultimodalTag):
             for part in element.parts():
@@ -1371,16 +1371,25 @@ def _parts_from_elements(  # noqa: C901, PLR0912, PLR0915
                     yield part
 
         else:
-            assert isinstance(  # nosec: B101
-                element,
-                ResourceReference | ResourceContent | ArtifactContent,
-            )
-
+            verified_element: MultimodalContentPart = _verified_part(element)
             if last_text is not None:
                 yield last_text
                 last_text = None
 
-            yield element
+            yield verified_element
 
     if last_text is not None:
         yield last_text
+
+
+def _verified_part(
+    part: object,
+    /,
+) -> MultimodalContentPart:
+    # the content comes from callers which can't always be type checked, i.e. tool results
+    match part:
+        case ResourceReference() | ResourceContent() | ArtifactContent():
+            return part
+
+        case _:
+            raise TypeError(f"Unsupported multimodal content element: {type(part).__name__}")

@@ -59,6 +59,7 @@ class SurrealStatementExecuting(Protocol):
     async def __call__(
         self,
         statement: str,
+        /,
         *,
         variables: Mapping[str, SurrealValue],
     ) -> Sequence[SurrealObject]: ...

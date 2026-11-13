@@ -3,13 +3,12 @@ import random
 from asyncio import Lock
 from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
-from typing import Annotated, Protocol, Self, cast, runtime_checkable
+from typing import Annotated, Protocol, Self, cast, final, runtime_checkable
 from uuid import uuid4
 
 from haiway import (
     Default,
     Description,
-    Immutable,
     Meta,
     MetaValues,
     State,
@@ -17,6 +16,7 @@ from haiway import (
     ctx,
     execute_concurrently,
 )
+from haiway.types.frozen import refuse_assignment, refuse_deletion, same_copy, same_deepcopy
 
 from draive.evaluation.evaluator import EvaluatorResult
 from draive.evaluation.scenario import EvaluatorScenarioResult
@@ -188,7 +188,9 @@ class EvaluatorSuiteResult(State, serializable=True):
 
     @property
     def passed(self) -> bool:
-        return all(result.passed for result in self.results)
+        """Whether every case passed, an empty result never passes."""
+        # no results is equivalent of failure, nothing was verified
+        return len(self.results) > 0 and all(result.passed for result in self.results)
 
     def report(
         self,
@@ -196,6 +198,21 @@ class EvaluatorSuiteResult(State, serializable=True):
         detailed: bool = True,
         include_passed: bool = True,
     ) -> str:
+        """Render the suite results as a report.
+
+        Parameters
+        ----------
+        detailed : bool, default=True
+            Whether to render the structured XML report, a short plain text summary
+            is rendered otherwise.
+        include_passed : bool, default=True
+            Whether to include passed cases, only failed cases are listed otherwise.
+
+        Returns
+        -------
+        str
+            Report text.
+        """
         if not self.results:
             return "Evaluator suite empty!"
 
@@ -235,6 +252,7 @@ class EvaluatorSuiteResult(State, serializable=True):
 
     @property
     def performance(self) -> float:
+        """Average performance of all cases, zero without results."""
         if not self.results:
             return 0.0
 
@@ -323,7 +341,8 @@ class PreparedEvaluatorSuite[Parameters: State](Protocol):
     ) -> EvaluatorSuiteResult: ...
 
 
-class EvaluatorSuite[**Args, Parameters: State](Immutable):
+@final
+class EvaluatorSuite[**Args, Parameters: State]:
     """
     Comprehensive test suite for systematic evaluation.
 
@@ -359,6 +378,23 @@ class EvaluatorSuite[**Args, Parameters: State](Immutable):
     >>> # Run 50% of cases
     >>> results = await validate(0.5)
     """
+
+    __slots__ = (
+        "_cases_cache",
+        "_cases_storage",
+        "_definition",
+        "_lock",
+        "_parameters",
+        "_state",
+        "concurrent_evaluations",
+        "meta",
+        "name",
+    )
+
+    __setattr__ = refuse_assignment
+    __delattr__ = refuse_deletion
+    __copy__ = same_copy
+    __deepcopy__ = same_deepcopy
 
     name: str
     concurrent_evaluations: int
@@ -433,6 +469,21 @@ class EvaluatorSuite[**Args, Parameters: State](Immutable):
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> PreparedEvaluatorSuite[Parameters]:
+        """Bind the arguments forwarded to the suite definition.
+
+        Parameters
+        ----------
+        *args : Args.args
+            Positional arguments forwarded to the suite definition.
+        **kwargs : Args.kwargs
+            Keyword arguments forwarded to the suite definition.
+
+        Returns
+        -------
+        PreparedEvaluatorSuite[Parameters]
+            Callable evaluating selected cases using the bound arguments.
+        """
+
         async def evaluate(
             cases: Sequence[EvaluatorSuiteCase[Parameters] | Parameters | str]
             | float
@@ -458,50 +509,39 @@ class EvaluatorSuite[**Args, Parameters: State](Immutable):
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> EvaluatorSuiteResult:
+        """Evaluate the suite cases.
+
+        Parameters
+        ----------
+        cases : Sequence[EvaluatorSuiteCase | Parameters | str] | float | int | None
+            Cases to evaluate - explicit cases, parameters or identifiers of stored cases,
+            a fraction of the stored cases within ``(0, 1]``, their count, or all of them
+            when omitted.
+        *args : Args.args
+            Additional positional arguments forwarded to the suite definition.
+        **kwargs : Args.kwargs
+            Additional keyword arguments forwarded to the suite definition.
+
+        Returns
+        -------
+        EvaluatorSuiteResult
+            Results of all evaluated cases. A case failing with an error is reported as
+            a failed case instead of aborting the suite.
+
+        Raises
+        ------
+        ValueError
+            When a selection resolves to no cases or refers to an unknown case identifier.
+        """
         async with ctx.scope(f"evaluator.suite.{self.name}", *self._state):
             available_cases: Sequence[EvaluatorSuiteCase[Parameters]]
             async with self._lock:
                 available_cases = await self._available_cases()
 
-            selected_cases: Sequence[EvaluatorSuiteCase[Parameters]]
-            if cases is None:
-                selected_cases = available_cases
-
-            elif isinstance(cases, int):
-                selected_cases = random.sample(  # nosec: B311
-                    available_cases,
-                    min(len(available_cases), cases),
-                )
-
-            elif isinstance(cases, float):
-                assert 0 < cases <= 1  # nosec: B101
-                selected_cases = random.sample(  # nosec: B311
-                    available_cases,
-                    min(len(available_cases), int(len(available_cases) * cases)),
-                )
-
-            else:
-                selected_cases = []
-                for case in cases:
-                    if isinstance(case, str):
-                        if evaluation_case := next(
-                            iter(
-                                available
-                                for available in available_cases
-                                if available.identifier == case
-                            ),
-                            None,
-                        ):
-                            selected_cases.append(evaluation_case)
-
-                        else:
-                            raise ValueError(f"Evaluation case with ID {case} does not exists.")
-
-                    elif isinstance(case, EvaluatorSuiteCase):
-                        selected_cases.append(cast(EvaluatorSuiteCase[Parameters], case))
-
-                    else:
-                        selected_cases.append(EvaluatorSuiteCase(parameters=case))
+            selected_cases: Sequence[EvaluatorSuiteCase[Parameters]] = _select_cases(
+                available_cases,
+                cases,
+            )
 
             async def evaluate_case(
                 case: EvaluatorSuiteCase[Parameters],
@@ -512,7 +552,7 @@ class EvaluatorSuite[**Args, Parameters: State](Immutable):
                     **kwargs,
                 )
 
-            return EvaluatorSuiteResult(
+            suite_result: EvaluatorSuiteResult = EvaluatorSuiteResult(
                 suite=self.name,
                 results=await execute_concurrently(
                     evaluate_case,
@@ -520,6 +560,18 @@ class EvaluatorSuite[**Args, Parameters: State](Immutable):
                     concurrent_tasks=self.concurrent_evaluations,
                 ),
             )
+            ctx.record_info(
+                metric=f"evaluator.suite.{self.name}.performance",
+                value=suite_result.performance,
+                unit="%",
+                kind="histogram",
+                attributes={
+                    "passed": suite_result.passed,
+                    "cases": len(suite_result.results),
+                    "cases.passed": sum(1 for case in suite_result.results if case.passed),
+                },
+            )
+            return suite_result
 
     async def _evaluate_case(
         self,
@@ -527,11 +579,35 @@ class EvaluatorSuite[**Args, Parameters: State](Immutable):
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> EvaluatorSuiteCaseResult:
-        results: Sequence[EvaluatorScenarioResult | EvaluatorResult] = await self._definition(
-            case.parameters,
-            *args,
-            **kwargs,
-        )
+        results: Sequence[EvaluatorScenarioResult | EvaluatorResult]
+        try:
+            results = await self._definition(
+                case.parameters,
+                *args,
+                **kwargs,
+            )
+
+        except Exception as exc:
+            ctx.log_error(
+                f"Evaluator suite `{self.name}` case failed due to an error",
+                exception=exc,
+            )
+            ctx.record_info(
+                metric="evaluator.suite.case_errors",
+                value=1,
+                unit="count",
+                kind="counter",
+                attributes={"suite": self.name},
+            )
+            # keep the error within a failed result instead of aborting the whole suite
+            results = (
+                EvaluatorResult.of(
+                    self.name,
+                    score=0.0,
+                    threshold=1.0,
+                    meta=Meta.empty.with_error(exc),
+                ),
+            )
 
         return EvaluatorSuiteCaseResult(
             case_identifier=case.identifier,
@@ -560,6 +636,18 @@ class EvaluatorSuite[**Args, Parameters: State](Immutable):
         name: str,
         /,
     ) -> Self:
+        """Create a copy of the suite with a different name.
+
+        Parameters
+        ----------
+        name : str
+            New suite name.
+
+        Returns
+        -------
+        Self
+            Suite copy with the name applied.
+        """
         return self.__class__(
             name=name,
             concurrent_evaluations=self.concurrent_evaluations,
@@ -575,6 +663,18 @@ class EvaluatorSuite[**Args, Parameters: State](Immutable):
         concurrent_evaluations: int,
         /,
     ) -> Self:
+        """Create a copy of the suite with a different concurrency limit.
+
+        Parameters
+        ----------
+        concurrent_evaluations : int
+            Number of cases evaluated concurrently.
+
+        Returns
+        -------
+        Self
+            Suite copy with the limit applied.
+        """
         return self.__class__(
             name=self.name,
             concurrent_evaluations=concurrent_evaluations,
@@ -590,6 +690,18 @@ class EvaluatorSuite[**Args, Parameters: State](Immutable):
         meta: Meta | MetaValues,
         /,
     ) -> Self:
+        """Create a copy of the suite with metadata merged into its own.
+
+        Parameters
+        ----------
+        meta : Meta | MetaValues
+            Metadata to merge.
+
+        Returns
+        -------
+        Self
+            Suite copy with updated metadata.
+        """
         return self.__class__(
             name=self.name,
             concurrent_evaluations=self.concurrent_evaluations,
@@ -606,6 +718,20 @@ class EvaluatorSuite[**Args, Parameters: State](Immutable):
         /,
         *states: State,
     ) -> Self:
+        """Create a copy of the suite running within additional context state.
+
+        Parameters
+        ----------
+        state : State
+            State to activate while evaluating.
+        *states : State
+            Further states to activate.
+
+        Returns
+        -------
+        Self
+            Suite copy using the state.
+        """
         return self.__class__(
             name=self.name,
             concurrent_evaluations=self.concurrent_evaluations,
@@ -624,6 +750,18 @@ class EvaluatorSuite[**Args, Parameters: State](Immutable):
         | str,
         /,
     ) -> Self:
+        """Create a copy of the suite using the given cases storage.
+
+        Parameters
+        ----------
+        storage : EvaluatorSuiteCasesStorage | Sequence[EvaluatorSuiteCase] | Path | str
+            Storage implementation, fixed cases kept in memory or a path of a JSON file.
+
+        Returns
+        -------
+        Self
+            Suite copy using the storage.
+        """
         suite_storage: EvaluatorSuiteCasesStorage[Parameters]
         if isinstance(storage, Path | str):
             suite_storage = _EvaluatorSuiteFileStorage[Parameters](
@@ -654,6 +792,18 @@ class EvaluatorSuite[**Args, Parameters: State](Immutable):
         *,
         reload: bool = False,
     ) -> Sequence[EvaluatorSuiteCase[Parameters]]:
+        """List the cases available within the suite.
+
+        Parameters
+        ----------
+        reload : bool, default=False
+            Whether to read the cases from the storage again instead of using the cache.
+
+        Returns
+        -------
+        Sequence[EvaluatorSuiteCase[Parameters]]
+            Available cases.
+        """
         async with self._lock:
             return await self._available_cases(reload=reload)
 
@@ -663,6 +813,15 @@ class EvaluatorSuite[**Args, Parameters: State](Immutable):
         /,
         identifier: str | None = None,
     ) -> None:
+        """Add a case to the suite and persist it within the suite storage.
+
+        Parameters
+        ----------
+        parameters : Parameters
+            Parameters of the new case.
+        identifier : str | None, default=None
+            Case identifier, generated when omitted.
+        """
         async with self._lock:
             current_cases: Sequence[EvaluatorSuiteCase[Parameters]] = await self._available_cases(
                 reload=True
@@ -690,6 +849,25 @@ class EvaluatorSuite[**Args, Parameters: State](Immutable):
         guidelines: str | None = None,
         examples: Iterable[Parameters] | None = None,
     ) -> Sequence[EvaluatorSuiteCase[Parameters]]:
+        """Generate additional evaluation cases using the configured generation model.
+
+        Parameters
+        ----------
+        count : int
+            Number of cases to generate.
+        persist : bool, default=False
+            Whether to store the generated cases. Cases which are not persisted are kept
+            only until the stored cases are reloaded.
+        guidelines : str | None, default=None
+            Additional guidelines used when generating the cases.
+        examples : Iterable[Parameters] | None, default=None
+            Example cases to follow, existing cases are used when omitted.
+
+        Returns
+        -------
+        Sequence[EvaluatorSuiteCase[Parameters]]
+            Generated cases.
+        """
         async with self._lock:
             from draive.helpers.evaluation_case_generation import generate_case_parameters
 
@@ -724,6 +902,13 @@ class EvaluatorSuite[**Args, Parameters: State](Immutable):
         identifier: str,
         /,
     ) -> None:
+        """Remove the case with the given identifier from the suite and its storage.
+
+        Parameters
+        ----------
+        identifier : str
+            Identifier of the case to remove.
+        """
         async with self._lock:
             current_cases: Sequence[EvaluatorSuiteCase[Parameters]] = await self._available_cases(
                 reload=True
@@ -844,7 +1029,15 @@ class EvaluatorSuiteData[Parameters: State](State, serializable=True):
     cases: Sequence[EvaluatorSuiteCase[Parameters]] = ()
 
 
-class _EvaluatorSuiteMemoryStorage[Parameters: State](Immutable):
+@final
+class _EvaluatorSuiteMemoryStorage[Parameters: State]:
+    __slots__ = ("_cases_store",)
+
+    __setattr__ = refuse_assignment
+    __delattr__ = refuse_deletion
+    __copy__ = same_copy
+    __deepcopy__ = same_deepcopy
+
     _cases_store: Sequence[EvaluatorSuiteCase[Parameters]]
 
     def __init__(
@@ -873,7 +1066,18 @@ class _EvaluatorSuiteMemoryStorage[Parameters: State](Immutable):
         )
 
 
-class _EvaluatorSuiteFileStorage[Parameters: State](Immutable):
+@final
+class _EvaluatorSuiteFileStorage[Parameters: State]:
+    __slots__ = (
+        "_data_type",
+        "_path",
+    )
+
+    __setattr__ = refuse_assignment
+    __delattr__ = refuse_deletion
+    __copy__ = same_copy
+    __deepcopy__ = same_deepcopy
+
     _path: Path
     _data_type: type[EvaluatorSuiteCase[Parameters]]
 
@@ -947,3 +1151,49 @@ class _EvaluatorSuiteFileStorage[Parameters: State](Immutable):
         self._path.parent.mkdir(parents=True, exist_ok=True)
         with open(self._path, mode="wb+") as file:
             file.write(json.dumps([case.to_basic_object() for case in cases]).encode("utf-8"))
+
+
+def _select_cases[Parameters: State](
+    available_cases: Sequence[EvaluatorSuiteCase[Parameters]],
+    cases: Sequence[EvaluatorSuiteCase[Parameters] | Parameters | str] | float | int | None,
+) -> Sequence[EvaluatorSuiteCase[Parameters]]:
+    if cases is None:
+        return available_cases
+
+    if isinstance(cases, int):
+        if cases <= 0:
+            raise ValueError("Number of selected cases must be greater than zero")
+
+        return random.sample(  # nosec: B311
+            available_cases,
+            min(len(available_cases), cases),
+        )
+
+    if isinstance(cases, float):
+        if not 0 < cases <= 1:
+            raise ValueError("Fraction of selected cases must be within (0, 1]")
+
+        return random.sample(  # nosec: B311
+            available_cases,
+            min(len(available_cases), max(1, int(len(available_cases) * cases))),
+        )
+
+    selected_cases: list[EvaluatorSuiteCase[Parameters]] = []
+    for case in cases:
+        if isinstance(case, str):
+            if evaluation_case := next(
+                iter(available for available in available_cases if available.identifier == case),
+                None,
+            ):
+                selected_cases.append(evaluation_case)
+
+            else:
+                raise ValueError(f"Evaluation case with ID {case} does not exists.")
+
+        elif isinstance(case, EvaluatorSuiteCase):
+            selected_cases.append(cast(EvaluatorSuiteCase[Parameters], case))
+
+        else:
+            selected_cases.append(EvaluatorSuiteCase(parameters=case))
+
+    return selected_cases

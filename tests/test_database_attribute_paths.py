@@ -1,5 +1,5 @@
 from collections.abc import Mapping, Sequence
-from typing import Annotated, Any
+from typing import Annotated
 
 import pytest
 from haiway import Alias, AttributePath, AttributeRequirement, State, Validator
@@ -8,7 +8,6 @@ from qdrant_client.models import FieldCondition
 from draive.postgres.vector_index import resolve_requirements
 from draive.qdrant.filters import prepare_filter as qdrant_filter
 from draive.surreal.filters import prepare_filter as surreal_filter
-from draive.utils.attributes import attribute_path_components, attribute_path_segments
 
 
 class _Nested(State):
@@ -55,9 +54,8 @@ def test_database_filters_resolve_typed_paths(
     components: Sequence[str | int],
     key: str,
 ) -> None:
-    assert attribute_path_components(path) == components
+    assert path.serialized_components == components
     segments = tuple(str(component) for component in components)
-    assert attribute_path_segments(path) == segments
     requirement = AttributeRequirement[_Document].equal("match", path)
     _, arguments = resolve_requirements(requirement)
     assert arguments == [segments, '"match"']
@@ -71,14 +69,8 @@ def test_database_filters_resolve_typed_paths(
     assert surreal_filter(requirement, scoped=True) == (f"content.{key} = $_f0", {"_f0": "match"})
 
 
-@pytest.mark.parametrize("path", ("nested.value", "entries[0].value", "", None))
-def test_untyped_paths_are_rejected(path: Any) -> None:
-    with pytest.raises(AssertionError, match="Expected an AttributePath"):
-        attribute_path_segments(path)
-
-
 def test_mapping_keys_are_not_split() -> None:
-    assert attribute_path_segments(_Document._.mapping["a.b[c]"].value) == (
+    assert _Document._.mapping["a.b[c]"].value.serialized_components == (
         "mapping",
         "a.b[c]",
         "stored_value",

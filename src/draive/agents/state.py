@@ -5,6 +5,7 @@ from uuid import UUID
 
 from haiway import Disposable, Meta, MetaValues, State, ctx
 
+from draive._constant import class_constant
 from draive.agents.types import (
     AgentException,
     AgentMemoryPreparing,
@@ -19,6 +20,14 @@ from draive.steps.step import Step, step
 from draive.tools import Tool
 
 __all__ = ("AgentMemory",)
+
+
+def _disabled_memory() -> AgentMemory:
+    return AgentMemory(
+        preparing=_prepare,
+        recalling=_recall,
+        remembering=_remember,
+    )
 
 
 @final
@@ -42,7 +51,7 @@ class AgentMemory(State):
         Additional metadata attached to the memory instance.
     """
 
-    disabled: ClassVar[Self]  # defined after the class
+    disabled: ClassVar[AgentMemory] = class_constant(_disabled_memory)
 
     @classmethod
     def volatile(
@@ -448,10 +457,3 @@ async def _remember(
     **extra: Any,
 ) -> None:
     pass
-
-
-AgentMemory.disabled = AgentMemory(
-    preparing=_prepare,
-    recalling=_recall,
-    remembering=_remember,
-)

@@ -605,3 +605,74 @@ async def test_resolve_raw_and_loaded_empty_templates_match() -> None:
 
     assert raw is MultimodalContent.empty
     assert loaded is MultimodalContent.empty
+
+
+@pytest.mark.asyncio
+async def test_file_repository_refuses_to_overwrite_invalid_storage(tmp_path: Path) -> None:
+    path = tmp_path / "templates.json"
+    path.write_text("{not json", encoding="utf-8")
+    repository = TemplatesRepository.file(path)
+
+    async with ctx.scope("test"):
+        with pytest.raises(TemplateInvalid):
+            await repository.define(
+                TemplateDeclaration(
+                    identifier="new",
+                    description=None,
+                    variables={},
+                    meta=Meta.empty,
+                ),
+                content="Hello",
+            )
+
+    assert path.read_text(encoding="utf-8") == "{not json"
+
+
+@pytest.mark.asyncio
+async def test_file_repository_with_skipped_elements_is_read_only(tmp_path: Path) -> None:
+    path = tmp_path / "templates.json"
+    original = (
+        '[{"identifier": "valid", "description": null, "variables": {}, "content": "Hello",'
+        ' "meta": {}}, {"broken": true}]'
+    )
+    path.write_text(original, encoding="utf-8")
+    repository = TemplatesRepository.file(path)
+
+    async with ctx.scope("test"):
+        # what could be read stays available
+        assert await repository.load(Template.of("valid")) == "Hello"
+        with pytest.raises(TemplateInvalid):
+            await repository.define(
+                TemplateDeclaration(
+                    identifier="new",
+                    description=None,
+                    variables={},
+                    meta=Meta.empty,
+                ),
+                content="World",
+            )
+
+    assert path.read_text(encoding="utf-8") == original
+
+
+@pytest.mark.asyncio
+async def test_file_repository_declarations_and_contents_stay_in_sync(tmp_path: Path) -> None:
+    repository = TemplatesRepository.file(tmp_path / "templates.json")
+
+    async with ctx.scope("test"):
+        await repository.define(
+            TemplateDeclaration(identifier="a", description=None, variables={}, meta=Meta.empty),
+            content="first",
+        )
+        await repository.define(
+            TemplateDeclaration(identifier="a", description="d", variables={}, meta=Meta.empty),
+            content="second",
+        )
+
+        listed = (await repository.templates()).items
+        assert [(item.identifier, item.description) for item in listed] == [("a", "d")]
+        assert await repository.load(Template.of("a")) == "second"
+
+    reloaded = TemplatesRepository.file(tmp_path / "templates.json")
+    async with ctx.scope("test"):
+        assert await reloaded.load(Template.of("a")) == "second"

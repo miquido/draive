@@ -4,17 +4,17 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
-from haiway import Pagination
+from haiway import Pagination, ctx
 from surrealdb.errors import parse_query_error
 
-import draive.surreal.conversation_memory as surreal_memory
 from draive.conversation.types import ConversationUserTurn
 from draive.multimodal import MultimodalContent
 from draive.surreal import SurrealConversationMemory, SurrealException, SurrealObject
+from tests._surreal_session import surreal_session
 
 
 @pytest.mark.asyncio
-async def test_surreal_conversation_memory_remember_flattens_execute_variables(
+async def test_surreal_conversation_memory_remember_stores_all_turns_with_single_statement(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     turn = ConversationUserTurn.of(
@@ -31,25 +31,28 @@ async def test_surreal_conversation_memory_remember_flattens_execute_variables(
     ) -> Sequence[SurrealObject]:
         if statement.lstrip().startswith("DEFINE "):
             return ()
-        assert "thread_id = $thread_id" in statement
+        assert statement == "INSERT INTO conversation_memory $rows;"
         execution_variables.append(variables)
         return ()
 
-    monkeypatch.setattr(surreal_memory.Surreal, "execute", fake_execute)
+    async with ctx.scope("test", surreal_session(fake_execute)):
+        memory = SurrealConversationMemory.prepare(thread="thread-1")
 
-    memory = SurrealConversationMemory.prepare(thread="thread-1")
+        await memory.remember(turn)
 
-    await memory.remember(turn)
-
-    assert execution_variables == [
-        {
-            "thread_id": "thread-1",
-            "turn": "user",
-            "identifier": str(turn.identifier),
-            "payload": turn.to_json(),
-            "created": turn.created,
-        }
-    ]
+        assert execution_variables == [
+            {
+                "rows": [
+                    {
+                        "thread_id": "thread-1",
+                        "turn": "user",
+                        "identifier": str(turn.identifier),
+                        "payload": turn.to_json(),
+                        "created": turn.created,
+                    }
+                ]
+            }
+        ]
 
 
 @pytest.mark.asyncio
@@ -67,17 +70,16 @@ async def test_surreal_conversation_memory_migration_defines_table_and_indexes(
         statements.append(statement)
         return ()
 
-    monkeypatch.setattr(surreal_memory.Surreal, "execute", fake_execute)
+    async with ctx.scope("test", surreal_session(fake_execute)):
+        await SurrealConversationMemory.migrate()
 
-    await SurrealConversationMemory.migrate()
-
-    assert statements == [
-        "DEFINE TABLE IF NOT EXISTS conversation_memory SCHEMALESS TYPE NORMAL;",
-        "DEFINE INDEX IF NOT EXISTS conversation_memory_thread_idx "
-        "ON TABLE conversation_memory FIELDS thread_id, created;",
-        "DEFINE INDEX IF NOT EXISTS conversation_memory_cursor_idx "
-        "ON TABLE conversation_memory FIELDS thread_id, identifier;",
-    ]
+        assert statements == [
+            "DEFINE TABLE IF NOT EXISTS conversation_memory SCHEMALESS TYPE NORMAL;",
+            "DEFINE INDEX IF NOT EXISTS conversation_memory_thread_idx "
+            "ON TABLE conversation_memory FIELDS thread_id, created;",
+            "DEFINE INDEX IF NOT EXISTS conversation_memory_cursor_idx "
+            "ON TABLE conversation_memory FIELDS thread_id, identifier;",
+        ]
 
 
 @pytest.mark.asyncio
@@ -105,11 +107,10 @@ async def test_surreal_conversation_memory_propagates_missing_table(
             }
         )
 
-    monkeypatch.setattr(surreal_memory.Surreal, "execute", fake_execute)
+    async with ctx.scope("test", surreal_session(fake_execute)):
+        memory = SurrealConversationMemory.prepare(thread=uuid4())
+        with pytest.raises(SurrealException):
+            await memory.recall()
 
-    memory = SurrealConversationMemory.prepare(thread=uuid4())
-    with pytest.raises(SurrealException):
-        await memory.recall()
-
-    with pytest.raises(SurrealException):
-        await memory.fetch(Pagination.of(limit=4))
+        with pytest.raises(SurrealException):
+            await memory.fetch(Pagination.of(limit=4))

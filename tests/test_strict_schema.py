@@ -7,7 +7,7 @@ from uuid import UUID
 
 from haiway import Meta, State, as_dict
 
-from draive.utils.schema import strict_schema
+from draive.openai.schema import strict_schema
 
 OPEN_MAP: Mapping[str, Any] = {"type": "object", "additionalProperties": {"type": "string"}}
 
@@ -155,6 +155,13 @@ def test_nesting_beyond_the_limit_is_not_convertible() -> None:
         deep_arrays = {"type": "array", "items": deep_arrays}
 
     assert strict_schema(_object({"n": deep_arrays})) is not None
+    # neither does an open map - the api accepts it below ten levels of properties
+    open_leaf: Mapping[str, Any] = _object({"m": OPEN_MAP})
+    for _ in range(9):
+        open_leaf = _object({"n": open_leaf})
+
+    assert strict_schema(open_leaf) is not None
+    assert strict_schema(_object({"n": open_leaf})) is None
 
 
 def test_non_object_root_is_not_convertible() -> None:
@@ -224,7 +231,6 @@ def test_keywords_outside_the_specification_vocabulary_are_not_convertible() -> 
         ("prefixItems", [{"type": "string"}]),
         ("allOf", [{"type": "string"}]),
         ("not", {"type": "integer"}),
-        ("uniqueItems", True),
         ("patternProperties", {"^a": {"type": "string"}}),
         ("minLength", 2),
         ("pattern", "^a+$"),
@@ -359,3 +365,15 @@ def test_schemas_without_open_maps_convert_either_way() -> None:
     schema = _object({"a": {"type": "string"}, "b": {"type": "integer"}})
 
     assert strict_schema(schema) == strict_schema(schema, open_maps=False)
+
+
+def test_state_with_bytes_and_set_stays_strict() -> None:
+    class _Binary(State):
+        data: bytes
+        tags: frozenset[str]
+
+    converted = strict_schema(as_dict(_Binary.__SPECIFICATION__))
+
+    assert converted is not None
+    assert converted["properties"]["data"] == {"type": "string"}
+    assert "uniqueItems" not in converted["properties"]["tags"]

@@ -161,7 +161,7 @@ async def test_surreal_session_transaction_is_unavailable_for_embedded_connectio
     ) as client:
         async with client.prepare_session() as session:
             with pytest.raises(
-                RuntimeError,
+                SurrealException,
                 match="Embedded SurrealDB connections do not support client-side transactions",
             ):
                 session.transaction()
@@ -331,3 +331,112 @@ async def test_surreal_client_transaction_accepts_supported_identifier_shapes(
                 await transaction_session.execute("RETURN [];")
 
     assert commit_txn == transaction_id
+
+
+@pytest.mark.asyncio
+async def test_surreal_transaction_cancel_failure_keeps_original_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[RequestMethod] = []
+
+    class _FakeConnection:
+        def __init__(self, url: str) -> None:
+            self.url = url
+
+        async def connect(self, url: str | None = None) -> None:
+            self.url = url or self.url
+
+        async def _send(
+            self,
+            message: object,
+            process: str,
+            bypass: bool = False,
+        ) -> dict[str, object]:
+            _ = process, bypass
+            calls.append(message.method)
+            if message.method is RequestMethod.BEGIN:
+                return {"result": str(uuid4())}
+
+            if message.method in (RequestMethod.CANCEL, RequestMethod.DETACH):
+                raise RuntimeError("cleanup failed")
+
+            return {"result": None}
+
+        async def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(surreal_connection, "AsyncWsSurrealConnection", _FakeConnection)
+
+    class _BodyError(Exception):
+        pass
+
+    async with SurrealClient(url="ws://example.test", namespace="ns", database="db") as client:
+        with pytest.raises(_BodyError):
+            async with client.prepare_session() as session:
+                async with session.transaction():
+                    raise _BodyError()
+
+    assert RequestMethod.CANCEL in calls
+    assert RequestMethod.DETACH in calls
+
+
+@pytest.mark.asyncio
+async def test_surreal_recursive_session_acquiring_raises_surreal_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from haiway import ctx
+
+    from draive.surreal.state import Surreal
+
+    class _FakeConnection:
+        def __init__(self, url: str) -> None:
+            self.url = url
+
+        async def connect(self, url: str | None = None) -> None:
+            self.url = url or self.url
+
+        async def _send(self, message: object, process: str, bypass: bool = False) -> object:
+            _ = message, process, bypass
+            return {"result": None}
+
+        async def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(surreal_connection, "AsyncWsSurrealConnection", _FakeConnection)
+
+    async with SurrealClient(url="ws://example.test", namespace="ns", database="db") as surreal:
+        async with ctx.scope("test", surreal):
+            async with Surreal.prepare_session() as session:
+                async with ctx.scope("bound", session):
+                    with pytest.raises(SurrealException, match="Recursive"):
+                        Surreal.prepare_session()
+
+
+@pytest.mark.asyncio
+async def test_surreal_undecodable_response_value_raises_surreal_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FakeConnection:
+        def __init__(self, url: str) -> None:
+            self.url = url
+
+        async def connect(self, url: str | None = None) -> None:
+            self.url = url or self.url
+
+        async def _send(self, message: object, process: str, bypass: bool = False) -> object:
+            _ = process, bypass
+            if message.method is RequestMethod.QUERY:  # pyright: ignore[reportAttributeAccessIssue]
+                # a bare scalar statement result cannot be turned into an object row
+                return {"result": [{"status": "OK", "result": [object()]}]}
+
+            return {"result": None}
+
+        async def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(surreal_connection, "AsyncWsSurrealConnection", _FakeConnection)
+
+    async with SurrealClient(url="ws://example.test", namespace="ns", database="db") as client:
+        async with client.prepare_session() as session:
+            with pytest.raises(SurrealException):
+                await session.execute("RETURN 1;")

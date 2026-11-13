@@ -58,7 +58,9 @@ async def prepare_instructions(
             case declaration:
                 instruction_declaration = declaration
 
-        assert instruction_declaration.description is not None  # nosec: B101
+        if instruction_declaration.description is None:
+            raise ValueError("Instruction preparation requires a description of the task")
+
         result: MultimodalContent = await Step.generating_completion(
             instructions=PREPARE_INSTRUCTION.replace(
                 "{guidelines}",

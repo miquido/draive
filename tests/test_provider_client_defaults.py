@@ -164,3 +164,39 @@ def test_openai_prefers_the_azure_key_over_the_openai_one(
     monkeypatch.setenv("OPENAI_API_KEY", "openai-key")
 
     assert OpenAIAPI()._prepare_client().api_key == "azure-key"
+
+
+@pytest.mark.parametrize(
+    ("environment", "argument", "expected"),
+    (
+        ({}, None, "https://api.mistral.ai"),
+        ({"MISTRAL_ENDPOINT": "https://alias.example"}, None, "https://alias.example"),
+        (
+            {
+                "MISTRAL_SERVER_URL": "https://canonical.example",
+                "MISTRAL_ENDPOINT": "https://alias",
+            },
+            None,
+            "https://canonical.example",
+        ),
+        (
+            {"MISTRAL_SERVER_URL": "https://canonical.example"},
+            "https://explicit.example",
+            "https://explicit.example",
+        ),
+    ),
+)
+def test_mistral_server_url_resolution(
+    monkeypatch: pytest.MonkeyPatch,
+    environment: dict[str, str],
+    argument: str | None,
+    expected: str,
+) -> None:
+    from draive.mistral.api import MistralAPI
+
+    monkeypatch.delenv("MISTRAL_SERVER_URL", raising=False)
+    monkeypatch.delenv("MISTRAL_ENDPOINT", raising=False)
+    for key, value in environment.items():
+        monkeypatch.setenv(key, value)
+
+    assert MistralAPI(server_url=argument)._server_url == expected  # pyright: ignore[reportPrivateUsage]

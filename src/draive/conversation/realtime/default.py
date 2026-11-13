@@ -68,7 +68,7 @@ def realtime_conversation_preparing(  # noqa: C901, PLR0915
             try:
                 await memory.remember(turn)
 
-            except BaseException as exc:
+            except Exception as exc:  # cancellation must propagate
                 ctx.log_error(
                     "Failed to persist conversation memory context",
                     exception=exc,

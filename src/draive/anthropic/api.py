@@ -65,8 +65,6 @@ class AnthropicAPI:
         await self._client.__aenter__()
 
     async def _deinitialize_client(self) -> None:
-        # closing keeps the instance usable - deleting it would break streams
-        # still held by a caller past the scope with an attribute error
         try:
             await self._client.__aexit__(
                 None,

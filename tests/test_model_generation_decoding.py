@@ -161,3 +161,23 @@ async def test_model_generation_ignores_trailing_output() -> None:
         )
 
     assert generated.name == "Paris"
+
+
+@pytest.mark.asyncio
+async def test_schema_injection_keeps_literal_braces_in_instructions() -> None:
+    captured: dict[str, Any] = {}
+
+    async def _completion(**kwargs: Any):
+        captured.update(kwargs)
+        yield TextContent.of('{"name": "Paris"}')
+
+    async with ctx.scope("test", GenerativeModel(generating=_completion)):
+        await ModelGeneration.generate(
+            Example,
+            instructions='Reply like {"city": "Rome"}. Schema: {model_schema}',
+            input="Describe Paris.",
+            schema_injection="simplified",
+        )
+
+    assert captured["instructions"].startswith('Reply like {"city": "Rome"}. Schema: ')
+    assert "{model_schema}" not in captured["instructions"]

@@ -1,8 +1,10 @@
+import base64
 import re
 from collections.abc import Callable, MutableSequence, Sequence
-from typing import Any, Final
+from typing import Any, Final, final
 
-from haiway import Immutable, ctx
+from haiway import ctx
+from haiway.types.frozen import refuse_assignment, refuse_deletion, same_copy, same_deepcopy
 
 from draive.guardrails.safety.types import GuardrailsSafetyException, GuardrailsSafetySanitization
 from draive.multimodal import MultimodalContent, MultimodalContentPart, TextContent
@@ -13,7 +15,8 @@ __all__ = (
 )
 
 
-class RegexSanitizationRule(Immutable):
+@final
+class RegexSanitizationRule:
     """
     Immutable regular-expression safety rule definition.
 
@@ -32,11 +35,38 @@ class RegexSanitizationRule(Immutable):
         action. When ``False`` the match is ignored.
     """
 
+    __slots__ = (
+        "identifier",
+        "mask",
+        "pattern",
+        "reason",
+        "validator",
+    )
+
+    __setattr__ = refuse_assignment
+    __delattr__ = refuse_deletion
+    __copy__ = same_copy
+    __deepcopy__ = same_deepcopy
+
     identifier: str
     pattern: re.Pattern[str]
     reason: str
     mask: str | None
-    validator: Callable[[re.Match[str], str], bool] | None = None
+    validator: Callable[[re.Match[str], str], bool] | None
+
+    def __init__(
+        self,
+        identifier: str,
+        pattern: re.Pattern[str],
+        reason: str,
+        mask: str | None,
+        validator: Callable[[re.Match[str], str], bool] | None = None,
+    ) -> None:
+        object.__setattr__(self, "identifier", identifier)
+        object.__setattr__(self, "pattern", pattern)
+        object.__setattr__(self, "reason", reason)
+        object.__setattr__(self, "mask", mask)
+        object.__setattr__(self, "validator", validator)
 
 
 _NEGATING_PREFIX: Final[re.Pattern[str]] = re.compile(
@@ -138,11 +168,56 @@ def _contains_sensitive_language(
     return False
 
 
+_PRINTABLE_RATIO: Final[float] = 0.85
+
+
+def _is_mostly_printable(decoded: bytes) -> bool:
+    if not decoded:
+        return False
+
+    try:
+        text: str = decoded.decode("utf-8")
+
+    except UnicodeDecodeError:
+        return False
+
+    printable: int = sum(1 for character in text if character.isprintable() or character in "\n\t")
+    return printable / len(text) >= _PRINTABLE_RATIO
+
+
+def _is_encoded_text_base64(
+    match: re.Match[str],
+    text: str,
+) -> bool:
+    # random identifiers, digests and paths look like base64 - only text counts
+    token: str = match.group(1)
+    token = token.rstrip("=")
+    token += "=" * (-len(token) % 4)
+    try:
+        return _is_mostly_printable(base64.b64decode(token, validate=True))
+
+    except ValueError:
+        return False
+
+
+def _is_encoded_text_hex(
+    match: re.Match[str],
+    text: str,
+) -> bool:
+    # mac addresses and other hex dumps are not text
+    tokens: list[str] = re.findall(r"(?i)\b(?:0x)?([0-9a-f]{2})\b", match.group(0))
+    try:
+        return _is_mostly_printable(bytes.fromhex("".join(tokens)))
+
+    except ValueError:
+        return False
+
+
 DEFAULT_REGEX_RULES: Final[tuple[RegexSanitizationRule, ...]] = (
     RegexSanitizationRule(
         identifier="ignore_system_instructions",
         pattern=re.compile(
-            r"(?i)\b(?:ignore|disregard|forget)\b"
+            r"(?is)\b(?:ignore|disregard|forget)\b"
             r".{0,80}\b(?:previous|prior|system)\b"
             r".{0,40}\b(?:instructions?|directives?|rules?)\b"
         ),
@@ -153,7 +228,7 @@ DEFAULT_REGEX_RULES: Final[tuple[RegexSanitizationRule, ...]] = (
     RegexSanitizationRule(
         identifier="exfiltrate_system_prompt",
         pattern=re.compile(
-            r"(?i)\b(?:reveal|show|expose|print|leak)\b"
+            r"(?is)\b(?:reveal|show|expose|print|leak)\b"
             r".{0,80}\b(?:system|hidden|initial)\b"
             r".{0,40}\b(?:prompt|message|instructions?)\b"
         ),
@@ -164,7 +239,7 @@ DEFAULT_REGEX_RULES: Final[tuple[RegexSanitizationRule, ...]] = (
     RegexSanitizationRule(
         identifier="disable_safety_mechanisms",
         pattern=re.compile(
-            r"(?i)\b(?:disable|bypass|circumvent|override)\b"
+            r"(?is)\b(?:disable|bypass|circumvent|override)\b"
             r".{0,80}\b(?:guardrails|safety|filters?|policies|restrictions?)\b"
         ),
         reason="Detected request to disable safety mechanisms.",
@@ -174,7 +249,7 @@ DEFAULT_REGEX_RULES: Final[tuple[RegexSanitizationRule, ...]] = (
     RegexSanitizationRule(
         identifier="jailbreak_mode_activation",
         pattern=re.compile(
-            r"(?i)\b(?:begin|enter|activate|start)\b"
+            r"(?is)\b(?:begin|enter|activate|start)\b"
             r".{0,40}\b(?:jailbreak|do[-\s]?anything[-\s]?now|dan\s*mode?)\b"
         ),
         reason="Detected explicit jailbreak mode activation attempt.",
@@ -198,7 +273,7 @@ DEFAULT_REGEX_RULES: Final[tuple[RegexSanitizationRule, ...]] = (
     RegexSanitizationRule(
         identifier="role_override_direct_assignment",
         pattern=re.compile(
-            r"(?i)\byou\s+are\s+now\b"
+            r"(?is)\byou\s+are\s+now\b"
             r".{0,80}\b(?:developer|hacker|uncensored|unfiltered|dan|do[-\s]?anything|"
             r"system|assistant|persona)\b"
         ),
@@ -209,7 +284,7 @@ DEFAULT_REGEX_RULES: Final[tuple[RegexSanitizationRule, ...]] = (
     RegexSanitizationRule(
         identifier="policy_negation",
         pattern=re.compile(
-            r"(?i)\b(?:ignore|without)\b"
+            r"(?is)\b(?:ignore|without)\b"
             r".{0,40}\b(?:policy|rule|restriction|guardrail)s?\b"
             r".{0,80}\b(?:respond|comply|answer)\b"
         ),
@@ -220,7 +295,7 @@ DEFAULT_REGEX_RULES: Final[tuple[RegexSanitizationRule, ...]] = (
     RegexSanitizationRule(
         identifier="tooling_inventory_exfiltration",
         pattern=re.compile(
-            r"(?i)\b(?:list|show|reveal|describe|enumerate|tell|provide|explain|what|which)\b"
+            r"(?is)\b(?:list|show|reveal|describe|enumerate|tell|provide|explain|what|which)\b"
             r".{0,80}\b(?:all\s+)?(?:tools?|functions?|apis?|capabilities|commands?|instructions?)\b"
             r".{0,60}\b(?:available|you\s+have|you\s+can\s+use|internal|hidden|system|secret)\b"
         ),
@@ -231,7 +306,7 @@ DEFAULT_REGEX_RULES: Final[tuple[RegexSanitizationRule, ...]] = (
     RegexSanitizationRule(
         identifier="instruction_manifest_exfiltration",
         pattern=re.compile(
-            r"(?i)\b(?:summarize|reveal|list|show|print|explain|detail)\b"
+            r"(?is)\b(?:summarize|reveal|list|show|print|explain|detail)\b"
             r".{0,80}\b(?:all\s+)?(?:system|safety|guardrail|policy|instruction|rule)s?\b"
             r".{0,60}\b(?:provided|you\s+follow|you\s+have|governing|hidden|internal)\b"
         ),
@@ -248,19 +323,21 @@ DEFAULT_REGEX_RULES: Final[tuple[RegexSanitizationRule, ...]] = (
     RegexSanitizationRule(
         identifier="base64_encoded_instructions",
         pattern=re.compile(
-            r"(?i)(?:\b(?:decode|interpret|base64)\b.{0,40})?" r"([A-Za-z0-9+/]{48,}={0,2})"
+            r"(?is)(?:\b(?:decode|interpret|base64)\b.{0,40}?)?" r"([A-Za-z0-9+/]{48,}={0,2})"
         ),
         reason="Detected attempt to convey instructions via base64 encoding.",
         mask=None,
+        validator=_is_encoded_text_base64,
     ),
     RegexSanitizationRule(
         identifier="hex_encoded_instructions",
         pattern=re.compile(
-            r"(?i)(?:\b(?:decode|interpret|hex|hexadecimal)\b.{0,40})?"
+            r"(?is)(?:\b(?:decode|interpret|hex|hexadecimal)\b.{0,40})?"
             r"(?:(?:0x[0-9a-f]{2}\b|[0-9a-f]{2}\b)(?:[\s,;:|/\\-]+(?:0x[0-9a-f]{2}\b|[0-9a-f]{2}\b)){5,})"
         ),
         reason="Detected attempt to convey instructions via hexadecimal encoding.",
         mask=None,
+        validator=_is_encoded_text_hex,
     ),
 )
 

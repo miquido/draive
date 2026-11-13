@@ -207,20 +207,23 @@ class SurrealVectorIndex:
                 raise ValueError("Selected attribute values have to be the same type")
 
             created_timestamp: datetime = datetime.now(UTC)
-            for idx, (value, embedded) in enumerate(
-                zip(indexed_values, embedded_values, strict=True)
-            ):
-                await Surreal.execute(
-                    f"""
-                    CREATE {surreal_identifier(model.__name__)} SET
-                        content = $content,
-                        embedding = $embedding,
-                        created = $created;
-                    """,
-                    content=cast(Any, value.to_mapping()),
-                    embedding=list(embedded.vector),
-                    created=created_timestamp + timedelta(microseconds=idx),
-                )
+            # a single statement is applied atomically, either all rows are stored or none
+            await Surreal.execute(
+                f"INSERT INTO {surreal_identifier(model.__name__)} $rows;",
+                rows=cast(
+                    Any,
+                    [
+                        {
+                            "content": value.to_mapping(),
+                            "embedding": list(embedded.vector),
+                            "created": created_timestamp + timedelta(microseconds=idx),
+                        }
+                        for idx, (value, embedded) in enumerate(
+                            zip(indexed_values, embedded_values, strict=True)
+                        )
+                    ],
+                ),
+            )
 
             ctx.log_info("Vector index update completed.")
 

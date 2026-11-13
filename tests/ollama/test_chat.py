@@ -12,6 +12,7 @@ from ollama._types import ChatRequest
 from draive.models import (
     ModelOutputFailed,
     ModelOutputLimit,
+    ModelRateLimit,
     ModelReasoningChunk,
     ModelToolRequest,
     ModelTools,
@@ -95,6 +96,21 @@ async def test_completion_translates_provider_errors_to_model_output_failed() ->
 
     async with ctx.scope("test"):
         with pytest.raises(ModelOutputFailed, match="connection lost"):
+            _ = await _collect(model)
+
+
+@pytest.mark.asyncio
+async def test_completion_translates_rate_limit_to_model_rate_limit() -> None:
+    from ollama import ResponseError
+
+    async def _chat(**_: Any) -> Any:
+        raise ResponseError("too many requests", 429)
+
+    model = object.__new__(OllamaChat)
+    model._client = SimpleNamespace(chat=_chat)
+
+    async with ctx.scope("test"):
+        with pytest.raises(ModelRateLimit):
             _ = await _collect(model)
 
 

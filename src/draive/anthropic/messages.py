@@ -9,7 +9,9 @@ from collections.abc import (
 from typing import Any, Final, Literal, TypedDict, cast
 
 from anthropic import Omit, omit
+from anthropic import OverloadedError as AnthropicOverloadedError
 from anthropic import RateLimitError as AnthropicRateLimitError
+from anthropic import ServiceUnavailableError as AnthropicServiceUnavailableError
 from anthropic.types import (
     CitationsDelta,
     DocumentBlockParam,
@@ -32,18 +34,12 @@ from anthropic.types import (
     ToolResultBlockParam,
     ToolUseBlock,
     ToolUseBlockParam,
+    Usage,
 )
 from anthropic.types.output_config_param import OutputConfigParam
 from anthropic.types.redacted_thinking_block_param import RedactedThinkingBlockParam
 from anthropic.types.thinking_block_param import ThinkingBlockParam
-from haiway import (
-    MISSING,
-    BasicValue,
-    Missing,
-    as_dict,
-    ctx,
-    unwrap_missing,
-)
+from haiway import BasicValue, Missing, as_dict, ctx
 
 from draive.anthropic.api import AnthropicAPI
 from draive.anthropic.config import AnthropicConfig
@@ -120,6 +116,9 @@ class AnthropicMessages(AnthropicAPI):
 
             try:
                 tool_accumulator: _ToolAccumulator | None = None
+                # input usage is reported with the message start, the message delta carries
+                # the final totals and may repeat or omit it - usage is recorded only once
+                started_usage: Usage | None = None
                 # kind of the reasoning block currently open, it has to be closed on
                 # its `content_block_stop` to keep its signature from merging into the
                 # next block within the same message
@@ -136,10 +135,9 @@ class AnthropicMessages(AnthropicAPI):
                         output,
                         effort=config.effort,
                     ),
-                    stop_sequences=unwrap_missing(
-                        cast(Any, config.stop_sequences),
-                        default=omit,
-                    ),
+                    stop_sequences=omit
+                    if cast(Any, config.stop_sequences) is Missing
+                    else cast(Any, config.stop_sequences),
                 ) as stream:
                     async for event in stream:
                         match event.type:
@@ -292,8 +290,16 @@ class AnthropicMessages(AnthropicAPI):
                                 record_usage_metrics(
                                     provider=self._provider,
                                     model=config.model,
-                                    input_tokens=event.usage.input_tokens,
-                                    cached_input_tokens=event.usage.cache_read_input_tokens,
+                                    input_tokens=event.usage.input_tokens
+                                    if event.usage.input_tokens is not None
+                                    else (started_usage.input_tokens if started_usage else None),
+                                    cached_input_tokens=event.usage.cache_read_input_tokens
+                                    if event.usage.cache_read_input_tokens is not None
+                                    else (
+                                        started_usage.cache_read_input_tokens
+                                        if started_usage
+                                        else None
+                                    ),
                                     output_tokens=event.usage.output_tokens,
                                 )
 
@@ -305,9 +311,9 @@ class AnthropicMessages(AnthropicAPI):
                                         raise ModelOutputLimit(
                                             provider=self._provider,
                                             model=config.model,
-                                            max_output_tokens=unwrap_missing(
-                                                config.max_output_tokens, default=0
-                                            ),
+                                            max_output_tokens=0
+                                            if config.max_output_tokens is Missing
+                                            else config.max_output_tokens,
                                         )
 
                                     case "model_context_window_exceeded":
@@ -339,8 +345,7 @@ class AnthropicMessages(AnthropicAPI):
 
                             case "message_start":
                                 assert isinstance(event, RawMessageStartEvent)  # nosec: B101
-                                if event.message.content:
-                                    pass  # TODO: FIXME: provide initial data
+                                started_usage = event.message.usage
 
                             case "message_stop":
                                 continue  # let it finish
@@ -376,6 +381,15 @@ class AnthropicMessages(AnthropicAPI):
                     model=config.model,
                     retry_after=exc.response.headers.get("Retry-After"),
                     quota_limit=quota_capacity,
+                ) from exc
+
+            except (AnthropicOverloadedError, AnthropicServiceUnavailableError) as exc:
+                # temporary capacity failures are retryable, same as rate limits
+                raise model_rate_limit(
+                    provider=self._provider,
+                    model=config.model,
+                    retry_after=exc.response.headers.get("Retry-After"),
+                    error_code="overloaded_error",
                 ) from exc
 
             except ModelException as exc:
@@ -627,8 +641,8 @@ def _output_config(
         # silently answering with text would not match the requested modality
         raise NotImplementedError(f"{output} output is not supported by Anthropic")
 
-    if effort is not MISSING:
-        config["effort"] = cast(Literal["low", "medium", "high", "xhigh", "max"], effort)
+    if effort is not Missing:
+        config["effort"] = effort
 
     return config or omit
 
@@ -639,7 +653,7 @@ def _thinking_config(
 ) -> ThinkingConfigParam | Omit:
     # thinking is adaptive unless requested otherwise, omitting it keeps that default
     # instead of sending a mode which some models refuse
-    if thinking is MISSING:
+    if thinking is Missing:
         return omit
 
     if thinking == "disabled":

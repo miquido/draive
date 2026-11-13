@@ -4,7 +4,7 @@ from typing import Any, Literal, cast
 
 from haiway import State
 
-from draive.surreal.utils import surreal_identifier
+from draive.surreal.utils import surreal_field_path, surreal_identifier
 
 __all__ = (
     "SurrealTableKind",
@@ -30,7 +30,7 @@ def surreal_field_definitions[Model: State](
         statements.append(
             # FLEXIBLE has to follow the type, a SurrealDB server rejects
             # the reversed order accepted by older versions with a parse error
-            f"DEFINE FIELD IF NOT EXISTS {field_name} ON TABLE {table_name} "
+            f"DEFINE FIELD IF NOT EXISTS {surreal_field_path((field_name,))} ON TABLE {table_name} "
             f"TYPE {surreal_type}{' FLEXIBLE' if flexible else ''};"
         )
 

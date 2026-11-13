@@ -2,6 +2,7 @@ from typing import Any, overload
 
 from haiway import State, statemethod
 
+from draive.guardrails.metrics import guardrails_verdict
 from draive.guardrails.moderation.types import (
     GuardrailsInputModerationException,
     GuardrailsModerationChecking,
@@ -41,12 +42,29 @@ class GuardrailsModeration(State):
     ) -> None: ...
 
     @statemethod
+    @guardrails_verdict("moderation.input")
     async def check_input(
         self,
         content: Multimodal,
         /,
         **extra: Any,
     ) -> None:
+        """Check user input against the moderation rules.
+
+        Parameters
+        ----------
+        content : Multimodal
+            Content to check.
+        **extra : Any
+            Additional options forwarded to the guardrails implementation.
+
+        Raises
+        ------
+        GuardrailsInputModerationException
+            When the input violates the moderation rules.
+        GuardrailsFailure
+            When the moderation itself fails.
+        """
         content = MultimodalContent.of(content)
         try:
             await self._input_checking(
@@ -99,12 +117,29 @@ class GuardrailsModeration(State):
     ) -> None: ...
 
     @statemethod
+    @guardrails_verdict("moderation.output")
     async def check_output(
         self,
         content: Multimodal,
         /,
         **extra: Any,
     ) -> None:
+        """Check model output against the moderation rules.
+
+        Parameters
+        ----------
+        content : Multimodal
+            Content to check.
+        **extra : Any
+            Additional options forwarded to the guardrails implementation.
+
+        Raises
+        ------
+        GuardrailsOutputModerationException
+            When the output violates the moderation rules.
+        GuardrailsFailure
+            When the moderation itself fails.
+        """
         content = MultimodalContent.of(content)
         try:
             await self._output_checking(

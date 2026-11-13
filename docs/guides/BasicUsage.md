@@ -240,8 +240,8 @@ The more advanced usage and use cases can be explored in other notebooks.
 
 Generation adapters distinguish temporary throttling (`ModelRateLimit`) from explicit quota or
 access restrictions (`ModelQuotaLimit`). `ModelQuotaLimit` is a separate `ModelException`, so a
-handler that catches `ModelRateLimit` will not retry it. It carries `provider`, `model`, and `reason`
-and records a `model.quota_limit` warning event without a retry delay.
+handler that catches `ModelRateLimit` will not retry it. It carries `provider`, `model`, and
+`reason` and records a `model.quota_limit` warning event without a retry delay.
 
 Mistral chat completions classify HTTP 429 with `x-ratelimit-limit-req-minute: 0` as a quota limit.
 Check the affected model's access and quota, or explicitly select another model. A successful model
@@ -251,11 +251,11 @@ header, with a short randomized delay when the header is absent or unparseable.
 
 OpenAI and vLLM also recognize `insufficient_quota` and `billing_hard_limit_reached` error codes.
 Their request/token capacity headers, and Anthropic's request/token capacity headers, are checked
-for explicit zero limits. Responses without a recognized quota signal remain `ModelRateLimit`;
-HTTP 429 alone cannot establish an entitlement restriction. Gemini generation and live sessions
-also recognize explicit zero `quotaValue` capacity in structured `QuotaFailure` details; missing
-values and unstructured messages do not establish zero capacity. Other provider paths retain their
-existing error classification.
+for explicit zero limits. Responses without a recognized quota signal remain `ModelRateLimit`; HTTP
+429 alone cannot establish an entitlement restriction. Gemini generation and live sessions also
+recognize explicit zero `quotaValue` capacity in structured `QuotaFailure` details; missing values
+and unstructured messages do not establish zero capacity. Other provider paths retain their existing
+error classification.
 
 Retry throttling a bounded number of times and let quota failures reach the caller:
 

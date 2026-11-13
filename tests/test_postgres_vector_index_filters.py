@@ -30,6 +30,11 @@ class _Document(State):
     meta: Mapping[str, Mapping[str, str]]
 
 
+def _elements(index: int) -> str:
+    accessor = f"payload #> ${index}::TEXT[]"
+    return f"(CASE WHEN jsonb_typeof({accessor}) = 'array' THEN {accessor} ELSE '[]'::JSONB END)"
+
+
 def test_equal_uses_parameterized_json_accessor() -> None:
     where_clause: str
     arguments: Sequence[Sequence[PostgresValue] | PostgresValue]
@@ -109,7 +114,7 @@ def test_contains_any_uses_json_elements() -> None:
     )
 
     assert where_clause == (
-        "EXISTS (SELECT 1 FROM jsonb_array_elements(payload #> $1::TEXT[]) AS element"
+        "EXISTS (SELECT 1 FROM jsonb_array_elements(" + _elements(1) + ") AS element"
         " WHERE element = ANY($2::JSONB[]))"
     )
     assert list(arguments) == [("tags",), ['"draive"', '"haiway"']]
@@ -126,7 +131,7 @@ def test_contains_uses_json_elements() -> None:
     )
 
     assert where_clause == (
-        "EXISTS (SELECT 1 FROM jsonb_array_elements(payload #> $1::TEXT[]) AS element"
+        "EXISTS (SELECT 1 FROM jsonb_array_elements(" + _elements(1) + ") AS element"
         " WHERE element = $2::JSONB)"
     )
     assert list(arguments) == [("tags",), '"draive"']
@@ -153,7 +158,7 @@ def test_nested_requirements_number_arguments_sequentially() -> None:
 
     assert where_clause == (
         "(payload #> $1::TEXT[] = ANY($2::JSONB[])"
-        " AND EXISTS (SELECT 1 FROM jsonb_array_elements(payload #> $3::TEXT[]) AS element"
+        " AND EXISTS (SELECT 1 FROM jsonb_array_elements(" + _elements(3) + ") AS element"
         " WHERE element = $4::JSONB))"
     )
     assert list(arguments) == [("name",), ['"draive"'], ("tags",), '"haiway"']

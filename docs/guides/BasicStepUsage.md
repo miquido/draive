@@ -60,9 +60,8 @@ async for chunk in pipeline.stream():
     print(chunk)
 ```
 
-When stopping before the stream ends, close it explicitly (i.e. through `ctx.closing`).
-Leaving it to garbage collection finalizes it within an unrelated context and breaks scoped state
-teardown.
+When stopping before the stream ends, close it explicitly (i.e. through `ctx.closing`). Leaving it
+to garbage collection finalizes it within an unrelated context and breaks scoped state teardown.
 
 ## Common Composition Helpers
 

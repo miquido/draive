@@ -51,3 +51,16 @@ def test_indent_is_applied() -> None:
 def test_unsupported_specification_raises(specification: dict[str, Any]) -> None:
     with pytest.raises(ValueError, match="Unsupported basic specification"):
         simplified_schema(specification)  # pyright: ignore[reportArgumentType]
+
+
+def test_simplified_schema_renders_mapping_of_values() -> None:
+    specification: TypeSpecification = {
+        "type": "object",
+        "properties": {
+            "labels": {"type": "object", "additionalProperties": {"type": "string"}},
+        },
+        "required": ["labels"],
+        "additionalProperties": False,
+    }
+
+    assert json.loads(simplified_schema(specification)) == {"labels": {"<key>": "string"}}

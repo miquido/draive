@@ -101,7 +101,7 @@ class EvaluationScore(State, serializable=True):
         bool
             True if values are equal
         """
-        if isinstance(other, float):
+        if isinstance(other, int | float):
             return self.value == other
 
         elif isinstance(other, EvaluationScore):
@@ -124,14 +124,14 @@ class EvaluationScore(State, serializable=True):
         bool
             True if values are not equal
         """
-        if isinstance(other, float):
+        if isinstance(other, int | float):
             return self.value != other
 
         elif isinstance(other, EvaluationScore):
             return self.value != other.value
 
         else:
-            return False
+            return True
 
     def __lt__(self, other: Any) -> bool:
         """
@@ -232,6 +232,6 @@ class EvaluationScore(State, serializable=True):
         Returns
         -------
         int
-            Hash of the value and metadata
+            Hash of the value, consistent with equality which ignores metadata
         """
-        return hash((self.value, self.meta))
+        return hash(self.value)

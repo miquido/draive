@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #
 # /// script
-# requires-python = ">=3.14"
+# requires-python = ">=3.15"
 # dependencies = [
 #     "draive[openai,anthropic,gemini,mistral,ollama]",
 #     "pyyaml~=6.0",

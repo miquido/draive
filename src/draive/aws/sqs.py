@@ -7,7 +7,7 @@ from collections.abc import (
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import Any
 
-from botocore.exceptions import ClientError  # pyright: ignore[reportMissingModuleSource]
+from botocore.exceptions import ClientError
 from haiway import (
     FlatObject,
     Meta,

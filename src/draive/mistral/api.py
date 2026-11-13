@@ -21,9 +21,13 @@ class MistralAPI:
         timeout: float | None = None,
         **extra: Any,
     ) -> None:
-        self._server_url: str = server_url or getenv_str(
-            "MISTRAL_SERVER_URL",
-            default="https://api.mistral.ai",
+        # explicit argument first, then the canonical variable, `MISTRAL_ENDPOINT` is accepted
+        # as an alias since it is the name commonly used for custom deployments
+        self._server_url: str = (
+            server_url
+            or getenv_str("MISTRAL_SERVER_URL")
+            or getenv_str("MISTRAL_ENDPOINT")
+            or "https://api.mistral.ai"
         )
         self._api_key: str | None = api_key or getenv_str("MISTRAL_API_KEY")
         self._timeout: float | None = timeout
@@ -43,18 +47,22 @@ class MistralAPI:
 
     async def _deinitialize_client(self) -> None:
         try:
-            await self._client.__aexit__(  # pyright: ignore[reportUnknownMemberType]
-                None,
-                None,
-                None,
-            )
-            # `Mistral` implicitly creates a synchronous httpx client as well, which only
-            # its synchronous context manager exit closes - without it the client leaks
-            self._client.__exit__(  # pyright: ignore[reportUnknownMemberType]
-                None,
-                None,
-                None,
-            )
+            try:
+                await self._client.__aexit__(  # pyright: ignore[reportUnknownMemberType]
+                    None,
+                    None,
+                    None,
+                )
+
+            finally:
+                # `Mistral` implicitly creates a synchronous httpx client as well, which only
+                # its synchronous context manager exit closes - without it the client leaks,
+                # it has to be closed even when closing the asynchronous one fails
+                self._client.__exit__(  # pyright: ignore[reportUnknownMemberType]
+                    None,
+                    None,
+                    None,
+                )
 
         finally:
             del self._client

@@ -1,8 +1,10 @@
 import json
 from collections.abc import Generator, Iterable
+from mimetypes import guess_type
 from typing import Any, cast
+from urllib.parse import urlparse
 
-from haiway import Meta, ctx, unwrap_missing
+from haiway import Meta, Missing, ctx
 from mistralai.client.errors import MistralError
 from mistralai.client.models import (
     ChatCompletionStreamRequestMessageTypedDict,
@@ -34,6 +36,7 @@ from draive.models import (
     ModelContext,
     ModelException,
     ModelInput,
+    ModelInputInvalid,
     ModelInstructions,
     ModelOutput,
     ModelOutputFailed,
@@ -97,22 +100,35 @@ class MistralCompletions(MistralAPI):
                 tool_selection=tools.selection,
             )
 
+            # prepare the request outside of the request handling, errors
+            # of building it are input errors instead of output failures
+            try:
+                request_messages = _build_messages(
+                    context=context,
+                    instructions=instructions,
+                )
+                request_response_format = _response_format(output)
+
+            except Exception as exc:
+                raise ModelInputInvalid(
+                    provider="mistral",
+                    model=config.model,
+                    reason=str(exc),
+                ) from exc
+
             usage: UsageInfo = UsageInfo()
             usage_recorded = False
             try:
                 stream: EventStreamAsync[CompletionEvent] = await self._client.chat.stream_async(
                     model=config.model,
-                    messages=_build_messages(
-                        context=context,
-                        instructions=instructions,
-                    ),
+                    messages=request_messages,
                     temperature=unwrap_missing_to_unset(config.temperature),
                     top_p=unwrap_missing_to_unset(config.top_p),
                     max_tokens=unwrap_missing_to_unset(config.max_output_tokens),
                     stop=unwrap_missing_list_to_unset(config.stop_sequences),
                     random_seed=unwrap_missing_to_unset(config.seed),
                     prompt_mode=unwrap_missing_to_unset(config.prompt_mode),
-                    response_format=_response_format(output),
+                    response_format=request_response_format,
                     tools=tools_list,
                     tool_choice=tool_choice,
                 )
@@ -229,9 +245,9 @@ class MistralCompletions(MistralAPI):
                             raise ModelOutputLimit(
                                 provider="mistral",
                                 model=config.model,
-                                max_output_tokens=unwrap_missing(
-                                    config.max_output_tokens, default=0
-                                ),
+                                max_output_tokens=0
+                                if config.max_output_tokens is Missing
+                                else config.max_output_tokens,
                             )
 
                 if tool_accumulator is not None:
@@ -532,9 +548,13 @@ def _content_chunk_as_content_element(
         return TextContent.of(chunk.text)
 
     elif isinstance(chunk, ImageURLChunk):
+        image_url: str = (
+            chunk.image_url if isinstance(chunk.image_url, str) else chunk.image_url.url
+        )
         return ResourceReference.of(
-            chunk.image_url if isinstance(chunk.image_url, str) else chunk.image_url.url,
-            mime_type="image/png",
+            image_url,
+            # the stream does not report the type, a file extension is the only hint
+            mime_type=_image_mime_type(image_url),
         )
 
     else:
@@ -634,3 +654,11 @@ def _response_format(
 
     # silently answering with text would not match the requested modality
     raise NotImplementedError(f"{output} output is not supported by Mistral")
+
+
+def _image_mime_type(url: str, /) -> str:
+    guessed, _ = guess_type(urlparse(url).path)
+    if guessed is not None and guessed.startswith("image/"):
+        return guessed
+
+    return "image/png"

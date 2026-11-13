@@ -27,7 +27,7 @@ class BedrockAPI:
 
         # postponing import of boto3 as late as possible, it does a lot of stuff
         try:
-            import boto3  # pyright: ignore[reportMissingTypeStubs]
+            import boto3
         except ImportError as exc:  # pragma: no cover
             raise ImportError(
                 "draive.bedrock requires the 'bedrock' extra."

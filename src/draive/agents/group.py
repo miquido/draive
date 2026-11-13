@@ -112,7 +112,8 @@ class AgentsGroup:
             "_names",
             Map({agent.identity.name: agent.identity.uri for agent in agents.values()}),
         )
-        assert len(self._agents) == len(self._names)  # nosec: B101
+        if len(self._agents) != len(self._names):
+            raise ValueError("AgentsGroup agents must have unique names")
         self.meta: Meta
         object.__setattr__(
             self,

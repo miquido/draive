@@ -11,7 +11,8 @@ building end-to-end evaluation flows.
 - Thresholds determine whether an evaluation passes; named levels are easier to reason about than
     raw floats: `"none"` (0.0), `"poor"` (0.2), `"fair"` (0.4), `"good"` (0.6), `"excellent"` (0.8),
     `"perfect"` (1.0). The default threshold is `1` - the strictest one.
-- `EvaluatorResult` carries `score`, `threshold`, `meta` and derives `passed` (`score >= threshold`).
+- `EvaluatorResult` carries `score`, `threshold`, `meta` and derives `passed`
+    (`score >= threshold`).
 - `EvaluatorResult.performance` is reported as a percentage and can exceed 100 when a score
     comfortably beats its threshold.
 - An evaluator that raises is not propagated: the failure is logged and turned into a `0.0` score
@@ -228,9 +229,9 @@ nominal = review_quality.referenced(
 `weighting` controls the falloff outside the window: `"quadratic"` (default) grants partial credit
 that decays with the squared distance to the nearest bound, `"nominal"` scores a miss as `0.0`. The
 result keeps the original evaluator name and threshold and records `predicted_score`,
-`predicted_level`, `reference_lower`, `reference_upper`, `within_reference` and `reference_weighting`
-in its metadata. `reference_conformance(score, reference, weighting=...)` exposes the same math
-directly.
+`predicted_level`, `reference_lower`, `reference_upper`, `within_reference` and
+`reference_weighting` in its metadata. `reference_conformance(score, reference, weighting=...)`
+exposes the same math directly.
 
 ## Rater Agreement
 
@@ -259,12 +260,12 @@ baselines.
 
 ## Evaluating Conversation Context
 
-Every built-in content evaluator has a `*_context_evaluator` twin operating on a `ModelContext` - the
-sequence of `ModelInput`/`ModelOutput` elements produced by a conversation - so multi-turn behaviour
-can be judged as a whole. Their reference-style arguments are optional: when omitted the evaluator
-judges the outputs on their own (for example internal consistency instead of consistency with a
-reference). `tool_usage_context_evaluator` is context-only and checks the tool calls recorded in the
-timeline.
+Every built-in content evaluator has a `*_context_evaluator` twin operating on a `ModelContext` -
+the sequence of `ModelInput`/`ModelOutput` elements produced by a conversation - so multi-turn
+behaviour can be judged as a whole. Their reference-style arguments are optional: when omitted the
+evaluator judges the outputs on their own (for example internal consistency instead of consistency
+with a reference). `tool_usage_context_evaluator` is context-only and checks the tool calls recorded
+in the timeline.
 
 ## Stateful Evaluation with Haiway
 

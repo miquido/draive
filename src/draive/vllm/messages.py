@@ -2,7 +2,7 @@ import json
 from collections.abc import Iterable, Mapping, MutableMapping, MutableSequence, Sequence
 from typing import Any, Literal, cast, overload
 
-from haiway import MISSING, Missing, as_list, ctx
+from haiway import Missing, as_list, ctx
 from openai import AsyncStream, Omit, omit
 from openai import RateLimitError as OpenAIRateLimitError
 from openai.types.chat import (
@@ -34,6 +34,7 @@ from draive.models import (
     ModelContext,
     ModelException,
     ModelInput,
+    ModelInputInvalid,
     ModelInstructions,
     ModelOutput,
     ModelOutputFailed,
@@ -98,16 +99,31 @@ class VLLMMessages(VLLMAPI):
                 tool_selection=tools.selection,
             )
 
+            # prepare the request outside of the request handling, errors
+            # of building it are input errors instead of output failures
+            try:
+                request_messages = list(
+                    _context_messages(
+                        instructions=instructions,
+                        context=context,
+                        vision_details=config.vision_details,
+                    )
+                )
+                request_response_format = _response_format(output)
+
+            except Exception as exc:
+                raise ModelInputInvalid(
+                    provider=self._provider,
+                    model=config.model,
+                    reason=str(exc),
+                ) from exc
+
             # Start streaming request
             stream: AsyncStream[ChatCompletionChunk]
             try:
                 stream = await self._client.chat.completions.create(
                     model=config.model,
-                    messages=_context_messages(
-                        instructions=instructions,
-                        context=context,
-                        vision_details=config.vision_details,
-                    ),
+                    messages=request_messages,
                     temperature=unwrap_missing(config.temperature),
                     top_p=unwrap_missing(config.top_p),
                     frequency_penalty=unwrap_missing(config.frequency_penalty),
@@ -117,10 +133,10 @@ class VLLMMessages(VLLMAPI):
                     if tools_list is not omit
                     else omit,
                     max_tokens=unwrap_missing(config.max_output_tokens),
-                    response_format=_response_format(output),
+                    response_format=request_response_format,
                     seed=unwrap_missing(config.seed),
                     stop=as_list(cast(Iterable[str], config.stop_sequences))
-                    if config.stop_sequences is not MISSING
+                    if config.stop_sequences is not Missing
                     else omit,
                     stream=True,
                     # usage is only reported within the stream when explicitly requested
@@ -207,8 +223,8 @@ class VLLMMessages(VLLMAPI):
                             provider=self._provider,
                             model=config.model,
                             max_output_tokens=(
-                                cast(int, config.max_output_tokens)
-                                if config.max_output_tokens is not MISSING
+                                config.max_output_tokens
+                                if config.max_output_tokens is not Missing
                                 else 0
                             ),
                         )
@@ -436,12 +452,15 @@ def _content_parts(  # noqa: C901, PLR0912
 
         elif isinstance(part, ResourceReference):
             if text_only:
+                ctx.log_warning(
+                    "vLLM tool and assistant messages carry text only, skipping media content"
+                )
                 continue  # skip with text only
 
             if not part.mime_type.startswith("image"):
                 raise ValueError(f"Unsupported message content mime type: {part.mime_type}")
 
-            if vision_details is MISSING:
+            if vision_details is Missing:
                 yield ChatCompletionContentPartImageParam(
                     type="image_url",
                     image_url=ImageURL(
@@ -454,18 +473,21 @@ def _content_parts(  # noqa: C901, PLR0912
                     type="image_url",
                     image_url=ImageURL(
                         url=part.uri,
-                        detail=cast(Literal["auto", "low", "high"], vision_details),
+                        detail=vision_details,
                     ),
                 )
 
         elif isinstance(part, ResourceContent):
             if text_only:
+                ctx.log_warning(
+                    "vLLM tool and assistant messages carry text only, skipping media content"
+                )
                 continue  # skip with text only
 
             if not part.mime_type.startswith("image"):
                 raise ValueError(f"Unsupported message content mime type: {part.mime_type}")
 
-            if vision_details is MISSING:
+            if vision_details is Missing:
                 yield ChatCompletionContentPartImageParam(
                     type="image_url",
                     image_url=ImageURL(
@@ -478,7 +500,7 @@ def _content_parts(  # noqa: C901, PLR0912
                     type="image_url",
                     image_url=ImageURL(
                         url=part.to_data_uri(),
-                        detail=cast(Literal["auto", "low", "high"], vision_details),
+                        detail=vision_details,
                     ),
                 )
 

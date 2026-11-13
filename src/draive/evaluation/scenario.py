@@ -1,16 +1,16 @@
 import re
 from collections.abc import Callable, Sequence
-from typing import Annotated, Protocol, Self, cast, overload, runtime_checkable
+from typing import Annotated, Protocol, Self, cast, final, overload, runtime_checkable
 
 from haiway import (
     AttributePath,
     Description,
-    Immutable,
     Meta,
     MetaValues,
     State,
     ctx,
 )
+from haiway.types.frozen import refuse_assignment, refuse_deletion, same_copy, same_deepcopy
 
 from draive.evaluation.evaluator import EvaluatorResult
 
@@ -172,7 +172,8 @@ class PreparedEvaluatorScenario[Value](Protocol):
     ) -> EvaluatorScenarioResult: ...
 
 
-class EvaluatorScenario[Value, **Args](Immutable):
+@final
+class EvaluatorScenario[Value, **Args]:
     """
     Configurable evaluator scenario for running multiple evaluations.
 
@@ -190,6 +191,18 @@ class EvaluatorScenario[Value, **Args](Immutable):
     meta : Meta
         Additional metadata for the scenario
     """
+
+    __slots__ = (
+        "_definition",
+        "_state",
+        "meta",
+        "name",
+    )
+
+    __setattr__ = refuse_assignment
+    __delattr__ = refuse_deletion
+    __copy__ = same_copy
+    __deepcopy__ = same_deepcopy
 
     name: str
     meta: Meta
@@ -405,6 +418,7 @@ class EvaluatorScenario[Value, **Args](Immutable):
                 attributes={
                     "passed": result.passed,
                     "evaluators": [result.evaluator for result in result.results],
+                    "errored": any(result.meta.error is not None for result in result.results),
                 },
             )
         return result

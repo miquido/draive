@@ -5,11 +5,11 @@ import pytest
 from haiway import Alias, AttributeRequirement, State, ctx
 from surrealdb.errors import parse_query_error
 
-import draive.surreal.vector as surreal_vector
 from draive.embedding import Embedded, TextEmbedding, VectorIndex
 from draive.surreal import SurrealClient
 from draive.surreal.types import SurrealException, SurrealObject
 from draive.surreal.vector import SurrealVectorIndex
+from tests._surreal_session import surreal_session
 
 
 class _Meta(State):
@@ -36,16 +36,15 @@ async def test_surreal_vector_index_delete_scopes_requirements_to_content(
         calls.append((statement, variables))
         return ()
 
-    monkeypatch.setattr(surreal_vector.Surreal, "execute", fake_execute)
+    async with ctx.scope("test", surreal_session(fake_execute)):
+        index = SurrealVectorIndex.prepare()
+        async with ctx.scope("test.surreal.vector.delete"):
+            await index.delete(
+                _Doc,
+                requirements=AttributeRequirement.equal("b", _Doc._.group),
+            )
 
-    index = SurrealVectorIndex.prepare()
-    async with ctx.scope("test.surreal.vector.delete"):
-        await index.delete(
-            _Doc,
-            requirements=AttributeRequirement.equal("b", _Doc._.group),
-        )
-
-    assert calls == [("DELETE _Doc WHERE content.group = $_f0;", {"_f0": "b"})]
+        assert calls == [("DELETE _Doc WHERE content.group = $_f0;", {"_f0": "b"})]
 
 
 @pytest.mark.asyncio
@@ -71,24 +70,23 @@ async def test_surreal_vector_index_search_without_query_scopes_nested_requireme
             ),
         )
 
-    monkeypatch.setattr(surreal_vector.Surreal, "execute", fake_execute)
+    async with ctx.scope("test", surreal_session(fake_execute)):
+        index = SurrealVectorIndex.prepare()
+        async with ctx.scope("test.surreal.vector.search.none"):
+            results = await index.search(
+                _Doc,
+                query=None,
+                requirements=AttributeRequirement.equal("note", _Doc._.meta.kind),
+                limit=2,
+            )
 
-    index = SurrealVectorIndex.prepare()
-    async with ctx.scope("test.surreal.vector.search.none"):
-        results = await index.search(
-            _Doc,
-            query=None,
-            requirements=AttributeRequirement.equal("note", _Doc._.meta.kind),
-            limit=2,
-        )
-
-    assert len(results) == 1
-    assert results[0].text == "alpha"
-    assert len(calls) == 1
-    statement, variables = calls[0]
-    assert "WHERE content.meta.kind = $_f0" in statement
-    assert variables["_f0"] == "note"
-    assert variables["limit"] == 2
+        assert len(results) == 1
+        assert results[0].text == "alpha"
+        assert len(calls) == 1
+        statement, variables = calls[0]
+        assert "WHERE content.meta.kind = $_f0" in statement
+        assert variables["_f0"] == "note"
+        assert variables["limit"] == 2
 
 
 @pytest.mark.asyncio
@@ -114,25 +112,24 @@ async def test_surreal_vector_index_search_with_query_scopes_requirements(
             ),
         )
 
-    monkeypatch.setattr(surreal_vector.Surreal, "execute", fake_execute)
+    async with ctx.scope("test", surreal_session(fake_execute)):
+        index = SurrealVectorIndex.prepare(search_effort=12)
+        async with ctx.scope("test.surreal.vector.search.query"):
+            results = await index.search(
+                _Doc,
+                query=[1.0, 0.0],
+                requirements=AttributeRequirement.equal("a", _Doc._.group),
+                limit=3,
+            )
 
-    index = SurrealVectorIndex.prepare(search_effort=12)
-    async with ctx.scope("test.surreal.vector.search.query"):
-        results = await index.search(
-            _Doc,
-            query=[1.0, 0.0],
-            requirements=AttributeRequirement.equal("a", _Doc._.group),
-            limit=3,
-        )
-
-    assert len(results) == 1
-    assert results[0].group == "a"
-    assert len(calls) == 1
-    statement, variables = calls[0]
-    assert "WHERE (content.group = $_f0) AND embedding <|3,12|> $query" in statement
-    assert variables["_f0"] == "a"
-    assert variables["limit"] == 3
-    assert variables["query"] == [1.0, 0.0]
+        assert len(results) == 1
+        assert results[0].group == "a"
+        assert len(calls) == 1
+        statement, variables = calls[0]
+        assert "WHERE (content.group = $_f0) AND embedding <|3,12|> $query" in statement
+        assert variables["_f0"] == "a"
+        assert variables["limit"] == 3
+        assert variables["query"] == [1.0, 0.0]
 
 
 @pytest.mark.asyncio
@@ -160,15 +157,14 @@ async def test_surreal_vector_index_propagates_missing_table(
             }
         )
 
-    monkeypatch.setattr(surreal_vector.Surreal, "execute", fake_execute)
+    async with ctx.scope("test", surreal_session(fake_execute)):
+        index = SurrealVectorIndex.prepare()
+        async with ctx.scope("test.surreal.vector.delete.missing"):
+            with pytest.raises(SurrealException):
+                await index.delete(_Doc)
 
-    index = SurrealVectorIndex.prepare()
-    async with ctx.scope("test.surreal.vector.delete.missing"):
-        with pytest.raises(SurrealException):
-            await index.delete(_Doc)
-
-        with pytest.raises(SurrealException):
-            await index.search(_Doc, limit=4)
+            with pytest.raises(SurrealException):
+                await index.search(_Doc, limit=4)
 
 
 @pytest.mark.asyncio
@@ -270,22 +266,21 @@ async def test_surreal_vector_index_migration_defines_table_and_hnsw_index(
         statements.append(statement)
         return ()
 
-    monkeypatch.setattr(surreal_vector.Surreal, "execute", fake_execute)
+    async with ctx.scope("test", surreal_session(fake_execute)):
+        async with ctx.scope("test.surreal.vector.migrate"):
+            await SurrealVectorIndex.migrate(
+                _Doc,
+                dimensions=1536,
+                efc=150,
+                m=12,
+            )
 
-    async with ctx.scope("test.surreal.vector.migrate"):
-        await SurrealVectorIndex.migrate(
-            _Doc,
-            dimensions=1536,
-            efc=150,
-            m=12,
-        )
-
-    assert statements == [
-        "DEFINE TABLE IF NOT EXISTS _Doc SCHEMALESS TYPE NORMAL;",
-        "DEFINE INDEX IF NOT EXISTS _Doc_embedding_index "
-        "ON TABLE _Doc FIELDS embedding "
-        "HNSW DIMENSION 1536 TYPE F64 DIST COSINE EFC 150 M 12;",
-    ]
+        assert statements == [
+            "DEFINE TABLE IF NOT EXISTS _Doc SCHEMALESS TYPE NORMAL;",
+            "DEFINE INDEX IF NOT EXISTS _Doc_embedding_index "
+            "ON TABLE _Doc FIELDS embedding "
+            "HNSW DIMENSION 1536 TYPE F64 DIST COSINE EFC 150 M 12;",
+        ]
 
 
 @pytest.mark.asyncio
@@ -319,14 +314,13 @@ async def test_surreal_vector_index_migration_retries_definition_conflicts(
 
         return ()
 
-    monkeypatch.setattr(surreal_vector.Surreal, "execute", fake_execute)
+    async with ctx.scope("test", surreal_session(fake_execute)):
+        async with ctx.scope("test.surreal.vector.migrate.conflict"):
+            await SurrealVectorIndex.migrate(_Doc, dimensions=2)
 
-    async with ctx.scope("test.surreal.vector.migrate.conflict"):
-        await SurrealVectorIndex.migrate(_Doc, dimensions=2)
-
-    # the conflicting attempt and its retry
-    assert definitions == 2
-    assert pending_conflicts == 0
+        # the conflicting attempt and its retry
+        assert definitions == 2
+        assert pending_conflicts == 0
 
 
 @pytest.mark.parametrize(
@@ -375,23 +369,22 @@ async def test_surreal_vector_index_scopes_aliased_requirements(
         calls.append((statement, variables))
         return ()
 
-    monkeypatch.setattr(surreal_vector.Surreal, "execute", fake_execute)
+    async with ctx.scope("test", surreal_session(fake_execute)):
+        index = SurrealVectorIndex.prepare()
+        async with ctx.scope("test.surreal.vector.aliased"):
+            await index.delete(
+                _AliasedDoc,
+                requirements=AttributeRequirement.equal("doc-1", _AliasedDoc._.code),
+            )
+            await index.delete(
+                _AliasedDoc,
+                requirements=AttributeRequirement.equal("value", _AliasedDoc._.nested.inner_value),
+            )
 
-    index = SurrealVectorIndex.prepare()
-    async with ctx.scope("test.surreal.vector.aliased"):
-        await index.delete(
-            _AliasedDoc,
-            requirements=AttributeRequirement.equal("doc-1", _AliasedDoc._.code),
-        )
-        await index.delete(
-            _AliasedDoc,
-            requirements=AttributeRequirement.equal("value", _AliasedDoc._.nested.inner_value),
-        )
-
-    assert calls == [
-        ("DELETE _AliasedDoc WHERE content.reference = $_f0;", {"_f0": "doc-1"}),
-        ("DELETE _AliasedDoc WHERE content.nested.inner = $_f0;", {"_f0": "value"}),
-    ]
+        assert calls == [
+            ("DELETE _AliasedDoc WHERE content.reference = $_f0;", {"_f0": "doc-1"}),
+            ("DELETE _AliasedDoc WHERE content.nested.inner = $_f0;", {"_f0": "value"}),
+        ]
 
 
 def test_surreal_filters_use_serialized_field_names() -> None:

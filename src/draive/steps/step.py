@@ -12,7 +12,7 @@ from collections.abc import (
     Sequence,
 )
 from time import monotonic
-from typing import Any, ClassVar, NoReturn, Protocol, Self, final, overload, runtime_checkable
+from typing import Any, ClassVar, NoReturn, Protocol, Self, cast, final, overload, runtime_checkable
 
 from haiway import (
     Disposable,
@@ -24,6 +24,7 @@ from haiway import (
     stream_concurrently,
 )
 
+from draive._constant import class_constant
 from draive.evaluation import (
     EvaluatorResult,
     EvaluatorScenarioResult,
@@ -74,12 +75,17 @@ from draive.steps.types import (
 )
 from draive.tools import Tool, Toolbox
 from draive.utils import ProcessingEvent
+from draive.utils.limits import verify_max_iterations
 
 __all__ = (
     "Step",
     "StepSelecting",
     "step",
 )
+
+
+def _noop_step() -> Step:
+    return _noop
 
 
 @final  # consider immutable
@@ -97,7 +103,7 @@ class Step:
     context-aware while staying easy to compose.
     """
 
-    noop: ClassVar[Self]  # defined after the class
+    noop: ClassVar[Step] = class_constant(_noop_step)
 
     @classmethod
     def emitting(
@@ -126,7 +132,7 @@ class Step:
         processing pipeline.
         """
         if not parts:
-            return cls.noop
+            return cast(Self, cls.noop)
 
         emitted: MutableSequence[StepOutputChunk] = []
         for part in parts:
@@ -140,7 +146,7 @@ class Step:
                 emitted.extend(MultimodalContent.of(part).parts)
 
         if not emitted:
-            return cls.noop
+            return cast(Self, cls.noop)
 
         async def step(
             state: StepState,
@@ -182,7 +188,7 @@ class Step:
         implementations.
         """
         if not artifacts and not keyed_artifacts:
-            return cls.noop
+            return cast(Self, cls.noop)
 
         merged_artifacts: Mapping[str, ArtifactContent] = artifacts_mapping(
             artifacts,
@@ -221,7 +227,7 @@ class Step:
             are provided.
         """
         if not keys:
-            return cls.noop
+            return cast(Self, cls.noop)
 
         async def step(
             state: StepState,
@@ -308,7 +314,7 @@ class Step:
         of previous state values.
         """
         if not elements:
-            return cls.noop
+            return cast(Self, cls.noop)
 
         async def step(
             state: StepState,
@@ -610,7 +616,7 @@ class Step:
         transformations.
         """
         if not steps:
-            return cls.noop
+            return cast(Self, cls.noop)
 
         executions: Sequence[StepExecuting] = tuple(
             step._executing if isinstance(step, Step) else step for step in steps
@@ -673,9 +679,9 @@ class Step:
         Rationale: enables iterative workflows while preserving structured
         context scoping per iteration.
         """
-        _validate_max_iterations(max_iterations)
+        verify_max_iterations(max_iterations)
         if not steps:
-            return cls.noop
+            return cast(Self, cls.noop)
 
         executions: Sequence[StepExecuting] = tuple(
             step._executing if isinstance(step, Step) else step for step in steps
@@ -739,7 +745,7 @@ class Step:
             A concurrent branch step, or ``Step.noop`` for empty branches.
         """
         if not steps:
-            return cls.noop
+            return cast(Self, cls.noop)
 
         executions: Sequence[StepExecuting] = tuple(
             step._executing if isinstance(step, Step) else step for step in steps
@@ -1002,7 +1008,7 @@ class Step:
         Rationale: packages completion-and-tool loop logic into a reusable
         typed primitive.
         """
-        _validate_max_iterations(max_iterations)
+        verify_max_iterations(max_iterations)
         toolbox: Toolbox = Toolbox.of(tools)
 
         async def step(  # noqa: C901, PLR0912
@@ -2182,15 +2188,7 @@ def _retry_delay(
             return float(strict)
 
         case make_delay:
-            return make_delay(attempt, exception)  # pyright: ignore[reportCallIssue, reportUnknownArgumentType]
-
-
-def _validate_max_iterations(
-    max_iterations: int | None,
-    /,
-) -> None:
-    if max_iterations is not None and max_iterations < 1:
-        raise ValueError("max_iterations has to be at least 1")
+            return make_delay(attempt, exception)
 
 
 async def _handling_tool_requests(
@@ -2248,9 +2246,6 @@ async def _noop(
 ) -> StepStream:
     return  # do not emit anything
     yield  # converts to AsyncGenerator
-
-
-Step.noop = _noop
 
 
 @runtime_checkable

@@ -8,6 +8,7 @@ from draive.evaluation import (
     PreparedEvaluator,
     PreparedEvaluatorScenario,
 )
+from draive.guardrails.metrics import guardrails_verdict
 from draive.guardrails.quality.types import GuardrailsQualityException, GuardrailsQualityVerifying
 from draive.guardrails.types import GuardrailsException, GuardrailsFailure
 from draive.multimodal import Multimodal, MultimodalContent
@@ -39,8 +40,18 @@ class GuardrailsQualityVerification(State):
             if result.passed:
                 return  # verification passed
 
+            # an evaluation that errored is an infrastructure failure, not a quality verdict
+            for evaluated in (result,) if isinstance(result, EvaluatorResult) else result.results:
+                if (error := evaluated.meta.error) is not None:
+                    raise GuardrailsFailure(
+                        f"Quality guardrails failed: {error}",
+                        cause=error,
+                        meta={"error_type": error.__class__.__name__},
+                    ) from error
+
             if isinstance(result, EvaluatorResult):
                 raise GuardrailsQualityException(
+                    f"Quality guardrails triggered: {result.evaluator}",
                     reason=result.evaluator,
                     content=content,
                     meta={
@@ -51,6 +62,7 @@ class GuardrailsQualityVerification(State):
 
             else:
                 raise GuardrailsQualityException(
+                    f"Quality guardrails triggered: {result.scenario}",
                     reason=result.scenario,
                     content=content,
                     meta={
@@ -79,12 +91,29 @@ class GuardrailsQualityVerification(State):
     ) -> None: ...
 
     @statemethod
+    @guardrails_verdict("quality")
     async def verify(
         self,
         content: Multimodal,
         /,
         **extra: Any,
     ) -> None:
+        """Verify the quality of the content.
+
+        Parameters
+        ----------
+        content : Multimodal
+            Content to verify.
+        **extra : Any
+            Additional options forwarded to the guardrails implementation.
+
+        Raises
+        ------
+        GuardrailsQualityException
+            When the content does not meet the quality requirements.
+        GuardrailsFailure
+            When the verification itself fails, i.e. the evaluator errors.
+        """
         content = MultimodalContent.of(content)
         try:
             await self._verifying(
@@ -92,7 +121,7 @@ class GuardrailsQualityVerification(State):
                 **extra,
             )
 
-        except GuardrailsQualityException:
+        except GuardrailsQualityException, GuardrailsFailure:
             raise
 
         except GuardrailsException as exc:

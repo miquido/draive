@@ -245,3 +245,19 @@ def test_request_config_rejects_unsupported_output() -> None:
             output="video",
             config=GeminiConfig(model="gemini-test"),
         )
+
+
+def test_request_config_gives_parameterless_tools_an_empty_object_schema() -> None:
+    from draive.models import ModelToolSpecification
+
+    configuration = _request_config(
+        instructions="",
+        tools=ModelTools.of(
+            ModelToolSpecification(name="ping", description="Ping", parameters=None),
+        ),
+        output="text",
+        config=GeminiConfig(model="gemini-test"),
+    )
+
+    declaration = configuration["tools"][0]["function_declarations"][0]
+    assert declaration["parameters_json_schema"] == {"type": "object", "properties": {}}

@@ -1,6 +1,6 @@
 from typing import Literal
 
-from haiway import MISSING, Configuration, Missing
+from haiway import Configuration, Missing
 from openai.types.realtime.realtime_audio_config_input_param import RealtimeAudioConfigInputParam
 from openai.types.realtime.realtime_audio_config_output_param import RealtimeAudioConfigOutputParam
 
@@ -24,22 +24,22 @@ class OpenAIResponsesConfig(Configuration):
         | str
     )
     vision_details: Literal["auto", "low", "high"] = "auto"
-    verbosity: Literal["low", "medium", "high"] | Missing = MISSING
+    verbosity: Literal["low", "medium", "high"] | Missing = Missing
     # "max" requires the gpt-5.6 generation, older models stop at "xhigh"
-    reasoning: Literal["none", "low", "medium", "high", "xhigh", "max"] | Missing = MISSING
+    reasoning: Literal["none", "low", "medium", "high", "xhigh", "max"] | Missing = Missing
     reasoning_summary: Literal["auto", "concise", "detailed"] = "auto"
     # scope of the reasoning carried into a turn, the default differs between model
     # generations - gpt-5.6 uses "all_turns" where gpt-5.5 uses "current_turn"
-    reasoning_context: Literal["auto", "current_turn", "all_turns"] | Missing = MISSING
+    reasoning_context: Literal["auto", "current_turn", "all_turns"] | Missing = Missing
     # "pro" requires an effort of at least "medium" on the models providing it
-    reasoning_mode: Literal["standard", "pro"] | Missing = MISSING
+    reasoning_mode: Literal["standard", "pro"] | Missing = Missing
     truncation: Literal["auto", "disabled"] = "auto"
-    max_output_tokens: int | Missing = MISSING
-    safety_identifier: str | Missing = MISSING
+    max_output_tokens: int | Missing = Missing
+    safety_identifier: str | Missing = Missing
     service_tier: Literal["auto", "default", "flex", "priority", "fast"] = "auto"
     # extended caching is opt-in and not offered by every model, the default
     # retention applies when this is left out
-    prompt_cache_retention: Literal["in_memory", "24h"] | Missing = MISSING
+    prompt_cache_retention: Literal["in_memory", "24h"] | Missing = Missing
 
 
 class OpenAIRealtimeConfig(Configuration):
@@ -62,7 +62,7 @@ class OpenAIEmbeddingConfig(Configuration):
     model: Literal["text-embedding-3-large", "text-embedding-3-small"] | str = (
         "text-embedding-3-small"
     )
-    dimensions: int | Missing = MISSING
+    dimensions: int | Missing = Missing
     batch_size: int = 128
 
 
@@ -76,22 +76,22 @@ class OpenAIImageGenerationConfig(Configuration):
     size: Literal["auto", "1024x1024", "1536x1024", "1024x1536"] = "auto"
     background: Literal["auto", "transparent", "opaque"] = "auto"
     output_format: Literal["png", "jpeg", "webp"] = "png"
-    output_compression: int | Missing = MISSING
+    output_compression: int | Missing = Missing
     moderation: Literal["auto", "low"] = "auto"
 
 
 class OpenAIModerationConfig(Configuration):
     model: Literal["omni-moderation-latest"] | str = "omni-moderation-latest"
-    harassment_threshold: float | Missing = MISSING
-    harassment_threatening_threshold: float | Missing = MISSING
-    hate_threshold: float | Missing = MISSING
-    hate_threatening_threshold: float | Missing = MISSING
-    self_harm_threshold: float | Missing = MISSING
-    self_harm_instructions_threshold: float | Missing = MISSING
-    self_harm_intent_threshold: float | Missing = MISSING
-    sexual_threshold: float | Missing = MISSING
-    sexual_minors_threshold: float | Missing = MISSING
-    violence_threshold: float | Missing = MISSING
-    violence_graphic_threshold: float | Missing = MISSING
-    illicit_threshold: float | Missing = MISSING
-    illicit_violent_threshold: float | Missing = MISSING
+    harassment_threshold: float | Missing = Missing
+    harassment_threatening_threshold: float | Missing = Missing
+    hate_threshold: float | Missing = Missing
+    hate_threatening_threshold: float | Missing = Missing
+    self_harm_threshold: float | Missing = Missing
+    self_harm_instructions_threshold: float | Missing = Missing
+    self_harm_intent_threshold: float | Missing = Missing
+    sexual_threshold: float | Missing = Missing
+    sexual_minors_threshold: float | Missing = Missing
+    violence_threshold: float | Missing = Missing
+    violence_graphic_threshold: float | Missing = Missing
+    illicit_threshold: float | Missing = Missing
+    illicit_violent_threshold: float | Missing = Missing

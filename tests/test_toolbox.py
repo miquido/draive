@@ -213,7 +213,7 @@ async def test_tools_provider_toolbox_accepts_tool_suggestion() -> None:
         async def ping() -> str:
             return "pong"
 
-        async def load_tools() -> tuple[()]:
+        async def load_tools(**extra: Any) -> tuple[()]:
             return ()
 
         toolbox = await ToolsProvider(load_tools).toolbox(ping, suggesting=ping)
@@ -225,7 +225,7 @@ async def test_tools_provider_toolbox_accepts_tool_suggestion() -> None:
 async def test_tools_provider_toolbox_uses_provider_meta_by_default() -> None:
     async with ctx.scope("test"):
 
-        async def load_tools() -> tuple[()]:
+        async def load_tools(**extra: Any) -> tuple[()]:
             return ()
 
         toolbox = await ToolsProvider(
@@ -240,7 +240,7 @@ async def test_tools_provider_toolbox_uses_provider_meta_by_default() -> None:
 async def test_tools_provider_toolbox_allows_overriding_provider_meta() -> None:
     async with ctx.scope("test"):
 
-        async def load_tools() -> tuple[()]:
+        async def load_tools(**extra: Any) -> tuple[()]:
             return ()
 
         toolbox = await ToolsProvider(

@@ -1,6 +1,6 @@
 import re
 from collections.abc import Callable, Sequence
-from re import Match, Pattern
+from re import Pattern
 
 __all__ = (
     "exhaustive_regex_split_text",
@@ -102,66 +102,27 @@ def _regex_split(
     result: list[str] = [text]
 
     for splitter in splitters:
+        # the pattern is used as is, flags, lookarounds and groups of any kind
+        # keep their meaning - only the positions of matches are used
+        pattern: Pattern[str] = splitter if isinstance(splitter, Pattern) else re.compile(splitter)
         parts: list[str] = []
         for element in result:
-            splitted: list[str] = re.split(
-                f"({_remove_capturing_groups(splitter)})",
-                element,
-            )
-            # Add the first part (always a non-splitter part)
-            parts.append(splitted[0])
-            # Combine splitter and following part
+            starts: list[int] = [match.start() for match in pattern.finditer(element)]
+            if not starts:
+                parts.append(element)
+                continue
+
+            # the part before the first match is never a splitter part,
+            # each match is combined with the text following it
+            parts.append(element[: starts[0]])
             parts.extend(
-                [
-                    splitter + following_part
-                    for splitter, following_part in zip(
-                        splitted[1::2],
-                        splitted[2::2],
-                        strict=False,
-                    )
-                ]
+                element[start:end]
+                for start, end in zip(starts, (*starts[1:], len(element)), strict=True)
             )
+
         result = parts
 
     return result
-
-
-def _remove_capturing_groups(pattern: str | Pattern[str]) -> str:
-    if isinstance(pattern, Pattern):
-        pattern = pattern.pattern
-
-    def process_group(match: Match[str]) -> str:
-        group_type, group_content = match.groups()
-        special_constructs: set[str] = {"?:", "?=", "?!", "?<=", "?<!", "?>"}
-
-        if group_type in special_constructs:
-            return match.group(0)  # Return special constructs unchanged
-
-        return group_content  # Remove parentheses for normal capturing groups
-
-    # Regex to match all types of parentheses groups
-    group_pattern = r"""\(  # Match opening parenthesis
-                        (\??[=!<>:]?)  # Optional special characters for non-capturing groups
-                        (  # Main content of the group
-                            (?:
-                                [^()\\]  # Any character that's not a parenthesis or backslash
-                                |  # OR
-                                \\.  # An escaped character
-                                |  # OR
-                                \((?:[^()\\]|\\.)*\)  # A nested group
-                            )*
-                        )
-                    \)  # Match closing parenthesis
-                    """
-
-    processed_pattern: str = re.sub(
-        group_pattern,
-        process_group,
-        pattern,
-        flags=re.VERBOSE,
-    )
-
-    return processed_pattern
 
 
 def _merge(

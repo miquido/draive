@@ -1,13 +1,16 @@
+import re
+import unicodedata
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, Final
 
 from haiway import AttributePath, AttributeRequirement, State
 
 from draive.surreal.types import SurrealValue
-from draive.surreal.utils import surreal_value
-from draive.utils.attributes import attribute_path_components
+from draive.surreal.utils import surreal_field_path, surreal_value
 
 __all__ = ("prepare_filter",)
+
+_WORD_TOKEN_PATTERN: Final[re.Pattern[str]] = re.compile(r"\b\w+\b", re.UNICODE)
 
 
 def prepare_filter[Model: State](
@@ -45,7 +48,7 @@ def prepare_filter[Model: State](
     return _convert(requirements, index=0, scoped=scoped)
 
 
-def _convert[Model: State](  # noqa: C901, PLR0911
+def _convert[Model: State](  # noqa: C901, PLR0911, PLR0912
     requirements: AttributeRequirement[Model],
     /,
     *,
@@ -122,13 +125,23 @@ def _convert[Model: State](  # noqa: C901, PLR0911
             )
 
         case "text_match":
-            # `string(...)` is not a valid function path, values have to be cast instead
-            parameter: str = f"_f{index}"
-            field: str = _field_reference(requirements.lhs, scoped=scoped)
-            return (
-                f"string::contains(<string>{field}, <string>${parameter})",
-                {parameter: str(requirements.rhs)},
+            # whole case insensitive tokens, the same way the in memory requirement check does
+            tokens: Sequence[str] = _WORD_TOKEN_PATTERN.findall(
+                unicodedata.normalize("NFC", str(requirements.rhs)).casefold()
             )
+            if not tokens:
+                return "true", {}  # nothing to match, same as haiway checks
+
+            field: str = _field_reference(requirements.lhs, scoped=scoped)
+            clauses: list[str] = []
+            variables: dict[str, SurrealValue] = {}
+            for token_index, token in enumerate(tokens):
+                parameter: str = f"_f{index}_{token_index}"
+                # tokens consist of word characters only, nothing to escape
+                clauses.append(f"string::matches(<string>{field}, <regex>${parameter})")
+                variables[parameter] = f"(?i)\\b{token}\\b"
+
+            return f"({' AND '.join(clauses)})", variables
 
         case _:
             raise NotImplementedError(
@@ -143,10 +156,5 @@ def _field_reference(
     scoped: bool,
 ) -> str:
     # stored documents use attribute aliases, filters have to follow them
-    resolved: str = ""
-    for component in attribute_path_components(path):
-        if isinstance(component, int):
-            resolved += f"[{component}]"
-        else:
-            resolved += f".{component}" if resolved else component
+    resolved: str = surreal_field_path(path.serialized_components)
     return f"content.{resolved}" if scoped else resolved

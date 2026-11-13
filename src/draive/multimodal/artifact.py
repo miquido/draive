@@ -82,8 +82,8 @@ class ArtifactContent(State, serializable=True):
             return cls(
                 category=category if category is not None else artifact.category,
                 artifact=artifact.artifact,
-                hidden=hidden,
-                meta=Meta.of(meta),
+                hidden=hidden or artifact.hidden,
+                meta=artifact.meta.merged_with(meta) if meta is not None else artifact.meta,
             )
 
         elif isinstance(artifact, State):

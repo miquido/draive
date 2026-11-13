@@ -3,15 +3,16 @@ import json
 import traceback
 from collections.abc import Mapping, MutableMapping, MutableSequence, Sequence
 from datetime import UTC, datetime
+from functools import partial
 from time import monotonic, time_ns
 from typing import Any, Self, cast
 from uuid import UUID, uuid4
 
-from boto3 import Session  # pyright: ignore[reportMissingTypeStubs]
-from botocore.exceptions import ClientError  # pyright: ignore[reportMissingModuleSource]
+from boto3 import Session
+from botocore.exceptions import ClientError
 from haiway import (
-    MISSING,
     ContextIdentifier,
+    Missing,
     Observability,
     ObservabilityAttribute,
     ObservabilityLevel,
@@ -46,8 +47,8 @@ def CloudwatchObservability(  # noqa: C901, PLR0915
     event_source: str,
     metrics_namespace: str,
 ) -> Observability:
-    trace_id: UUID = uuid4()
-    root_scope: ContextIdentifier | None = None
+    # scopes of all concurrently running root scopes, each root has its own trace,
+    # a root is derived from the scope path - there is no separate registry of them
     scopes: MutableMapping[UUID, ScopeStore] = {}
 
     session_kwargs: MutableMapping[str, object] = {}
@@ -169,10 +170,9 @@ def CloudwatchObservability(  # noqa: C901, PLR0915
         scope: ContextIdentifier,
         /,
     ) -> UUID:
-        assert root_scope is not None  # nosec: B101
         assert scope.scope_id in scopes  # nosec: B101
 
-        return trace_id
+        return scopes[scope.scope_id].trace_id
 
     def log_recording(
         scope: ContextIdentifier,
@@ -182,7 +182,6 @@ def CloudwatchObservability(  # noqa: C901, PLR0915
         *args: Any,
         exception: BaseException | None,
     ) -> None:
-        assert root_scope is not None  # nosec: B101
         assert scope.scope_id in scopes  # nosec: B101
 
         if level < log_level:
@@ -210,7 +209,6 @@ def CloudwatchObservability(  # noqa: C901, PLR0915
         event: str,
         attributes: Mapping[str, ObservabilityAttribute],
     ) -> None:
-        assert root_scope is not None  # nosec: B101
         assert scope.scope_id in scopes  # nosec: B101
 
         if level < log_level:
@@ -233,7 +231,6 @@ def CloudwatchObservability(  # noqa: C901, PLR0915
         kind: ObservabilityMetricKind,
         attributes: Mapping[str, ObservabilityAttribute],
     ) -> None:
-        assert root_scope is not None  # nosec: B101
         assert scope.scope_id in scopes  # nosec: B101
 
         if level < log_level:
@@ -253,7 +250,6 @@ def CloudwatchObservability(  # noqa: C901, PLR0915
         level: ObservabilityLevel,
         attributes: Mapping[str, ObservabilityAttribute],
     ) -> None:
-        assert root_scope is not None  # nosec: B101
         assert scope.scope_id in scopes  # nosec: B101
 
         if level < log_level:
@@ -271,15 +267,13 @@ def CloudwatchObservability(  # noqa: C901, PLR0915
         scope: ContextIdentifier,
         /,
     ) -> str:
-        nonlocal root_scope
         assert scope.scope_id not in scopes  # nosec: B101
 
         scope_store: ScopeStore
-        if root_scope is None:
-            assert scope.is_root  # nosec: B101
+        if scope.is_root:
             scope_store = ScopeStore(
                 scope,
-                trace_id=trace_id,
+                trace_id=uuid4(),
                 log_group=log_group,
                 log_stream=log_stream,
                 event_bus=event_bus,
@@ -288,8 +282,8 @@ def CloudwatchObservability(  # noqa: C901, PLR0915
                 log_putting=log_putting,
                 metric_putting=metric_putting,
                 event_putting=event_putting,
+                loop=_running_loop(),
             )
-            root_scope = scope
 
         else:
             assert scope.parent_id in scopes  # nosec: B101
@@ -307,9 +301,6 @@ def CloudwatchObservability(  # noqa: C901, PLR0915
         *,
         exception: BaseException | None,
     ) -> None:
-        nonlocal root_scope
-        nonlocal trace_id
-        assert root_scope is not None  # nosec: B101
         assert scope.scope_id in scopes  # nosec: B101
 
         scope_store: ScopeStore = scopes[scope.scope_id]
@@ -319,20 +310,25 @@ def CloudwatchObservability(  # noqa: C901, PLR0915
         if not scope_store.try_complete():
             return  # not completed yet or already completed
 
+        root_id: UUID = scope.path[0]
         # try complete parent scopes
-        if scope != root_scope:
+        if not scope.is_root:
             parent_id: UUID = scope.parent_id
             while scopes[parent_id].try_complete():
-                if scopes[parent_id].identifier == root_scope:
+                if parent_id == root_id:
                     break
 
                 parent_id = scopes[parent_id].identifier.parent_id
 
-        # check for root completion
-        if scopes[root_scope.scope_id].completed:
-            trace_id = uuid4()
-            root_scope = None
-            scopes.clear()
+        # check for root completion, releasing only the scopes of its own tree
+        if scopes[root_id].completed:
+            finished: list[UUID] = [
+                scope_id
+                for scope_id, store in scopes.items()
+                if store.identifier.path[0] == root_id
+            ]
+            for scope_id in finished:
+                del scopes[scope_id]
 
     return Observability(
         trace_identifying=trace_identifying,
@@ -357,6 +353,7 @@ class ScopeStore:
         "log_group",
         "log_putting",
         "log_stream",
+        "loop",
         "metric_putting",
         "metrics_namespace",
         "nested",
@@ -377,8 +374,11 @@ class ScopeStore:
         log_putting: AWSCloudwatchLogPutting,
         metric_putting: AWSCloudwatchMetricPutting,
         event_putting: AWSCloudwatchEventPutting,
+        loop: asyncio.AbstractEventLoop | None = None,
     ) -> None:
         self.identifier: ContextIdentifier = identifier
+        # loop running the scopes, records made from worker threads are scheduled onto it
+        self.loop: asyncio.AbstractEventLoop | None = loop
         self.trace_id: UUID = trace_id
         self.log_group: str = log_group
         self.log_stream: str = log_stream
@@ -409,6 +409,7 @@ class ScopeStore:
             log_putting=self.log_putting,
             metric_putting=self.metric_putting,
             event_putting=self.event_putting,
+            loop=self.loop,
         )
         self.nested.append(child)
         return child
@@ -458,7 +459,8 @@ class ScopeStore:
             attributes["exception.type"] = exception.__class__.__name__
             attributes["exception.message"] = str(exception)
 
-        ctx.spawn_background(
+        _spawn_background(
+            self.loop,
             self.log_putting,
             log_stream=self.log_stream,
             log_group=self.log_group,
@@ -480,7 +482,8 @@ class ScopeStore:
         exception: BaseException,
         /,
     ) -> None:
-        ctx.spawn_background(
+        _spawn_background(
+            self.loop,
             self.event_putting,
             event_bus=self.event_bus,
             event_source=self.event_source,
@@ -518,7 +521,8 @@ class ScopeStore:
         level: ObservabilityLevel,
         attributes: Mapping[str, ObservabilityAttribute],
     ) -> None:
-        ctx.spawn_background(
+        _spawn_background(
+            self.loop,
             self.event_putting,
             event_bus=self.event_bus,
             event_source=self.event_source,
@@ -556,7 +560,8 @@ class ScopeStore:
             _sanitized_attributes(attributes)
         )
         metric_attributes.setdefault("otel.metric.kind", kind)
-        ctx.spawn_background(
+        _spawn_background(
+            self.loop,
             self.metric_putting,
             namespace=self.metrics_namespace,
             metric=name,
@@ -629,13 +634,13 @@ def _sanitized_attributes(
 ) -> Mapping[str, Any]:
     sanitized: dict[str, Any] = {}
     for key, value in attributes.items():
-        if value is None or value is MISSING:
+        if value is None or value is Missing:
             continue  # skip missing/empty
 
         if isinstance(value, Sequence) and not isinstance(value, str | bytes | bytearray):
             elements: list[Any] = []
             for item in cast(Sequence[Any], value):
-                if item is None or item is MISSING:
+                if item is None or item is Missing:
                     continue  # skip missing/empty
 
                 assert isinstance(item, str | float | int | bool)  # nosec: B101
@@ -648,7 +653,7 @@ def _sanitized_attributes(
 
         elif isinstance(value, Mapping):
             for name, item in cast(Mapping[str, Any], value).items():
-                if item is None or item is MISSING:
+                if item is None or item is Missing:
                     continue  # skip missing/empty
 
                 assert isinstance(item, str | float | int | bool)  # nosec: B101
@@ -670,4 +675,32 @@ def _json_dumps(
         ensure_ascii=True,
         separators=(",", ":"),
         default=str,
+    )
+
+
+def _running_loop() -> asyncio.AbstractEventLoop | None:
+    try:
+        return asyncio.get_running_loop()
+
+    except RuntimeError:
+        return None
+
+
+def _spawn_background(
+    loop: asyncio.AbstractEventLoop | None,
+    function: Any,
+    /,
+    **kwargs: Any,
+) -> None:
+    if _running_loop() is not None:
+        ctx.spawn_background(function, **kwargs)
+        return
+
+    # called from a worker thread, background tasks can be created only on the loop,
+    # the callback keeps the context of the caller so the task joins the right scope
+    if loop is None or loop.is_closed():
+        return  # nothing to deliver the record to
+
+    loop.call_soon_threadsafe(
+        partial(ctx.spawn_background, function, **kwargs),
     )

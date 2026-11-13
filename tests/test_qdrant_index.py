@@ -2,7 +2,7 @@ import warnings
 from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 import pytest
@@ -568,3 +568,73 @@ async def test_qdrant_search_filters_by_aliased_attribute() -> None:
         )
 
         assert [element.identifier for element in results] == ["doc-2"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("rerank", "expected_limit"), ((False, 2), (True, 16)))
+async def test_qdrant_rerank_overfetches_candidates(
+    monkeypatch: pytest.MonkeyPatch,
+    rerank: bool,
+    expected_limit: int,
+) -> None:
+    fetched_limits: list[int] = []
+
+    class SpyingQdrant:
+        @staticmethod
+        async def search(*args: Any, **kwargs: Any) -> Any:
+            fetched_limits.append(kwargs["limit"])
+            return await Qdrant.search(*args, **kwargs)
+
+        def __getattr__(self, name: str) -> Any:
+            return getattr(Qdrant, name)
+
+    async with _measurement_scope():
+        monkeypatch.setattr("draive.qdrant.index.Qdrant", SpyingQdrant())
+        results: Sequence[_Measurement] = await VectorIndex.search(
+            _Measurement,
+            query=[3.0, 1.0],
+            limit=2,
+            rerank=rerank,
+        )
+
+    assert len(results) == 2
+    assert fetched_limits == [expected_limit]
+
+
+def test_qdrant_session_reads_environment_when_created(monkeypatch: pytest.MonkeyPatch) -> None:
+    from draive.qdrant import QdrantClient as Client
+
+    monkeypatch.setenv("QDRANT_HOST", "qdrant.internal")
+    monkeypatch.setenv("QDRANT_PORT", "7001")
+    monkeypatch.setenv("QDRANT_GRPC_PORT", "7002")
+    monkeypatch.setenv("QDRANT_API_KEY", "from-env")
+
+    from_env = Client()
+    assert (from_env._host, from_env._port, from_env._grpc_port) == (  # pyright: ignore[reportPrivateUsage]
+        "qdrant.internal",
+        7001,
+        7002,
+    )
+    assert from_env._api_key == "from-env"  # pyright: ignore[reportPrivateUsage]
+
+    explicit = Client(host="explicit", port=1, grpc_port=2, api_key="explicit-key")
+    assert (explicit._host, explicit._port, explicit._grpc_port) == (  # pyright: ignore[reportPrivateUsage]
+        "explicit",
+        1,
+        2,
+    )
+    assert explicit._api_key == "explicit-key"  # pyright: ignore[reportPrivateUsage]
+
+
+@pytest.mark.asyncio
+async def test_qdrant_index_rejects_invalid_inputs_with_value_errors() -> None:
+    async with _measurement_scope():
+        with pytest.raises(ValueError, match="score_threshold"):
+            await VectorIndex.search(_Measurement, query=None, score_threshold=0.5)
+
+        with pytest.raises(ValueError, match="path"):
+            await VectorIndex.index(
+                _Measurement,
+                attribute="label",  # pyright: ignore[reportArgumentType]
+                values=[],
+            )

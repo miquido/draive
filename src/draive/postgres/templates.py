@@ -191,7 +191,7 @@ async def _list_template_declarations(
     ctx.log_info("Listing templates...")
     pagination, token, fetch_limit = _paginated_query_arguments(pagination)
     if pagination.limit <= 0:
-        return Paginated[TemplateDeclaration].of(
+        return Paginated[TemplateDeclaration](
             (),
             pagination=pagination.with_token(None),
         )
@@ -321,7 +321,7 @@ async def _list_template_declarations(
     if len(results) > pagination.limit:
         next_token = f"{page_results[-1]['identifier']}"
 
-    return Paginated[TemplateDeclaration].of(
+    return Paginated[TemplateDeclaration](
         tuple(
             TemplateDeclaration(
                 identifier=cast(str, result["identifier"]),

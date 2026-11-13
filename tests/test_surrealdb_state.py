@@ -600,3 +600,65 @@ async def test_surreal_transaction_scopes_transaction_session() -> None:
         "transaction-exit",
         "session-exit",
     ]
+
+
+@pytest.mark.asyncio
+async def test_surreal_transaction_scopes_transaction_session_within_active_session() -> None:
+    events: list[str] = []
+
+    async def base_execute(
+        statement: str,
+        /,
+        *,
+        variables: Mapping[str, Any] | None = None,
+    ) -> Sequence[SurrealObject]:
+        events.append(f"base:{statement}")
+        return ()
+
+    async def transaction_execute(
+        statement: str,
+        /,
+        *,
+        variables: Mapping[str, Any] | None = None,
+    ) -> Sequence[SurrealObject]:
+        events.append(f"transaction:{statement}")
+        return ()
+
+    transaction_session = SurrealSession(
+        statement_executing=transaction_execute,
+        transaction_preparing=lambda: pytest.fail("unexpected nested transaction"),
+    )
+
+    class TransactionContext:
+        async def __aenter__(self) -> SurrealSession:
+            events.append("transaction-enter")
+            return transaction_session
+
+        async def __aexit__(
+            self,
+            exc_type: type[BaseException] | None,
+            exc_val: BaseException | None,
+            exc_tb: TracebackType | None,
+        ) -> None:
+            _ = exc_type, exc_val, exc_tb
+            events.append("transaction-exit")
+
+    base_session = SurrealSession(
+        statement_executing=base_execute,
+        transaction_preparing=TransactionContext,
+    )
+
+    async with ctx.scope("test.surreal.transaction.active", base_session):
+        await Surreal.execute("SELECT 0;")
+        async with Surreal.transaction():
+            await Surreal.execute("SELECT 1;")
+
+        await Surreal.execute("SELECT 2;")
+
+    assert events == [
+        "base:SELECT 0;",
+        "transaction-enter",
+        "transaction:SELECT 1;",
+        "transaction-exit",
+        "base:SELECT 2;",
+    ]

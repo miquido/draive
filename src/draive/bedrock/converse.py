@@ -10,7 +10,7 @@ from collections.abc import (
 )
 from typing import Any, Final, Literal, TypedDict, cast
 
-from haiway import MISSING, BasicValue, Missing, asynchronous, ctx, unwrap_missing
+from haiway import BasicValue, Missing, asynchronous, ctx
 
 from draive.bedrock.api import BedrockAPI
 from draive.bedrock.config import BedrockChatConfig
@@ -388,7 +388,7 @@ def _verify_stop_reason(
         raise ModelOutputLimit(
             provider="bedrock",
             model=model,
-            max_output_tokens=unwrap_missing(max_output_tokens, default=0),
+            max_output_tokens=0 if max_output_tokens is Missing else max_output_tokens,
         )
 
     if stop_reason in _FAILURE_STOP_REASONS:
@@ -464,16 +464,16 @@ def _request_parameters(
     ):
         parameters["toolConfig"] = tool_config
 
-    if config.max_output_tokens is not MISSING:
+    if config.max_output_tokens is not Missing:
         parameters["inferenceConfig"]["maxTokens"] = config.max_output_tokens
 
-    if config.top_p is not MISSING:
+    if config.top_p is not Missing:
         parameters["inferenceConfig"]["topP"] = config.top_p
 
     if config.stop_sequences:
         parameters["inferenceConfig"]["stopSequences"] = config.stop_sequences
 
-    if config.guardrail_identifier is not MISSING and config.guardrail_version is not MISSING:
+    if config.guardrail_identifier is not Missing and config.guardrail_version is not Missing:
         parameters["guardrailConfig"] = {
             "guardrailIdentifier": config.guardrail_identifier,
             "guardrailVersion": config.guardrail_version,
@@ -490,14 +490,12 @@ _THROTTLING_ERROR_CODES: Final[frozenset[str]] = frozenset(
         "ThrottlingException",
         "TooManyRequestsException",
         "ServiceQuotaExceededException",
-    )
-)
-_INPUT_ERROR_CODES: Final[frozenset[str]] = frozenset(
-    (
-        "ValidationException",
+        # temporary capacity failures are retryable, same as throttling
         "ServiceUnavailableException",
+        "ModelNotReadyException",
     )
 )
+_INPUT_ERROR_CODES: Final[frozenset[str]] = frozenset(("ValidationException",))
 
 
 def _request_failure(
@@ -527,6 +525,7 @@ def _request_failure(
         return ModelInputInvalid(
             provider="bedrock",
             model=model,
+            reason=str(exception),
         )
 
     return ModelOutputFailed(

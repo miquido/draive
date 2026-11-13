@@ -63,6 +63,9 @@ def mmr_vector_similarity_search(  # noqa: C901
     else:
         results_limit = len(values_vectors)
 
+    if results_limit <= 0:
+        return []
+
     query: NDArray[Any] = np.array(query_vector)
     if query.ndim == 1:
         # ensure 2D shape for similarity calculation
@@ -111,7 +114,7 @@ def mmr_vector_similarity_search(  # noqa: C901
         selected_indices.append(best_index)
         selected = np.append(
             selected,
-            [values[best_index]],  # pyright: ignore[reportUnknownArgumentType]
+            [values[best_index]],
             axis=0,
         )
 

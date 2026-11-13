@@ -18,8 +18,8 @@ from draive.embedding import (
     mmr_vector_similarity_search,
 )
 from draive.multimodal import TextContent
+from draive.postgres._transaction import postgres_transaction
 from draive.resources import ResourceContent
-from draive.utils.attributes import attribute_path_segments
 
 __all__ = (
     "PostgresVectorIndex",
@@ -165,30 +165,29 @@ class PostgresVectorIndex:
                 raise ValueError("Selected attribute values have to be the same type")
 
             created_timestamp: datetime = datetime.now(UTC)
-            async with Postgres.acquire_connection() as connection:
-                async with connection.transaction():
-                    for idx, embedded in enumerate(embedded_values):
-                        await connection.execute(
-                            f"""
-                            INSERT INTO {postgres_identifier(model.__name__)} (
-                                embedding,
-                                payload,
-                                meta,
-                                created
-                            )
-
-                            VALUES (
-                                $1::VECTOR,
-                                $2::JSONB,
-                                $3::JSONB,
-                                $4::TIMESTAMPTZ
-                            );
-                            """,  # nosec: B608
-                            postgres_vector(embedded.vector),
-                            embedded.value.to_json(),
-                            embedded.meta.to_json(),
-                            created_timestamp + timedelta(microseconds=idx),
+            async with postgres_transaction() as connection:
+                for idx, embedded in enumerate(embedded_values):
+                    await connection.execute(
+                        f"""
+                        INSERT INTO {postgres_identifier(model.__name__)} (
+                            embedding,
+                            payload,
+                            meta,
+                            created
                         )
+
+                        VALUES (
+                            $1::VECTOR,
+                            $2::JSONB,
+                            $3::JSONB,
+                            $4::TIMESTAMPTZ
+                        );
+                        """,  # nosec: B608
+                        postgres_vector(embedded.vector),
+                        embedded.value.to_json(),
+                        embedded.meta.to_json(),
+                        created_timestamp + timedelta(microseconds=idx),
+                    )
 
             ctx.log_info("Vector index update completed.")
 
@@ -315,7 +314,7 @@ class PostgresVectorIndex:
                 for index in mmr_vector_similarity_search(
                     query_vector=query_vector,
                     values_vectors=[element.vector for element in matching],
-                    limit=limit,
+                    limit=limit or 8,
                 )
             )
 
@@ -394,6 +393,7 @@ def _resolve_requirement(  # noqa: C901, PLR0911
 
         case "equal":
             accessor, resolved_arguments = _json_accessor(requirement.lhs, arguments)
+            elements: str = _array_or_empty(accessor)
             resolved_arguments = [*resolved_arguments, _json_value(requirement.rhs)]
             return (
                 f"{accessor} = ${len(resolved_arguments)}::JSONB",
@@ -423,23 +423,25 @@ def _resolve_requirement(  # noqa: C901, PLR0911
 
         case "contains_any":
             accessor, resolved_arguments = _json_accessor(requirement.lhs, arguments)
+            elements: str = _array_or_empty(accessor)
             resolved_arguments = [
                 *resolved_arguments,
                 _json_values(cast(Iterable[Any], requirement.rhs)),
             ]
             return (
                 # the interpolated accessor is fully parameterized
-                f"EXISTS (SELECT 1 FROM jsonb_array_elements({accessor}) AS element"  # nosec: B608
+                f"EXISTS (SELECT 1 FROM jsonb_array_elements({elements}) AS element"  # nosec: B608
                 f" WHERE element = ANY(${len(resolved_arguments)}::JSONB[]))",
                 resolved_arguments,
             )
 
         case "contains":
             accessor, resolved_arguments = _json_accessor(requirement.lhs, arguments)
+            elements = _array_or_empty(accessor)
             resolved_arguments = [*resolved_arguments, _json_value(requirement.rhs)]
             return (
                 # the interpolated accessor is fully parameterized
-                f"EXISTS (SELECT 1 FROM jsonb_array_elements({accessor}) AS element"  # nosec: B608
+                f"EXISTS (SELECT 1 FROM jsonb_array_elements({elements}) AS element"  # nosec: B608
                 f" WHERE element = ${len(resolved_arguments)}::JSONB)",
                 resolved_arguments,
             )
@@ -460,6 +462,11 @@ def _resolve_requirement(  # noqa: C901, PLR0911
                 )
 
             return f"({' AND '.join(clauses)})", resolved_arguments
+
+
+def _array_or_empty(accessor: str) -> str:
+    # jsonb_array_elements fails the whole statement for any non array value
+    return f"(CASE WHEN jsonb_typeof({accessor}) = 'array' THEN {accessor} ELSE '[]'::JSONB END)"
 
 
 def resolve_requirements(
@@ -511,7 +518,7 @@ def _path_segments(
     /,
 ) -> Sequence[str]:
     # the payload is stored serialized, attribute aliases have to be applied
-    segments: Sequence[str] = attribute_path_segments(path)
+    segments: Sequence[str] = tuple(str(component) for component in path.serialized_components)
     if not segments or any(
         _PATH_SEGMENT_PATTERN.fullmatch(segment) is None for segment in segments
     ):

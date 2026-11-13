@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from typing import Self, final
 
-from haiway import Default, Meta, MetaValues, State
+from haiway import DefaultFactory, Meta, MetaValues, State
 
 from draive.multimodal import Multimodal, MultimodalContent
 
@@ -45,6 +45,6 @@ class ProcessingEvent(State, serializable=True):
         )
 
     event: str
-    created: datetime = Default(factory=lambda: datetime.now(UTC))
+    created: datetime = DefaultFactory(datetime.now, UTC)
     content: MultimodalContent
     meta: Meta = Meta.empty
