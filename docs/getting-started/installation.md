@@ -49,7 +49,7 @@ uv sync --all-groups --all-extras --frozen
 - `draive[qdrant]`, `draive[postgres]`, `draive[surrealdb]` (plus `draive[surrealdb_embedded]` for
     in-process `mem://`/`file://` connections) for vector/storage backends; the Postgres index
     requires the `pgvector` server extension, while a remote SurrealDB connection requires a
-    SurrealDB 3.x server with its namespace and database already defined. SurrealDB tables have to
+    SurrealDB 3.x or newer server (verified with 4.0) with its namespace and database already defined. SurrealDB tables have to
     be defined upfront as well - each feature provides a static `migrate()`
     (`SurrealConversationMemory`, `SurrealTemplatesRepository`, `SurrealVectorIndex`), while custom
     models are defined with `Surreal.define_table`.
