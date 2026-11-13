@@ -1,4 +1,3 @@
-from asyncio import gather
 from collections.abc import Callable, Sequence
 from itertools import chain
 from typing import Any, cast
@@ -7,7 +6,12 @@ from haiway import State, as_list, ctx
 from ollama import EmbedResponse
 
 from draive.embedding import Embedded
-from draive.models.metrics import record_embedding_invocation, record_embedding_metrics
+from draive.models.metrics import (
+    provider_failure,
+    provider_gather,
+    record_embedding_invocation,
+    record_embedding_metrics,
+)
 from draive.ollama.api import OllamaAPI
 from draive.ollama.config import OllamaEmbeddingConfig
 
@@ -58,27 +62,35 @@ class OllamaEmbedding(OllamaAPI):
             if not attributes:
                 return ()  # empty
 
-            responses: list[EmbedResponse]
+            responses: Sequence[EmbedResponse]
             if embedding_config.concurrent:
-                responses = await gather(
+                responses = await provider_gather(
                     *[
                         self._client.embed(
                             model=embedding_config.model,
                             input=attributes[index : index + embedding_config.batch_size],
                         )
                         for index in range(0, len(attributes), embedding_config.batch_size)
-                    ]
+                    ],
+                    provider="ollama",
+                    model=embedding_config.model,
+                    operation="embedding",
                 )
 
             else:
                 responses = []
-                for index in range(0, len(attributes), embedding_config.batch_size):
-                    responses.append(
-                        await self._client.embed(
-                            model=embedding_config.model,
-                            input=attributes[index : index + embedding_config.batch_size],
+                with provider_failure(
+                    provider="ollama",
+                    model=embedding_config.model,
+                    operation="embedding",
+                ):
+                    for index in range(0, len(attributes), embedding_config.batch_size):
+                        responses.append(
+                            await self._client.embed(
+                                model=embedding_config.model,
+                                input=attributes[index : index + embedding_config.batch_size],
+                            )
                         )
-                    )
 
             return cast(
                 Sequence[Embedded[Value]] | Sequence[Embedded[str]],

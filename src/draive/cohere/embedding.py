@@ -1,4 +1,3 @@
-from asyncio import gather
 from base64 import b64encode
 from collections.abc import Callable, Sequence
 from typing import Any, cast
@@ -9,7 +8,11 @@ from haiway import State, as_list, ctx
 from draive.cohere.api import CohereAPI
 from draive.cohere.config import CohereImageEmbeddingConfig, CohereTextEmbeddingConfig
 from draive.embedding import Embedded, ImageEmbedding, TextEmbedding
-from draive.models.metrics import record_embedding_invocation, record_embedding_metrics
+from draive.models.metrics import (
+    provider_gather,
+    record_embedding_invocation,
+    record_embedding_metrics,
+)
 
 __all__ = ("CohereEmbedding",)
 
@@ -61,7 +64,7 @@ class CohereEmbedding(CohereAPI):
             if not attributes:
                 return ()  # empty
 
-            responses: list[EmbedByTypeResponse] = await gather(
+            responses: Sequence[EmbedByTypeResponse] = await provider_gather(
                 *[
                     self._client.embed(
                         model=embedding_config.model,
@@ -70,7 +73,10 @@ class CohereEmbedding(CohereAPI):
                         input_type=embedding_config.purpose,
                     )
                     for index in range(0, len(attributes), embedding_config.batch_size)
-                ]
+                ],
+                provider="cohere",
+                model=embedding_config.model,
+                operation="embedding",
             )
 
             return cast(
@@ -138,7 +144,7 @@ class CohereEmbedding(CohereAPI):
             if not attributes:
                 return ()  # empty
 
-            responses: list[EmbedByTypeResponse] = await gather(
+            responses: Sequence[EmbedByTypeResponse] = await provider_gather(
                 *[
                     self._client.embed(
                         model=embedding_config.model,
@@ -151,7 +157,10 @@ class CohereEmbedding(CohereAPI):
                         input_type="image",
                     )
                     for index in range(0, len(attributes), embedding_config.batch_size)
-                ]
+                ],
+                provider="cohere",
+                model=embedding_config.model,
+                operation="embedding",
             )
 
             return cast(

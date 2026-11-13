@@ -1,4 +1,5 @@
 import json
+import sys
 from base64 import b64decode
 from collections.abc import Generator, Mapping, MutableMapping, Sequence
 from contextlib import AbstractAsyncContextManager
@@ -108,27 +109,44 @@ class OpenAIRealtime(OpenAIAPI):
             # enter scope
             scope = ctx.scope("model.session")
             await scope.__aenter__()
-            record_model_invocation(
-                provider="openai",
-                model=config.model,
-                tools=tools,
-                output=output,
-            )
-            # open connection
-            connection: AsyncRealtimeConnection = await connection_manager.__aenter__()
-            # setup connection
-            await connection.session.update(session=session_config)
-
             current_items: MutableMapping[str, Meta] = {}
             # audio appended to the input buffer since its last commit
             buffered_audio: bool = False
-
-            if context:  # send initial context
-                await _send_context(
-                    context,
-                    current_items=current_items,
-                    connection=connection,
+            try:
+                record_model_invocation(
+                    provider="openai",
+                    model=config.model,
+                    tools=tools,
+                    output=output,
                 )
+                # open connection
+                connection: AsyncRealtimeConnection = await connection_manager.__aenter__()
+
+            except BaseException:
+                # close is never called when opening fails, release the scope here
+                await scope.__aexit__(*sys.exc_info())
+                raise
+
+            try:
+                # setup connection
+                await connection.session.update(session=session_config)
+
+                if context:  # send initial context
+                    await _send_context(
+                        context,
+                        current_items=current_items,
+                        connection=connection,
+                    )
+
+            except BaseException:
+                # close is never called when opening fails, release everything here
+                try:
+                    await connection_manager.__aexit__(*sys.exc_info())
+
+                finally:
+                    await scope.__aexit__(*sys.exc_info())
+
+                raise
 
             async def read() -> ModelSessionOutputChunk:  # noqa: C901, PLR0911, PLR0912, PLR0915
                 nonlocal current_items

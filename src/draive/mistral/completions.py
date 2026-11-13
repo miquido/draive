@@ -34,6 +34,7 @@ from draive.models import (
     ModelContext,
     ModelException,
     ModelInput,
+    ModelInputInvalid,
     ModelInstructions,
     ModelOutput,
     ModelOutputFailed,
@@ -97,22 +98,35 @@ class MistralCompletions(MistralAPI):
                 tool_selection=tools.selection,
             )
 
+            # prepare the request outside of the request handling, errors
+            # of building it are input errors instead of output failures
+            try:
+                request_messages = _build_messages(
+                    context=context,
+                    instructions=instructions,
+                )
+                request_response_format = _response_format(output)
+
+            except Exception as exc:
+                raise ModelInputInvalid(
+                    provider="mistral",
+                    model=config.model,
+                    reason=str(exc),
+                ) from exc
+
             usage: UsageInfo = UsageInfo()
             usage_recorded = False
             try:
                 stream: EventStreamAsync[CompletionEvent] = await self._client.chat.stream_async(
                     model=config.model,
-                    messages=_build_messages(
-                        context=context,
-                        instructions=instructions,
-                    ),
+                    messages=request_messages,
                     temperature=unwrap_missing_to_unset(config.temperature),
                     top_p=unwrap_missing_to_unset(config.top_p),
                     max_tokens=unwrap_missing_to_unset(config.max_output_tokens),
                     stop=unwrap_missing_list_to_unset(config.stop_sequences),
                     random_seed=unwrap_missing_to_unset(config.seed),
                     prompt_mode=unwrap_missing_to_unset(config.prompt_mode),
-                    response_format=_response_format(output),
+                    response_format=request_response_format,
                     tools=tools_list,
                     tool_choice=tool_choice,
                 )

@@ -1,17 +1,24 @@
 import random
+from collections.abc import Coroutine, Generator, Sequence
+from contextlib import contextmanager
 
 from haiway import Missing, ObservabilityAttribute, ctx
 
 from draive.models.types import (
+    ModelException,
+    ModelOutputFailed,
     ModelOutputSelection,
     ModelQuotaLimit,
     ModelRateLimit,
     ModelTools,
     ModelToolSpecification,
 )
+from draive.utils.concurrent import gather_all
 
 __all__ = (
     "model_rate_limit",
+    "provider_failure",
+    "provider_gather",
     "record_embedding_invocation",
     "record_embedding_metrics",
     "record_guardrails_invocation",
@@ -261,3 +268,83 @@ def record_usage_metrics(
             kind="counter",
             attributes=attributes,
         )
+
+
+@contextmanager
+def provider_failure(
+    *,
+    provider: str,
+    model: str,
+    operation: str,
+) -> Generator[None]:
+    """Translate unexpected provider SDK errors into a typed model exception.
+
+    Wraps a single provider call outside of the chat completion flow, i.e. embedding,
+    moderation or image generation. Model exceptions already raised within, rate limits
+    among them, are passed through untouched and cancellation is never intercepted.
+
+    Parameters
+    ----------
+    provider : str
+        Provider identifier used for the request.
+    model : str
+        Provider model identifier used for the request.
+    operation : str
+        Short operation name included in the error, i.e. ``"embedding"``.
+
+    Raises
+    ------
+    ModelOutputFailed
+        When the wrapped call fails with any other exception.
+    """
+    try:
+        yield
+
+    except ModelException:
+        raise
+
+    except Exception as exc:
+        ctx.log_error(
+            f"{provider} {operation} request failed",
+            exception=exc,
+        )
+        raise ModelOutputFailed(
+            provider=provider,
+            model=model,
+            reason=f"{operation} request failed - {type(exc).__name__}: {exc}",
+        ) from exc
+
+
+async def provider_gather[Result](
+    *awaitables: Coroutine[None, None, Result],
+    provider: str,
+    model: str,
+    operation: str,
+) -> Sequence[Result]:
+    """Run provider calls concurrently translating failures into typed exceptions.
+
+    The remaining calls are cancelled when one of them fails.
+
+    Parameters
+    ----------
+    *awaitables : Coroutine[None, None, Result]
+        Provider calls to run concurrently.
+    provider : str
+        Provider identifier used for the requests.
+    model : str
+        Provider model identifier used for the requests.
+    operation : str
+        Short operation name included in the error, i.e. ``"embedding"``.
+
+    Returns
+    -------
+    Sequence[Result]
+        Results in the order of the given calls.
+
+    Raises
+    ------
+    ModelOutputFailed
+        When any of the calls fails with an unexpected exception.
+    """
+    with provider_failure(provider=provider, model=model, operation=operation):
+        return await gather_all(*awaitables)

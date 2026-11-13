@@ -1,6 +1,8 @@
 from draive.models.generative import GenerativeModel, RealtimeGenerativeModel
 from draive.models.metrics import (
     model_rate_limit,
+    provider_failure,
+    provider_gather,
     record_embedding_invocation,
     record_embedding_metrics,
     record_guardrails_invocation,
@@ -106,6 +108,8 @@ __all__ = (
     "RealtimeGenerativeModel",
     "model_output_blocks",
     "model_rate_limit",
+    "provider_failure",
+    "provider_gather",
     "record_embedding_invocation",
     "record_embedding_metrics",
     "record_guardrails_invocation",
