@@ -315,12 +315,12 @@ def test_agents_group_rejects_duplicate_agent_names() -> None:
         agent="worker",
     )
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError, match="unique names"):
         _ = AgentsGroup.of(agent_a, agent_b)
 
 
 def test_agents_group_rejects_duplicate_placeholder_names() -> None:
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError, match="unique names"):
         _ = AgentsGroup.of(
             AgentIdentity.of(uri="agent://worker-a", name="worker"),
             AgentIdentity.of(uri="agent://worker-b", name="worker"),
@@ -591,3 +591,21 @@ def test_agents_group_bind_rejects_conflicting_name(name: str) -> None:
 
     with pytest.raises(AgentException, match="is already defined"):
         group.bind(Agent.noop(AgentIdentity.of(uri=identity.uri, name=name)))
+
+
+@pytest.mark.asyncio
+async def test_generative_agent_stops_endless_tool_loop() -> None:
+    async def generating(
+        *,
+        instructions: str,
+        tools: ModelTools,
+        context: Sequence[ModelContextElement],
+        output: Any,
+        **extra: Any,
+    ) -> AsyncIterable[ModelOutputChunk]:
+        yield ModelToolRequest.of("call", tool="missing", arguments={})
+
+    agent = Agent.generative("helper", instructions="Use tools", max_iterations=3)
+    async with ctx.scope("test", GenerativeModel(generating=generating)):
+        with pytest.raises(AgentException, match="exceeded the limit of 3"):
+            _ = [chunk async for chunk in agent.call(thread=uuid4(), input="hello")]

@@ -23,6 +23,7 @@ from draive.utils import ProcessingEvent
 __all__ = (
     "ConversationAssistantTurn",
     "ConversationEvent",
+    "ConversationException",
     "ConversationInputChunk",
     "ConversationInputStream",
     "ConversationMemoryFetching",
@@ -33,6 +34,10 @@ __all__ = (
     "ConversationTurn",
     "ConversationUserTurn",
 )
+
+
+class ConversationException(Exception):
+    """Base exception raised by conversation flows."""
 
 
 @final

@@ -4,7 +4,7 @@ from typing import Any
 import pytest
 from haiway import ctx
 
-from draive.conversation import Conversation
+from draive.conversation import Conversation, ConversationException
 from draive.conversation.state import ConversationMemory
 from draive.conversation.types import ConversationAssistantTurn, ConversationUserTurn
 from draive.models import (
@@ -350,3 +350,32 @@ async def test_conversation_completion_links_new_turns_in_memory_order() -> None
     assert remembered_turns[0].identifier == existing_turn.identifier
     assert user_turn.turn == "user"
     assert assistant_turn.turn == "assistant"
+
+
+@pytest.mark.asyncio
+async def test_conversation_completion_stops_endless_tool_loop() -> None:
+    @tool
+    async def echo(value: str) -> str:
+        return value
+
+    def mock_generating(
+        *,
+        instructions: str,
+        tools: ModelTools,
+        context: Sequence[ModelContextElement],
+        output: str | type | Sequence[str],
+        **extra: Any,
+    ) -> AsyncIterable[ModelOutputChunk]:
+        _ = (instructions, tools, context, output, extra)
+        return _stream_of(ModelToolRequest.of("call", tool="echo", arguments={"value": "x"}))
+
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), Conversation()):
+        with pytest.raises(ConversationException, match="exceeded the limit"):
+            _ = [
+                chunk
+                async for chunk in Conversation.completion(
+                    message="Hi",
+                    memory=ConversationMemory.disabled,
+                    tools=Toolbox.of(echo),
+                )
+            ]
