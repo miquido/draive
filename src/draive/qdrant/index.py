@@ -21,7 +21,7 @@ __all__ = ("QdrantVectorIndex",)
 @final
 class QdrantVectorIndex:
     @staticmethod
-    def prepare(  # noqa: C901
+    def prepare(  # noqa: C901, PLR0915
         *,
         mmr_multiplier: int = 8,
     ) -> VectorIndex:
@@ -54,9 +54,11 @@ class QdrantVectorIndex:
             attribute: Callable[[Model], Value] | AttributePath[Model, Value] | Value,
             **extra: Any,
         ) -> None:
-            assert isinstance(  # nosec: B101
-                attribute, AttributePath | Callable
-            ), f"Prepare parameter path by using {model.__name__}._.path.to.property"
+            if not isinstance(attribute, AttributePath | Callable):
+                raise ValueError(
+                    f"Prepare parameter path by using {model.__name__}._.path.to.property"
+                )
+
             value_selector: Callable[[Model], Value] = cast(Callable[[Model], Value], attribute)
 
             selected_texts: list[str] = []
@@ -127,7 +129,8 @@ class QdrantVectorIndex:
             rerank: bool = False,
             **extra: Any,
         ) -> Sequence[Model]:
-            assert query is not None or (query is None and score_threshold is None)  # nosec: B101
+            if query is None and score_threshold is not None:
+                raise ValueError("score_threshold requires a query")
 
             if query is None:
                 return (

@@ -222,7 +222,7 @@ class _EmbeddedSessionContext:
                 )
 
         def transaction() -> SurrealTransactionContext:
-            raise RuntimeError(
+            raise SurrealException(
                 "Embedded SurrealDB connections do not support client-side transactions"
             )
 
@@ -298,7 +298,7 @@ class _TransactionContext:
             )
 
         def transaction() -> SurrealTransactionContext:
-            raise RuntimeError("Nested transactions are not supported")
+            raise SurrealException("Nested transactions are not supported")
 
         return SurrealSession(
             statement_executing=execute,
@@ -570,9 +570,13 @@ async def _execute(
     try:
         rows: Sequence[SurrealObject] = tuple(_process_response(response))
 
-    except BaseException:
+    except SurrealException:
         _record_query(started, outcome="error", rows=None)
         raise
+
+    except Exception as exc:
+        _record_query(started, outcome="error", rows=None)
+        raise SurrealException(f"Invalid Surreal response: {exc}") from exc
 
     _record_query(started, outcome="success", rows=len(rows))
     return rows
@@ -605,9 +609,13 @@ async def _execute_embedded(
     try:
         rows: Sequence[SurrealObject] = tuple(_process_response(response))
 
-    except BaseException:
+    except SurrealException:
         _record_query(started, outcome="error", rows=None)
         raise
+
+    except Exception as exc:
+        _record_query(started, outcome="error", rows=None)
+        raise SurrealException(f"Invalid Surreal response: {exc}") from exc
 
     _record_query(started, outcome="success", rows=len(rows))
     return rows
