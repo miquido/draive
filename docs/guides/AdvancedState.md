@@ -28,9 +28,6 @@ print(simplified_schema(Example.__SPECIFICATION__, indent=2))
 `json_schema(...)` is precise and machine-oriented; `simplified_schema(...)` is compact and often
 useful when injecting schema hints into LLM prompts.
 
-`strict_schema(...)` sits next to it and converts a JSON schema into its OpenAI strict mode
-equivalent, returning `None` when the schema holds something strict mode cannot express.
-
 ## Immutability And Updates
 
 ```python

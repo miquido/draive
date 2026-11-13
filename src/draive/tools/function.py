@@ -20,13 +20,9 @@ __all__ = (
 )
 
 
-@final
-class CoroutineTool[**Args, Result: Multimodal = MultimodalContent](
-    Function[Args, Coroutine[None, None, Result]]
-):
-    """Tool adapter wrapping an async function returning multimodal content."""
-
+class _ToolFunction[**Args, Output](Function[Args, Output]):
     __slots__ = (
+        "_declared_parameters",
         "description",
         "handling",
         "name",
@@ -37,7 +33,7 @@ class CoroutineTool[**Args, Result: Multimodal = MultimodalContent](
     def __init__(
         self,
         /,
-        function: Callable[Args, Coroutine[None, None, Result]],
+        function: Callable[Args, Output],
         *,
         name: str,
         description: str | None,
@@ -45,12 +41,12 @@ class CoroutineTool[**Args, Result: Multimodal = MultimodalContent](
         handling: ModelToolHandling,
         meta: Meta,
     ) -> None:
-        """Initialize a coroutine-backed tool.
+        """Initialize a function-backed tool.
 
         Parameters
         ----------
-        function : Callable[Args, Coroutine[None, None, Multimodal]]
-            Async callable executed when the tool is invoked.
+        function : Callable[Args, Output]
+            Callable executed when the tool is invoked.
         name : str
             Public tool name exposed to model tool selection.
         description : str | None
@@ -58,7 +54,7 @@ class CoroutineTool[**Args, Result: Multimodal = MultimodalContent](
         parameters : ModelToolParametersSpecification | None
             Explicit JSON schema for arguments. When omitted, the schema is inferred
             from the wrapped function signature.
-        handling : ModelToolHandling, default="response"
+        handling : ModelToolHandling
             Output handling mode used by the toolbox.
         meta : Meta
             Metadata attached to the generated tool specification.
@@ -70,41 +66,44 @@ class CoroutineTool[**Args, Result: Multimodal = MultimodalContent](
             parameter without a type specification.
         """
         super().__init__(function)
-        self.name: str = name
-        self.description: str | None = description
         assert all(arg.name in self._keyword_arguments for arg in self._positional_arguments)  # nosec: B101
         assert self._variadic_positional_arguments is None  # nosec: B101
 
-        if parameters is None:
-            aliased_required: MutableSequence[str] = []
-            specifications: MutableMapping[str, TypeSpecification] = {}
-            for argument in self._keyword_arguments.values():
-                specification: TypeSpecification | None = argument.specification
-                if specification is None:
-                    raise RuntimeError(
-                        f"Function argument {argument.name} does not provide a valid specification"
-                    )
-
-                specifications[argument.alias or argument.name] = specification
-
-                if argument.required:
-                    aliased_required.append(argument.alias or argument.name)
-
-            parameters = {
-                "type": "object",
-                "properties": specifications,
-                "required": aliased_required,
-                "additionalProperties": False,
-            }
-
-        self.parameters: ModelToolParametersSpecification = parameters
+        self.name: str = name
+        self.description: str | None = description
+        self._declared_parameters: ModelToolParametersSpecification | None = parameters
+        self.parameters: ModelToolParametersSpecification = (
+            parameters if parameters is not None else self._inferred_parameters()
+        )
         self.specification: ModelToolSpecification = ModelToolFunctionSpecification(
             name=name,
             description=description,
-            parameters=parameters,
+            parameters=self.parameters,
             meta=meta,
         )
         self.handling: ModelToolHandling = handling
+
+    def _inferred_parameters(self) -> ModelToolParametersSpecification:
+        required: MutableSequence[str] = []
+        specifications: MutableMapping[str, TypeSpecification] = {}
+        for argument in self._keyword_arguments.values():
+            specification: TypeSpecification | None = argument.specification
+            if specification is None:
+                raise RuntimeError(
+                    f"Function argument {argument.name} does not provide a valid specification"
+                )
+
+            key: str = argument.alias or argument.name
+            specifications[key] = specification
+            if argument.required:
+                required.append(key)
+
+        return {
+            "type": "object",
+            "properties": specifications,
+            "required": required,
+            "additionalProperties": False,
+        }
 
     @property
     def meta(self) -> Meta:
@@ -116,10 +115,10 @@ class CoroutineTool[**Args, Result: Multimodal = MultimodalContent](
         *,
         name: str | None = None,
         description: str | None = None,
-        function: Callable[Args, Coroutine[None, None, Result]] | None = None,
+        function: Callable[Args, Output] | None = None,
         parameters: ModelToolParametersSpecification | None = None,
         handling: ModelToolHandling | None = None,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         """Return a copy with selected attributes replaced.
 
@@ -129,13 +128,14 @@ class CoroutineTool[**Args, Result: Multimodal = MultimodalContent](
             Replacement tool name.
         description : str | None, default=None
             Replacement description. Passing ``None`` keeps the current value.
-        function : Callable[Args, Coroutine[None, None, Multimodal]] | None, default=None
+        function : Callable[Args, Output] | None, default=None
             Replacement callable. When omitted, the current callable is reused.
         parameters : ModelToolParametersSpecification | None, default=None
-            Replacement parameter schema. When omitted, the current schema is reused.
+            Replacement parameter schema. When omitted, an explicitly declared schema
+            is reused, otherwise the schema is inferred again from the callable.
         handling : ModelToolHandling | None, default=None
             Replacement handling mode.
-        meta : Meta | None, default=None
+        meta : Meta | MetaValues | None, default=None
             Replacement metadata for the tool specification.
 
         Returns
@@ -147,10 +147,19 @@ class CoroutineTool[**Args, Result: Multimodal = MultimodalContent](
             function or self._call,
             name=name or self.name,
             description=description if description is not None else self.description,
-            parameters=parameters if parameters is not None else self.parameters,
+            parameters=parameters if parameters is not None else self._declared_parameters,
             handling=handling if handling is not None else self.handling,
-            meta=meta if meta is not None else self.specification.meta,
+            meta=Meta.of(meta) if meta is not None else self.specification.meta,
         )
+
+
+@final
+class CoroutineTool[**Args, Result: Multimodal = MultimodalContent](
+    _ToolFunction[Args, Coroutine[None, None, Result]]
+):
+    """Tool adapter wrapping an async function returning multimodal content."""
+
+    __slots__ = ()
 
     async def call(
         self,
@@ -175,7 +184,7 @@ class CoroutineTool[**Args, Result: Multimodal = MultimodalContent](
 
 
 @final
-class GeneratorTool[**Args](Function[Args, AsyncGenerator[ToolOutputChunk]]):
+class GeneratorTool[**Args](_ToolFunction[Args, AsyncGenerator[ToolOutputChunk]]):
     """Tool adapter wrapping an async generator of tool output chunks.
 
     The wrapped function has to be an async generator. Only a generator can hold a
@@ -183,131 +192,7 @@ class GeneratorTool[**Args](Function[Args, AsyncGenerator[ToolOutputChunk]]):
     nested streams to be released deterministically when a consumer closes it early.
     """
 
-    __slots__ = (
-        "description",
-        "handling",
-        "name",
-        "parameters",
-        "specification",
-    )
-
-    def __init__(
-        self,
-        /,
-        function: Callable[Args, AsyncGenerator[ToolOutputChunk]],
-        *,
-        name: str,
-        description: str | None,
-        parameters: ModelToolParametersSpecification | None,
-        handling: ModelToolHandling,
-        meta: Meta,
-    ) -> None:
-        """Initialize a generator-backed tool.
-
-        Parameters
-        ----------
-        function : Callable[Args, AsyncGenerator[ToolOutputChunk]]
-            Async generator callable executed when the tool is invoked.
-        name : str
-            Public tool name exposed to model tool selection.
-        description : str | None
-            Optional human-readable tool description.
-        parameters : ModelToolParametersSpecification | None
-            Explicit JSON schema for arguments. When omitted, the schema is inferred
-            from the wrapped function signature.
-        handling : ModelToolHandling, default="response"
-            Output handling mode used by the toolbox.
-        meta : Meta
-            Metadata attached to the generated tool specification.
-
-        Raises
-        ------
-        RuntimeError
-            If argument schema inference encounters an unsupported function
-            parameter without a type specification.
-        """
-        super().__init__(function)
-        self.name: str = name
-        self.description: str | None = description
-        assert all(arg.name in self._keyword_arguments for arg in self._positional_arguments)  # nosec: B101
-        assert self._variadic_positional_arguments is None  # nosec: B101
-
-        if parameters is None:
-            aliased_required: MutableSequence[str] = []
-            specifications: MutableMapping[str, TypeSpecification] = {}
-            for argument in self._keyword_arguments.values():
-                specification: TypeSpecification | None = argument.specification
-                if specification is None:
-                    raise RuntimeError(
-                        f"Function argument {argument.name} does not provide a valid specification"
-                    )
-
-                specifications[argument.alias or argument.name] = specification
-
-                if argument.required:
-                    aliased_required.append(argument.alias or argument.name)
-
-            parameters = {
-                "type": "object",
-                "properties": specifications,
-                "required": aliased_required,
-                "additionalProperties": False,
-            }
-
-        self.parameters: ModelToolParametersSpecification = parameters
-        self.specification: ModelToolSpecification = ModelToolFunctionSpecification(
-            name=name,
-            description=description,
-            parameters=parameters,
-            meta=meta,
-        )
-        self.handling: ModelToolHandling = handling
-
-    @property
-    def meta(self) -> Meta:
-        """Metadata attached to the underlying model tool specification."""
-        return self.specification.meta
-
-    def updating(
-        self,
-        *,
-        name: str | None = None,
-        description: str | None = None,
-        function: Callable[Args, AsyncGenerator[ToolOutputChunk]] | None = None,
-        parameters: ModelToolParametersSpecification | None = None,
-        handling: ModelToolHandling | None = None,
-        meta: Meta | None = None,
-    ) -> Self:
-        """Return a copy with selected attributes replaced.
-
-        Parameters
-        ----------
-        name : str | None, default=None
-            Replacement tool name.
-        description : str | None, default=None
-            Replacement description. Passing ``None`` keeps the current value.
-        function : Callable[Args, AsyncGenerator[ToolOutputChunk]] | None, default=None
-            Replacement callable. When omitted, the current callable is reused.
-        parameters : ModelToolParametersSpecification | None, default=None
-            Replacement parameter schema. When omitted, the current schema is reused.
-        handling : ModelToolHandling | None, default=None
-            Replacement handling mode.
-        meta : Meta | None, default=None
-            Replacement metadata for the tool specification.
-
-        Returns
-        -------
-        Self
-            Updated tool instance.
-        """
-        return self.__class__(
-            function or self._call,
-            name=name or self.name,
-            description=description if description is not None else self.description,
-            parameters=parameters if parameters is not None else self.parameters,
-            handling=handling if handling is not None else self.handling,
-            meta=meta if meta is not None else self.specification.meta,
-        )
+    __slots__ = ()
 
     def call(
         self,

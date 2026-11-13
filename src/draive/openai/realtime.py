@@ -35,10 +35,10 @@ from openai.types.realtime.realtime_response_status import RealtimeResponseStatu
 
 from draive.models import (
     ModelContext,
-    ModelException,
     ModelInput,
     ModelInstructions,
     ModelOutput,
+    ModelOutputFailed,
     ModelOutputInvalid,
     ModelSession,
     ModelSessionEvent,
@@ -309,11 +309,11 @@ class OpenAIRealtime(OpenAIAPI):
 
                             match event.response.status:
                                 case "failed":
-                                    raise ModelException(
-                                        "Realtime response failed: "
-                                        + _response_status_reason(event.response.status_details),
+                                    raise ModelOutputFailed(
                                         provider="openai",
                                         model=config.model,
+                                        reason="Realtime response failed: "
+                                        + _response_status_reason(event.response.status_details),
                                     )
 
                                 case "incomplete":
@@ -407,11 +407,13 @@ class OpenAIRealtime(OpenAIAPI):
                                 continue  # skip other items
 
                         case "error":
-                            raise ModelException(
-                                f"Realtime processing error:"
-                                f" {event.error.type} - {event.error.message}",
+                            raise ModelOutputFailed(
                                 provider="openai",
                                 model=config.model,
+                                reason=(
+                                    f"Realtime processing error:"
+                                    f" {event.error.type} - {event.error.message}"
+                                ),
                             )
 
                         case _:

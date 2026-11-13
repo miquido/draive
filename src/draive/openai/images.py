@@ -5,7 +5,7 @@ from openai import omit
 from openai.types.image import Image
 from openai.types.images_response import ImagesResponse
 
-from draive.models import ModelInstructions, provider_failure
+from draive.models import ModelInstructions, provider_failure, record_usage_metrics
 from draive.multimodal import Multimodal, MultimodalContent, Template, TemplatesRepository
 from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIImageGenerationConfig
@@ -27,6 +27,15 @@ class OpenAIImageGeneration(OpenAIAPI):
             OpenAIImageGenerationConfig
         )
         async with ctx.scope("generation.image.invocation"):
+            ctx.record_info(
+                attributes={
+                    "model.provider": "openai",
+                    "model.name": generation_config.model,
+                    "image.size": generation_config.size,
+                    "image.quality": generation_config.quality,
+                    "image.output_format": generation_config.output_format,
+                },
+            )
             # the image API takes a single prompt, the input content carries the subject
             # while instructions carry the guidance - both have to reach it
             content: MultimodalContent = MultimodalContent.of(input)
@@ -63,6 +72,14 @@ class OpenAIImageGeneration(OpenAIAPI):
                     if generation_config.output_compression is Missing
                     else generation_config.output_compression,
                     moderation=generation_config.moderation,
+                )
+
+            if usage := response.usage:
+                record_usage_metrics(
+                    provider="openai",
+                    model=generation_config.model,
+                    input_tokens=usage.input_tokens,
+                    output_tokens=usage.output_tokens,
                 )
 
             if not response.data:

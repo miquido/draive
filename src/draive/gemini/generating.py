@@ -404,7 +404,10 @@ def _request_config(  # noqa: C901, PLR0912
                     FunctionDeclarationDict(
                         name=tool.name,
                         description=tool.description,
-                        parameters_json_schema=tool.parameters,
+                        # tools without parameters still get an empty object schema
+                        parameters_json_schema=tool.parameters
+                        if tool.parameters is not None
+                        else {"type": "object", "properties": {}},
                     )
                     for tool in tools.specification
                 ]

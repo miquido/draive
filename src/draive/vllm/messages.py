@@ -452,6 +452,9 @@ def _content_parts(  # noqa: C901, PLR0912
 
         elif isinstance(part, ResourceReference):
             if text_only:
+                ctx.log_warning(
+                    "vLLM tool and assistant messages carry text only, skipping media content"
+                )
                 continue  # skip with text only
 
             if not part.mime_type.startswith("image"):
@@ -476,6 +479,9 @@ def _content_parts(  # noqa: C901, PLR0912
 
         elif isinstance(part, ResourceContent):
             if text_only:
+                ctx.log_warning(
+                    "vLLM tool and assistant messages carry text only, skipping media content"
+                )
                 continue  # skip with text only
 
             if not part.mime_type.startswith("image"):

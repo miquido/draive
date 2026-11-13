@@ -7,6 +7,7 @@ from collections.abc import (
     MutableSet,
     Sequence,
 )
+from itertools import chain
 from typing import ClassVar, Self, final, overload
 
 from haiway import (
@@ -69,7 +70,7 @@ class Toolbox(State):
     ) -> Self: ...
 
     @classmethod
-    def of(  # noqa: C901, PLR0912
+    def of(
         cls,
         tool_or_tools: Self | Iterable[Tool] | Tool | None = None,
         /,
@@ -107,69 +108,20 @@ class Toolbox(State):
             assert suggesting is None  # nosec: B101
             return tool_or_tools
 
-        tools_mapping: Mapping[str, Tool]
-        suggestion: ToolsSuggesting
-        metadata: Meta
+        first: Iterable[Tool]
         if tool_or_tools is None:
-            assert suggesting is None or suggesting is False  # nosec: B101
-            tools_mapping = {}
-            suggestion = _no_suggestion
-            metadata = Meta.of(meta)
+            first = ()
 
         elif isinstance(tool_or_tools, Tool):
-            tools_mapping = {
-                **{tool_or_tools.name: tool_or_tools},
-                **{tool.name: tool for tool in tools},
-            }
-            if suggesting is None or suggesting is False:
-                suggestion = _no_suggestion
-
-            elif suggesting is True:
-                suggestion = _suggest_any(iterations=1)
-
-            elif isinstance(suggesting, int):
-                suggestion = _suggest_any(iterations=suggesting)
-
-            elif isinstance(suggesting, Tool):
-                suggestion = _suggest_tool(
-                    suggesting,
-                    iterations=1,
-                )
-
-            else:
-                suggestion = suggesting
-
-            metadata = Meta.of(meta)
+            first = (tool_or_tools,)
 
         else:
-            tools_mapping = {
-                **{tool.name: tool for tool in tool_or_tools},
-                **{tool.name: tool for tool in tools},
-            }
-            if suggesting is None or suggesting is False:
-                suggestion = _no_suggestion
-
-            elif suggesting is True:
-                suggestion = _suggest_any(iterations=1)
-
-            elif isinstance(suggesting, int):
-                suggestion = _suggest_any(iterations=suggesting)
-
-            elif isinstance(suggesting, Tool):
-                suggestion = _suggest_tool(
-                    suggesting,
-                    iterations=1,
-                )
-
-            else:
-                suggestion = suggesting
-
-            metadata = Meta.of(meta)
+            first = tool_or_tools
 
         return cls(
-            tools=tools_mapping,
-            suggesting=suggestion,
-            meta=metadata,
+            tools={tool.name: tool for tool in chain(first, tools)},
+            suggesting=_resolve_suggestion(suggesting),
+            meta=Meta.of(meta),
         )
 
     tools: Mapping[str, Tool]
@@ -185,7 +137,7 @@ class Toolbox(State):
 
         Parameters
         ----------
-        iteration : int, default=0
+        iteration : int
             Conversation iteration passed to each tool availability check and to the
             suggestion strategy.
 
@@ -247,6 +199,7 @@ class Toolbox(State):
 
             requested_tool: Tool | None = self.tools.get(tool)
             if requested_tool is None:
+                _record_tool_invocation(tool, status="unknown")
                 raise ToolException(
                     f"Requested unknown tool {tool}",
                     tool=tool,
@@ -259,6 +212,7 @@ class Toolbox(State):
                 tool_stream = requested_tool.call(**arguments)
 
             except Exception as exc:
+                _record_tool_invocation(tool, status="call_error")
                 raise ToolException(
                     f"Tool {tool} call failed due to an error: {exc}",
                     tool=tool,
@@ -272,6 +226,7 @@ class Toolbox(State):
                     accumulator.append(chunk)
 
             except Exception as exc:
+                _record_tool_invocation(tool, status="error")
                 raise ToolException(
                     f"Tool {tool} call failed due to an error: {exc}",
                     tool=tool,
@@ -280,6 +235,7 @@ class Toolbox(State):
             finally:
                 await tool_stream.aclose()  # release the tool stream
 
+            _record_tool_invocation(tool, status="success")
             return MultimodalContent.of(*accumulator)
 
     def handle(
@@ -312,7 +268,7 @@ class Toolbox(State):
             )
         )
 
-    async def response_stream(  # noqa: C901, PLR0912
+    async def response_stream(
         self,
         request: ModelToolRequest,
     ) -> AsyncGenerator[ModelToolResponse | ProcessingEvent | MultimodalContentPart]:
@@ -361,40 +317,25 @@ class Toolbox(State):
 
             accumulator: MutableSequence[MultimodalContentPart] = []
             try:
-                match handling:
-                    case "response":
-                        async for chunk in tool_stream:
-                            if isinstance(chunk, ProcessingEvent):
-                                ctx.record_info(event=chunk.event)
-                                yield chunk.updating(
-                                    meta=chunk.meta.updating(
-                                        tool=request.tool,
-                                        request=request.identifier,
-                                    )
-                                )
+                async for chunk in tool_stream:
+                    if isinstance(chunk, ProcessingEvent):
+                        ctx.record_info(event=chunk.event)
+                        yield chunk.updating(
+                            meta=chunk.meta.updating(
+                                tool=request.tool,
+                                request=request.identifier,
+                            )
+                        )
 
-                            else:
-                                accumulator.append(chunk)
-
-                    case "output":
-                        async for chunk in tool_stream:
-                            if isinstance(chunk, ProcessingEvent):
-                                ctx.record_info(event=chunk.event)
-                                yield chunk.updating(
-                                    meta=chunk.meta.updating(
-                                        tool=request.tool,
-                                        request=request.identifier,
-                                    )
+                    else:
+                        accumulator.append(chunk)
+                        if handling == "output":
+                            yield chunk.updating(
+                                meta=chunk.meta.updating(
+                                    tool=request.tool,
+                                    request=request.identifier,
                                 )
-
-                            else:
-                                accumulator.append(chunk)
-                                yield chunk.updating(
-                                    meta=chunk.meta.updating(
-                                        tool=request.tool,
-                                        request=request.identifier,
-                                    )
-                                )
+                            )
 
                 _record_tool_invocation(request.tool, status="success")
                 yield ModelToolResponse(
@@ -479,27 +420,9 @@ class Toolbox(State):
         Self
             Toolbox with unchanged tools and metadata but replaced suggestion logic.
         """
-        suggestion: ToolsSuggesting
-        if suggesting is True:
-            suggestion = _suggest_any(
-                iterations=iterations,
-            )
-
-        elif suggesting is False:
-            suggestion = _no_suggestion
-
-        elif isinstance(suggesting, Tool):
-            suggestion = _suggest_tool(
-                suggesting,
-                iterations=iterations,
-            )
-
-        else:
-            suggestion = suggesting
-
         return self.__class__(
             tools=self.tools,
-            suggesting=suggestion,
+            suggesting=_resolve_suggestion(suggesting, iterations=iterations),
             meta=self.meta,
         )
 
@@ -562,6 +485,27 @@ class Toolbox(State):
             return self
 
 
+def _resolve_suggestion(
+    suggesting: ToolsSuggesting | Tool | int | bool | None,
+    /,
+    *,
+    iterations: int = 1,
+) -> ToolsSuggesting:
+    if suggesting is None or suggesting is False:
+        return _no_suggestion
+
+    if suggesting is True:
+        return _suggest_any(iterations=iterations)
+
+    if isinstance(suggesting, int):
+        return _suggest_any(iterations=suggesting)
+
+    if isinstance(suggesting, Tool):
+        return _suggest_tool(suggesting, iterations=iterations)
+
+    return suggesting
+
+
 def _suggest_tool(
     tool: Tool,
     /,
@@ -576,9 +520,6 @@ def _suggest_tool(
     ) -> ModelToolSpecification | bool:
         if iteration >= iterations:
             return False
-
-        if suggested_tool in tools:
-            return suggested_tool
 
         return next(
             (

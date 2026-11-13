@@ -1,6 +1,8 @@
 import json
 from collections.abc import Generator, Iterable
+from mimetypes import guess_type
 from typing import Any, cast
+from urllib.parse import urlparse
 
 from haiway import Meta, Missing, ctx
 from mistralai.client.errors import MistralError
@@ -546,9 +548,13 @@ def _content_chunk_as_content_element(
         return TextContent.of(chunk.text)
 
     elif isinstance(chunk, ImageURLChunk):
+        image_url: str = (
+            chunk.image_url if isinstance(chunk.image_url, str) else chunk.image_url.url
+        )
         return ResourceReference.of(
-            chunk.image_url if isinstance(chunk.image_url, str) else chunk.image_url.url,
-            mime_type="image/png",
+            image_url,
+            # the stream does not report the type, a file extension is the only hint
+            mime_type=_image_mime_type(image_url),
         )
 
     else:
@@ -648,3 +654,11 @@ def _response_format(
 
     # silently answering with text would not match the requested modality
     raise NotImplementedError(f"{output} output is not supported by Mistral")
+
+
+def _image_mime_type(url: str, /) -> str:
+    guessed, _ = guess_type(urlparse(url).path)
+    if guessed is not None and guessed.startswith("image/"):
+        return guessed
+
+    return "image/png"
