@@ -139,22 +139,23 @@ class SurrealConversationMemory:
             if not turns:
                 return
 
-            for turn in turns:
-                await Surreal.execute(
-                    """
-                    CREATE conversation_memory SET
-                        thread_id = $thread_id,
-                        turn = $turn,
-                        identifier = $identifier,
-                        payload = $payload,
-                        created = $created;
-                    """,
-                    thread_id=thread_id,
-                    turn=turn.turn,
-                    identifier=str(turn.identifier),
-                    payload=turn.to_json(),
-                    created=turn.created,
-                )
+            # a single statement is applied atomically, either all turns are stored or none
+            await Surreal.execute(
+                "INSERT INTO conversation_memory $rows;",
+                rows=cast(
+                    Any,
+                    [
+                        {
+                            "thread_id": thread_id,
+                            "turn": turn.turn,
+                            "identifier": str(turn.identifier),
+                            "payload": turn.to_json(),
+                            "created": turn.created,
+                        }
+                        for turn in turns
+                    ],
+                ),
+            )
 
             ctx.log_debug("...conversation memory persisted in SurrealDB.")
 

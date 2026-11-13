@@ -18,6 +18,7 @@ from draive.embedding import (
     mmr_vector_similarity_search,
 )
 from draive.multimodal import TextContent
+from draive.postgres._transaction import postgres_transaction
 from draive.resources import ResourceContent
 
 __all__ = (
@@ -164,30 +165,29 @@ class PostgresVectorIndex:
                 raise ValueError("Selected attribute values have to be the same type")
 
             created_timestamp: datetime = datetime.now(UTC)
-            async with Postgres.acquire_connection() as connection:
-                async with connection.transaction():
-                    for idx, embedded in enumerate(embedded_values):
-                        await connection.execute(
-                            f"""
-                            INSERT INTO {postgres_identifier(model.__name__)} (
-                                embedding,
-                                payload,
-                                meta,
-                                created
-                            )
-
-                            VALUES (
-                                $1::VECTOR,
-                                $2::JSONB,
-                                $3::JSONB,
-                                $4::TIMESTAMPTZ
-                            );
-                            """,  # nosec: B608
-                            postgres_vector(embedded.vector),
-                            embedded.value.to_json(),
-                            embedded.meta.to_json(),
-                            created_timestamp + timedelta(microseconds=idx),
+            async with postgres_transaction() as connection:
+                for idx, embedded in enumerate(embedded_values):
+                    await connection.execute(
+                        f"""
+                        INSERT INTO {postgres_identifier(model.__name__)} (
+                            embedding,
+                            payload,
+                            meta,
+                            created
                         )
+
+                        VALUES (
+                            $1::VECTOR,
+                            $2::JSONB,
+                            $3::JSONB,
+                            $4::TIMESTAMPTZ
+                        );
+                        """,  # nosec: B608
+                        postgres_vector(embedded.vector),
+                        embedded.value.to_json(),
+                        embedded.meta.to_json(),
+                        created_timestamp + timedelta(microseconds=idx),
+                    )
 
             ctx.log_info("Vector index update completed.")
 
@@ -314,7 +314,7 @@ class PostgresVectorIndex:
                 for index in mmr_vector_similarity_search(
                     query_vector=query_vector,
                     values_vectors=[element.vector for element in matching],
-                    limit=limit,
+                    limit=limit or 8,
                 )
             )
 

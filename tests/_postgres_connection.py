@@ -19,6 +19,7 @@ def postgres_states(
     fetch: Callable[..., Awaitable[object]] | None = None,
     fetch_one: Callable[..., Awaitable[object]] | None = None,
     execute: Callable[..., Awaitable[object]] | None = None,
+    transaction_context: Callable[[], PostgresTransactionContext] | None = None,
 ) -> tuple[Postgres, PostgresConnection]:
     """Postgres and connection states serving the given fakes, `fetch_one` yields a row or none."""
 
@@ -53,7 +54,10 @@ def postgres_states(
         readonly: bool = False,
         deferrable: bool = False,
     ) -> PostgresTransactionContext:
-        pytest.fail("unexpected transaction")
+        if transaction_context is None:
+            pytest.fail("unexpected transaction")
+
+        return transaction_context()
 
     def acquiring() -> PostgresConnectionContext:
         pytest.fail("unexpected connection acquiring")

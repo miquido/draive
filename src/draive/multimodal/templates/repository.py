@@ -646,6 +646,7 @@ class FileStorage:
         "_contents",
         "_declarations",
         "_path",
+        "_unreadable",
     )
 
     __setattr__ = refuse_assignment
@@ -656,6 +657,8 @@ class FileStorage:
     _path: Path
     _declarations: MutableMapping[str, TemplateDeclaration] | None
     _contents: MutableMapping[str, str] | None
+    # set when the stored file could not be fully read, saving would destroy its contents
+    _unreadable: bool
 
     def __init__(
         self,
@@ -681,6 +684,7 @@ class FileStorage:
             None,
         )
         object.__setattr__(self, "_contents", None)
+        object.__setattr__(self, "_unreadable", False)
 
     async def listing(
         self,
@@ -722,6 +726,15 @@ class FileStorage:
         if self._contents is None or self._declarations is None:
             await self._load_file()
 
+        if self._unreadable:
+            raise TemplateInvalid(
+                identifier=identifier,
+                description=(
+                    f"Templates file storage {self._path} is invalid or partially unreadable, "
+                    "refusing to overwrite it"
+                ),
+            )
+
         self._declarations[identifier] = TemplateDeclaration(  # pyright: ignore[reportOptionalSubscript]
             identifier=identifier,
             description=description,
@@ -741,6 +754,7 @@ class FileStorage:
 
         declarations: MutableMapping[str, TemplateDeclaration] = {}
         contents: MutableMapping[str, str] = {}
+        unreadable: bool = False
         try:
             match json.loads(file_contents):
                 case [*elements]:
@@ -763,20 +777,24 @@ class FileStorage:
                                     contents[identifier] = content
 
                                 case _:  # skip with warning
+                                    unreadable = True
                                     ctx.log_warning(
                                         "Invalid templates file storage element, skipping..."
                                     )
 
                         except Exception as exc:
+                            unreadable = True
                             ctx.log_warning(
                                 "Invalid templates file storage element, skipping...",
                                 exception=exc,
                             )
 
                 case _:  # empty storage with error
+                    unreadable = True
                     ctx.log_error("Invalid templates file storage, using empty...")
 
         except Exception as exc:
+            unreadable = True
             ctx.log_error(
                 "Invalid templates file storage, using empty...",
                 exception=exc,
@@ -793,6 +811,7 @@ class FileStorage:
             "_contents",
             contents,
         )
+        object.__setattr__(self, "_unreadable", unreadable)
 
     async def _save_file(self) -> None:
         if self._declarations is None or self._contents is None:

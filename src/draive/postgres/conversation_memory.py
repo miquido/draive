@@ -14,6 +14,7 @@ from draive.conversation.types import (
     ConversationUserTurn,
 )
 from draive.models import ModelContext
+from draive.postgres._transaction import postgres_transaction
 
 __all__ = ("PostgresConversationMemory",)
 
@@ -157,34 +158,33 @@ class PostgresConversationMemory:
             if not turns:
                 return
 
-            async with Postgres.acquire_connection() as connection:
-                async with connection.transaction():
-                    for turn in turns:
-                        await connection.execute(
-                            """
-                            INSERT INTO
-                                conversation_memory (
-                                    thread_id,
-                                    turn,
-                                    identifier,
-                                    payload,
-                                    created
-                                )
+            async with postgres_transaction() as connection:
+                for turn in turns:
+                    await connection.execute(
+                        """
+                        INSERT INTO
+                            conversation_memory (
+                                thread_id,
+                                turn,
+                                identifier,
+                                payload,
+                                created
+                            )
 
-                            VALUES (
-                                $1::TEXT,
-                                $2::TEXT,
-                                $3::UUID,
-                                $4::JSONB,
-                                $5::TIMESTAMPTZ
-                            );
-                            """,  # nosec: B608
-                            thread_id,
-                            turn.turn,
-                            turn.identifier,
-                            turn.to_json(),
-                            turn.created,
-                        )
+                        VALUES (
+                            $1::TEXT,
+                            $2::TEXT,
+                            $3::UUID,
+                            $4::JSONB,
+                            $5::TIMESTAMPTZ
+                        );
+                        """,  # nosec: B608
+                        thread_id,
+                        turn.turn,
+                        turn.identifier,
+                        turn.to_json(),
+                        turn.created,
+                    )
 
             ctx.log_debug("...conversation memory persisted.")
 
