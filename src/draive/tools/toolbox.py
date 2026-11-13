@@ -7,7 +7,7 @@ from collections.abc import (
     MutableSet,
     Sequence,
 )
-from typing import Self, final, overload
+from typing import ClassVar, Self, final, overload
 
 from haiway import (
     BasicValue,
@@ -39,7 +39,7 @@ __all__ = ("Toolbox",)
 class Toolbox(State):
     """Immutable registry of tools with selection and execution helpers."""
 
-    empty = class_constant(
+    empty: ClassVar[Toolbox] = class_constant(
         lambda: Toolbox(
             tools={},
             suggesting=_no_suggestion,

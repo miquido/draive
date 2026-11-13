@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from collections.abc import Collection, Sequence
-from typing import Any, Self, final
+from typing import Any, ClassVar, Self, final
 from uuid import UUID
 
 from haiway import Disposable, Meta, MetaValues, State, ctx
@@ -43,7 +43,7 @@ class AgentMemory(State):
         Additional metadata attached to the memory instance.
     """
 
-    disabled = class_constant(
+    disabled: ClassVar[AgentMemory] = class_constant(
         lambda: AgentMemory(preparing=_prepare, recalling=_recall, remembering=_remember)
     )
 
