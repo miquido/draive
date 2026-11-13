@@ -275,8 +275,8 @@ payload JSON. Requirements are translated to SQL expressions with both the attri
 compared value bound as parameters, so `AttributeRequirement.equal` becomes
 `payload #> $1::TEXT[] = $2::JSONB`. Using the `#>` accessor keeps the `jsonb` type, which is what
 allows non-string values (integers, floats, booleans, UUIDs, timestamps) to be compared at all. The
-`text_match` operator is not implemented yet and raises `NotImplementedError`, keeping the query
-surface explicit.
+`text_match` operator requires every whitespace separated token of the query to appear as a whole
+word, case-insensitively, in the text at the path - the same way in-memory requirement checks do.
 
 ## AgentMemory implementation
 
