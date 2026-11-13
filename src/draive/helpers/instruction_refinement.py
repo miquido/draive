@@ -451,7 +451,12 @@ async def _explore_node[Parameters: State](
     return {
         **children,
         # link children back to the parent, it is no longer a leaf to explore
-        node.identifier: node.updating(children=tuple(children.keys())),
+        # a node producing no children has nothing left to explore - without
+        # pruning it would stay a leaf and be explored again in every round
+        node.identifier: node.updating(
+            children=tuple(children.keys()),
+            pruned=node.pruned or not children,
+        ),
     }
 
 

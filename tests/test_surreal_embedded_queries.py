@@ -97,6 +97,30 @@ async def test_text_match_requirement_filters_records() -> None:
 
 
 @pytest.mark.asyncio
+async def test_text_match_requirement_matches_whole_tokens_ignoring_case() -> None:
+    """Regression test: `text_match` used to be a case sensitive substring check,
+    unlike the in memory and Postgres checks matching whole casefolded tokens.
+    """
+    async with _embedded_session() as session:
+        await session.define_table(_Item)
+        await session.create(_Item(name="Alpha Beta", amount=1))
+        await session.create(_Item(name="alphabet soup", amount=2))
+        await session.create(_Item(name="gamma", amount=3))
+
+        page: Paginated[_Item] = await session.fetch(
+            _Item,
+            requirements=AttributeRequirement[_Item].text_match("ALPHA beta", _Item._.name),
+        )
+        assert tuple(item.name for item in page.items) == ("Alpha Beta",)
+
+        page = await session.fetch(
+            _Item,
+            requirements=AttributeRequirement[_Item].text_match("alpha", _Item._.name),
+        )
+        assert tuple(item.name for item in page.items) == ("Alpha Beta",)  # not "alphabet"
+
+
+@pytest.mark.asyncio
 async def test_contained_in_requirement_filters_records() -> None:
     async with _embedded_session() as session:
         await session.define_table(_Item)

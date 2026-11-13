@@ -67,13 +67,13 @@ def extract_evaluation_result(
     for tag in content.tags():
         if tag.name.lower() == "rating":
             if rating_tag is not None:
-                raise ValueError(f"Invalid evaluator result - multiple rating tags:\n{content}")
+                raise ValueError("Invalid evaluator result - multiple rating tags")
 
             rating_tag = tag
 
         elif tag.name.lower() == "justification":
             if comment_tag is not None:
-                raise ValueError(f"Invalid evaluator result - multiple comment tags:\n{content}")
+                raise ValueError("Invalid evaluator result - multiple comment tags")
 
             comment_tag = tag
 
@@ -89,7 +89,8 @@ def extract_evaluation_result(
         )
 
     except Exception as exc:
-        raise ValueError(f"Invalid evaluator result - {exc}:\n{content}") from exc
+        # judge output is left out, it may repeat the evaluated content
+        raise ValueError(f"Invalid evaluator result - {exc}") from exc
 
 
 def model_context_multimodal(

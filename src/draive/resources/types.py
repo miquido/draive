@@ -188,7 +188,8 @@ class ResourceContent(State, serializable=True):
     ) -> Self:
         if isinstance(content, str):
             # Treat strings as base64
-            assert validate_base64(content)  # nosec: B101
+            if not validate_base64(content):
+                raise ValueError("String resource content has to be base64 encoded")
 
             return cls(
                 data=content,
@@ -362,7 +363,7 @@ def validate_base64(data: str) -> bool:
     try:
         b64decode(data, validate=True)
 
-    except Exception:
+    except ValueError:  # binascii.Error is a ValueError
         return False
 
     return True

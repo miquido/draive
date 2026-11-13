@@ -393,6 +393,7 @@ def _resolve_requirement(  # noqa: C901, PLR0911
 
         case "equal":
             accessor, resolved_arguments = _json_accessor(requirement.lhs, arguments)
+            elements: str = _array_or_empty(accessor)
             resolved_arguments = [*resolved_arguments, _json_value(requirement.rhs)]
             return (
                 f"{accessor} = ${len(resolved_arguments)}::JSONB",
@@ -422,23 +423,25 @@ def _resolve_requirement(  # noqa: C901, PLR0911
 
         case "contains_any":
             accessor, resolved_arguments = _json_accessor(requirement.lhs, arguments)
+            elements: str = _array_or_empty(accessor)
             resolved_arguments = [
                 *resolved_arguments,
                 _json_values(cast(Iterable[Any], requirement.rhs)),
             ]
             return (
                 # the interpolated accessor is fully parameterized
-                f"EXISTS (SELECT 1 FROM jsonb_array_elements({accessor}) AS element"  # nosec: B608
+                f"EXISTS (SELECT 1 FROM jsonb_array_elements({elements}) AS element"  # nosec: B608
                 f" WHERE element = ANY(${len(resolved_arguments)}::JSONB[]))",
                 resolved_arguments,
             )
 
         case "contains":
             accessor, resolved_arguments = _json_accessor(requirement.lhs, arguments)
+            elements = _array_or_empty(accessor)
             resolved_arguments = [*resolved_arguments, _json_value(requirement.rhs)]
             return (
                 # the interpolated accessor is fully parameterized
-                f"EXISTS (SELECT 1 FROM jsonb_array_elements({accessor}) AS element"  # nosec: B608
+                f"EXISTS (SELECT 1 FROM jsonb_array_elements({elements}) AS element"  # nosec: B608
                 f" WHERE element = ${len(resolved_arguments)}::JSONB)",
                 resolved_arguments,
             )
@@ -459,6 +462,11 @@ def _resolve_requirement(  # noqa: C901, PLR0911
                 )
 
             return f"({' AND '.join(clauses)})", resolved_arguments
+
+
+def _array_or_empty(accessor: str) -> str:
+    # jsonb_array_elements fails the whole statement for any non array value
+    return f"(CASE WHEN jsonb_typeof({accessor}) = 'array' THEN {accessor} ELSE '[]'::JSONB END)"
 
 
 def resolve_requirements(

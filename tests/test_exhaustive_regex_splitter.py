@@ -202,3 +202,16 @@ def test_uses_overlap_splitting_with_long_text(
         part_overlap_size=100,
     )
     assert "\n\n\n\n".join(result) == exhaustive_overlap_splitting_expected_result
+
+
+def test_regex_splitter_keeps_lookarounds_and_flags() -> None:
+    import re
+
+    from draive.splitters.exhaustive import _regex_split  # pyright: ignore[reportPrivateUsage]
+
+    # a lookbehind and a case insensitive flag used to be rewritten into different patterns
+    assert _regex_split("a. B. c", [re.compile(r"(?<=\.) (?=b)", re.IGNORECASE)]) == [
+        "a.",
+        " B. c",
+    ]
+    assert _regex_split("one(?)two", [r"(?P<sep>\(\?\))"]) == ["one", "(?)two"]
