@@ -1334,16 +1334,12 @@ def _parts_from_elements(  # noqa: C901, PLR0912, PLR0915
                         last_text = part
 
                 else:
-                    assert isinstance(  # nosec: B101
-                        part,
-                        ResourceReference | ResourceContent | ArtifactContent,
-                    )
-
+                    verified: MultimodalContentPart = _verified_part(part)
                     if last_text is not None:
                         yield last_text
                         last_text = None
 
-                    yield part
+                    yield verified
 
         elif isinstance(element, MultimodalTag):
             for part in element.parts():
@@ -1375,16 +1371,25 @@ def _parts_from_elements(  # noqa: C901, PLR0912, PLR0915
                     yield part
 
         else:
-            assert isinstance(  # nosec: B101
-                element,
-                ResourceReference | ResourceContent | ArtifactContent,
-            )
-
+            verified_element: MultimodalContentPart = _verified_part(element)
             if last_text is not None:
                 yield last_text
                 last_text = None
 
-            yield element
+            yield verified_element
 
     if last_text is not None:
         yield last_text
+
+
+def _verified_part(
+    part: object,
+    /,
+) -> MultimodalContentPart:
+    # the content comes from callers which can't always be type checked, i.e. tool results
+    match part:
+        case ResourceReference() | ResourceContent() | ArtifactContent():
+            return part
+
+        case _:
+            raise TypeError(f"Unsupported multimodal content element: {type(part).__name__}")

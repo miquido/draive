@@ -11,7 +11,7 @@ from draive.models import (
     ModelToolSpecification,
 )
 from draive.multimodal import Multimodal, MultimodalContent
-from draive.tools.types import ToolOutputChunk
+from draive.tools.types import ToolException, ToolOutputChunk
 
 __all__ = (
     "CoroutineTool",
@@ -177,9 +177,20 @@ class CoroutineTool[**Args, Result: Multimodal = MultimodalContent](
         ToolOutputChunk
             Content parts produced from the multimodal return value.
         """
-        for part in MultimodalContent.of(
-            await super().__call__(**arguments)  # pyright: ignore[reportCallIssue]
-        ).parts:
+        result: Multimodal = await super().__call__(**arguments)  # pyright: ignore[reportCallIssue]
+        content: MultimodalContent
+        try:
+            content = MultimodalContent.of(result)
+
+        except TypeError as exc:
+            raise ToolException(
+                f"Tool `{self.name}` returned {type(result).__name__}, tools have to return"
+                " multimodal content - text, resources or artifacts - convert other values"
+                " i.e. to a string",
+                tool=self.name,
+            ) from exc
+
+        for part in content.parts:
             yield part
 
 

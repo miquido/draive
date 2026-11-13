@@ -318,3 +318,17 @@ async def test_tool_suggestion_applies_to_first_iteration_only() -> None:
         for item in model.tools
     ]
     assert selections == ["lookup_user", "auto", "auto"]
+
+
+@pytest.mark.asyncio
+async def test_tool_returning_unsupported_value_raises_descriptive_tool_exception() -> None:
+    from draive.tools import ToolException, tool
+
+    @tool
+    async def add(a: int, b: int) -> str:
+        return a + b  # pyright: ignore[reportReturnType]
+
+    with pytest.raises(ToolException, match="returned int") as caught:
+        _ = [chunk async for chunk in add.call(a=1, b=2)]
+
+    assert caught.value.tool == "add"
