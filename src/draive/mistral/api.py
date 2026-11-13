@@ -21,9 +21,13 @@ class MistralAPI:
         timeout: float | None = None,
         **extra: Any,
     ) -> None:
-        self._server_url: str = server_url or getenv_str(
-            "MISTRAL_SERVER_URL",
-            default="https://api.mistral.ai",
+        # explicit argument first, then the canonical variable, `MISTRAL_ENDPOINT` is accepted
+        # as an alias since it is the name commonly used for custom deployments
+        self._server_url: str = (
+            server_url
+            or getenv_str("MISTRAL_SERVER_URL")
+            or getenv_str("MISTRAL_ENDPOINT")
+            or "https://api.mistral.ai"
         )
         self._api_key: str | None = api_key or getenv_str("MISTRAL_API_KEY")
         self._timeout: float | None = timeout
