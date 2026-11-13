@@ -167,6 +167,10 @@ For each call, the agent:
 If a tool uses `handling="output"`, the tool can stream visible output directly and terminate the
 loop early.
 
+The loop is bounded by `max_iterations` (32 by default, `None` removes the limit). An agent which
+keeps requesting tools past the limit fails with an `AgentException`. The conversation completion
+loop is bounded the same way and fails with a `ConversationException`.
+
 By default the model context is local to a single request; the agent does not persist prior turns by
 itself. Pass `memory=` to keep context across turns (see below), use higher level conversation APIs,
 or provide the required context explicitly.

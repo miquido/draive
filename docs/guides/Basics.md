@@ -82,4 +82,20 @@ async with ctx.scope("basics", observability=LoggerObservability()):
     ctx.record_info(attributes={"event": "example"})
 ```
 
+Draive records a few metrics out of the box, available through any observability backend:
+
+| Metric                                      | Kind      | Attributes                                                |
+| ------------------------------------------- | --------- | --------------------------------------------------------- |
+| `tool.invocations`                          | counter   | `tool.name`, `tool.status`                                |
+| `guardrails.verdicts`                       | counter   | `guardrails.kind`, `guardrails.outcome`                   |
+| `evaluator.<name>.performance`              | histogram | `passed`, `threshold`, `score`, `errored`                 |
+| `evaluator.scenario.<name>.performance`     | histogram | `passed`, `evaluators`, `errored`                         |
+| `evaluator.suite.<name>.performance`        | histogram | `passed`, `cases`, `cases.passed`                         |
+| `model.input_tokens`, `model.output_tokens` | counter   | `model.provider`, `model.name`                            |
+| `embedding.items`, `embedding.input_tokens` | counter   | `embedding.provider`, `embedding.model`, `embedding.type` |
+| `qdrant.operation.duration`                 | histogram | `qdrant.operation`, `qdrant.outcome`                      |
+| `surreal.query.duration`                    | histogram | `surreal.outcome`, `surreal.rows`                         |
+
+Statements, content and payloads are never recorded.
+
 Use `load_env()` during startup when credentials are stored in `.env`.
