@@ -42,6 +42,7 @@ from draive.gemini.utils import (
 from draive.models import (
     ModelContext,
     ModelInput,
+    ModelInputInvalid,
     ModelInstructions,
     ModelOutput,
     ModelOutputBlock,
@@ -119,7 +120,21 @@ class GeminiLive(GeminiAPI):
             # enter scope
             scope = ctx.scope("model.session")
             await scope.__aenter__()
+            request_turns: list[Content | ContentDict] | None = None
             try:
+                if context:
+                    # validate the context before connecting, a malformed context
+                    # is an input error instead of a failure of the open session
+                    try:
+                        request_turns = list(_request_content(context))
+
+                    except Exception as exc:
+                        raise ModelInputInvalid(
+                            provider="gemini",
+                            model=config.model,
+                            reason=str(exc),
+                        ) from exc
+
                 record_model_invocation(
                     provider="gemini",
                     model=config.model,
@@ -145,9 +160,9 @@ class GeminiLive(GeminiAPI):
             try:
                 # seed the session with prior context as an incomplete turn - the api rejects
                 # a completed client content turn, realtime input starts the turn instead
-                if context:
+                if request_turns is not None:
                     await session.send_client_content(
-                        turns=_request_content(context),
+                        turns=request_turns,
                         turn_complete=False,
                     )
 

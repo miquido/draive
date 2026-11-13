@@ -287,6 +287,15 @@ class OpenAIResponses(OpenAIAPI):
                                         reason=f"{error.code}: {error.message}",
                                     )
 
+                                if event.type == "response.failed":
+                                    # a failure carries its details within the error, never
+                                    # complete the output silently when they are missing
+                                    raise ModelOutputFailed(
+                                        provider="openai",
+                                        model=config.model,
+                                        reason="response failed without details",
+                                    )
+
                                 if incomplete := event.response.incomplete_details:
                                     if incomplete.reason == "max_output_tokens":
                                         raise ModelOutputLimit(

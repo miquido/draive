@@ -159,3 +159,40 @@ class _ErrorStream:
 
     async def __anext__(self) -> Any:
         raise self._error
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [503, 529])
+async def test_anthropic_capacity_errors_are_retryable_rate_limits(status: int) -> None:
+    from anthropic import InternalServerError, OverloadedError, ServiceUnavailableError
+
+    response = httpx.Response(
+        status,
+        headers={"Retry-After": "7"},
+        request=httpx.Request("POST", "https://test"),
+    )
+    error: InternalServerError = (
+        OverloadedError("overloaded", response=response, body={})
+        if status == 529
+        else ServiceUnavailableError("unavailable", response=response, body={})
+    )
+
+    def stream(**_: Any) -> Any:
+        raise error
+
+    model: Any = object.__new__(AnthropicMessages)
+    model._client = SimpleNamespace(messages=SimpleNamespace(stream=stream))
+    model._provider = "anthropic"
+
+    async with ctx.scope("test"):
+        with pytest.raises(ModelRateLimit) as caught:
+            async for _ in model.completion(
+                instructions="test",
+                tools=ModelTools.none,
+                context=(),
+                output="text",
+                config=AnthropicConfig(model="test-model"),
+            ):
+                pass
+
+    assert caught.value.retry_after == 7

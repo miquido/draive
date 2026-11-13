@@ -7,7 +7,7 @@ import pytest
 from haiway import Meta, State, as_dict, ctx
 from openai import omit
 
-from draive.models import ModelOutputLimit, ModelTools, ModelToolSpecification
+from draive.models import ModelOutputFailed, ModelOutputLimit, ModelTools, ModelToolSpecification
 from draive.openai.config import OpenAIResponsesConfig
 from draive.openai.responses import OpenAIResponses
 
@@ -100,6 +100,16 @@ async def test_truncated_response_raises_output_limit() -> None:
     )
 
     with pytest.raises(ModelOutputLimit):
+        await _consume(model)
+
+
+@pytest.mark.asyncio
+async def test_failed_response_without_details_raises_output_failed() -> None:
+    # a failure which carries neither an error nor incomplete details
+    # must not complete the output silently
+    model = _model([_terminal_event(kind="response.failed")])
+
+    with pytest.raises(ModelOutputFailed, match="without details"):
         await _consume(model)
 
 

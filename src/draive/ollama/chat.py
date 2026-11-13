@@ -559,9 +559,6 @@ def _normalize_schema_for_ollama(schema: Mapping[str, Any]) -> tuple[dict[str, A
                 }
                 return normalized_schema, True
 
-    if "$ref" in schema or any(key in schema for key in ("anyOf", "allOf", "not")):
-        return None, changed
-
     return None, changed
 
 

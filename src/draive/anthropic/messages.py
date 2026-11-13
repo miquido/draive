@@ -9,7 +9,9 @@ from collections.abc import (
 from typing import Any, Final, Literal, TypedDict, cast
 
 from anthropic import Omit, omit
+from anthropic import OverloadedError as AnthropicOverloadedError
 from anthropic import RateLimitError as AnthropicRateLimitError
+from anthropic import ServiceUnavailableError as AnthropicServiceUnavailableError
 from anthropic.types import (
     CitationsDelta,
     DocumentBlockParam,
@@ -376,6 +378,15 @@ class AnthropicMessages(AnthropicAPI):
                     model=config.model,
                     retry_after=exc.response.headers.get("Retry-After"),
                     quota_limit=quota_capacity,
+                ) from exc
+
+            except (AnthropicOverloadedError, AnthropicServiceUnavailableError) as exc:
+                # temporary capacity failures are retryable, same as rate limits
+                raise model_rate_limit(
+                    provider=self._provider,
+                    model=config.model,
+                    retry_after=exc.response.headers.get("Retry-After"),
+                    error_code="overloaded_error",
                 ) from exc
 
             except ModelException as exc:
