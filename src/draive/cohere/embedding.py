@@ -79,6 +79,13 @@ class CohereEmbedding(CohereAPI):
                 operation="embedding",
             )
 
+            record_embedding_metrics(
+                provider="cohere",
+                model=embedding_config.model,
+                embedding_type="text",
+                input_tokens=_billed_input_tokens(responses),
+            )
+
             return cast(
                 Sequence[Embedded[Value]] | Sequence[Embedded[str]],
                 [
@@ -163,6 +170,13 @@ class CohereEmbedding(CohereAPI):
                 operation="embedding",
             )
 
+            record_embedding_metrics(
+                provider="cohere",
+                model=embedding_config.model,
+                embedding_type="image",
+                input_tokens=_billed_input_tokens(responses),
+            )
+
             return cast(
                 Sequence[Embedded[Value]] | Sequence[Embedded[bytes]],
                 [
@@ -202,6 +216,21 @@ def _response_vectors(
         vectors.extend(response.embeddings.float_)
 
     return vectors
+
+
+def _billed_input_tokens(
+    responses: Sequence[EmbedByTypeResponse],
+    /,
+) -> int | None:
+    billed: float | None = None
+    for response in responses:
+        if response.meta is None or response.meta.billed_units is None:
+            continue
+
+        if (tokens := response.meta.billed_units.input_tokens) is not None:
+            billed = (billed or 0.0) + tokens
+
+    return int(billed) if billed is not None else None
 
 
 def _image_mime_type(
