@@ -645,7 +645,9 @@ class Surreal(State):
     @classmethod
     def transaction(cls) -> SurrealTransactionContext:
         if ctx.contains_state(SurrealSession):
-            return SurrealSession.transaction()
+            # reuse the active session but still scope the transaction session,
+            # otherwise statements executed within would run outside of the transaction
+            return _SurrealTransactionContext(session=_ActiveSessionContext())
 
         return _SurrealTransactionContext(session=cls.prepare_session())
 
@@ -877,6 +879,22 @@ class Surreal(State):
         session_preparing: SurrealSessionPreparing,
     ) -> None:
         super().__init__(_session_preparing=session_preparing)
+
+
+class _ActiveSessionContext:
+    __slots__ = ()
+
+    async def __aenter__(self) -> SurrealSession:
+        return ctx.state(SurrealSession)
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        # the session is owned by an outer scope
+        return None
 
 
 class _SurrealTransactionContext:

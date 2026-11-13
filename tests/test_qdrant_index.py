@@ -2,7 +2,7 @@ import warnings
 from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 import pytest
@@ -568,3 +568,34 @@ async def test_qdrant_search_filters_by_aliased_attribute() -> None:
         )
 
         assert [element.identifier for element in results] == ["doc-2"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("rerank", "expected_limit"), ((False, 2), (True, 16)))
+async def test_qdrant_rerank_overfetches_candidates(
+    monkeypatch: pytest.MonkeyPatch,
+    rerank: bool,
+    expected_limit: int,
+) -> None:
+    fetched_limits: list[int] = []
+
+    class SpyingQdrant:
+        @staticmethod
+        async def search(*args: Any, **kwargs: Any) -> Any:
+            fetched_limits.append(kwargs["limit"])
+            return await Qdrant.search(*args, **kwargs)
+
+        def __getattr__(self, name: str) -> Any:
+            return getattr(Qdrant, name)
+
+    async with _measurement_scope():
+        monkeypatch.setattr("draive.qdrant.index.Qdrant", SpyingQdrant())
+        results: Sequence[_Measurement] = await VectorIndex.search(
+            _Measurement,
+            query=[3.0, 1.0],
+            limit=2,
+            rerank=rerank,
+        )
+
+    assert len(results) == 2
+    assert fetched_limits == [expected_limit]

@@ -605,3 +605,24 @@ async def test_resolve_raw_and_loaded_empty_templates_match() -> None:
 
     assert raw is MultimodalContent.empty
     assert loaded is MultimodalContent.empty
+
+
+@pytest.mark.asyncio
+async def test_file_repository_refuses_to_overwrite_invalid_storage(tmp_path: Path) -> None:
+    path = tmp_path / "templates.json"
+    path.write_text("{not json", encoding="utf-8")
+    repository = TemplatesRepository.file(path)
+
+    async with ctx.scope("test"):
+        with pytest.raises(TemplateInvalid):
+            await repository.define(
+                TemplateDeclaration(
+                    identifier="new",
+                    description=None,
+                    variables={},
+                    meta=Meta.empty,
+                ),
+                content="Hello",
+            )
+
+    assert path.read_text(encoding="utf-8") == "{not json"

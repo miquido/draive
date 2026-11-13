@@ -5,6 +5,7 @@ from types import TracebackType
 from typing import Any, final
 from uuid import UUID, uuid4
 
+from haiway import ctx
 from surrealdb import AsyncWsSurrealConnection
 from surrealdb.errors import parse_query_error, parse_rpc_error
 from surrealdb.request_message.message import RequestMessage
@@ -320,14 +321,23 @@ class _TransactionContext:
             )
 
         else:
-            await self._connection._send(  # pyright: ignore[reportPrivateUsage]
-                RequestMessage(
-                    RequestMethod.CANCEL,
-                    session=self._session_id,
-                    txn=self._transaction_id,
-                ),
-                process="",  # it is more or less ignored by surreal
-            )
+            try:
+                await self._connection._send(  # pyright: ignore[reportPrivateUsage]
+                    RequestMessage(
+                        RequestMethod.CANCEL,
+                        session=self._session_id,
+                        txn=self._transaction_id,
+                    ),
+                    process="",  # it is more or less ignored by surreal
+                )
+
+            except Exception as exc:
+                # the original error is the one to surface, the server drops
+                # an unfinished transaction together with its session anyways
+                ctx.log_error(
+                    "Failed to cancel Surreal transaction",
+                    exception=exc,
+                )
 
 
 @final
@@ -385,13 +395,22 @@ class _SessionContext:
                 )
 
         except BaseException:
-            await self._connection._send(  # pyright: ignore[reportPrivateUsage]
-                RequestMessage(
-                    RequestMethod.DETACH,
-                    session=self._session_id,
-                ),
-                process="",  # it is more or less ignored by surreal
-            )
+            try:
+                await self._connection._send(  # pyright: ignore[reportPrivateUsage]
+                    RequestMessage(
+                        RequestMethod.DETACH,
+                        session=self._session_id,
+                    ),
+                    process="",  # it is more or less ignored by surreal
+                )
+
+            except Exception as exc:
+                # the original error is the one to surface
+                ctx.log_error(
+                    "Failed to detach Surreal session",
+                    exception=exc,
+                )
+
             raise
 
         async def execute(
@@ -424,13 +443,24 @@ class _SessionContext:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        await self._connection._send(  # pyright: ignore[reportPrivateUsage]
-            RequestMessage(
-                RequestMethod.DETACH,
-                session=self._session_id,
-            ),
-            process="",  # it is more or less ignored by surreal
-        )
+        try:
+            await self._connection._send(  # pyright: ignore[reportPrivateUsage]
+                RequestMessage(
+                    RequestMethod.DETACH,
+                    session=self._session_id,
+                ),
+                process="",  # it is more or less ignored by surreal
+            )
+
+        except Exception as exc:
+            if exc_val is None:
+                raise
+
+            # do not hide the error the session was left with
+            ctx.log_error(
+                "Failed to detach Surreal session",
+                exception=exc,
+            )
 
 
 def _process_statement_result(  # noqa: C901, PLR0912

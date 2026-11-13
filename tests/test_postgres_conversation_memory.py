@@ -1,10 +1,13 @@
-from collections.abc import Sequence
+from collections.abc import AsyncGenerator, Sequence
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import cast
 from uuid import UUID, uuid4
 
 import pytest
 from haiway import Pagination, ctx
+from haiway.postgres.types import PostgresTransactionContext
 
 from draive.conversation.types import ConversationTurn, ConversationUserTurn
 from draive.multimodal import MultimodalContent
@@ -163,3 +166,32 @@ async def test_postgres_conversation_memory_recall_uses_latest_turns_in_order(
         context = await memory.recall(Pagination.of(limit=2))
 
         assert [element.content.to_str() for element in context] == ["second", "third"]
+
+
+@pytest.mark.asyncio
+async def test_postgres_conversation_memory_remember_reuses_bound_connection() -> None:
+    events: list[str] = []
+
+    async def fake_execute(statement: str, /, *args: object) -> None:
+        events.append("execute")
+
+    @asynccontextmanager
+    async def transaction() -> AsyncGenerator[None]:
+        events.append("begin")
+        yield
+        events.append("commit")
+
+    async with ctx.scope(
+        "test",
+        *postgres_states(
+            execute=fake_execute,
+            transaction_context=lambda: cast(PostgresTransactionContext, transaction()),
+        ),
+    ):
+        memory = PostgresConversationMemory.prepare(thread="thread-1")
+        await memory.remember(
+            ConversationUserTurn.of(MultimodalContent.of("first")),
+            ConversationUserTurn.of(MultimodalContent.of("second")),
+        )
+
+    assert events == ["begin", "execute", "execute", "commit"]

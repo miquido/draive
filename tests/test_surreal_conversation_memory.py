@@ -14,7 +14,7 @@ from tests._surreal_session import surreal_session
 
 
 @pytest.mark.asyncio
-async def test_surreal_conversation_memory_remember_flattens_execute_variables(
+async def test_surreal_conversation_memory_remember_stores_all_turns_with_single_statement(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     turn = ConversationUserTurn.of(
@@ -31,7 +31,7 @@ async def test_surreal_conversation_memory_remember_flattens_execute_variables(
     ) -> Sequence[SurrealObject]:
         if statement.lstrip().startswith("DEFINE "):
             return ()
-        assert "thread_id = $thread_id" in statement
+        assert statement == "INSERT INTO conversation_memory $rows;"
         execution_variables.append(variables)
         return ()
 
@@ -42,11 +42,15 @@ async def test_surreal_conversation_memory_remember_flattens_execute_variables(
 
         assert execution_variables == [
             {
-                "thread_id": "thread-1",
-                "turn": "user",
-                "identifier": str(turn.identifier),
-                "payload": turn.to_json(),
-                "created": turn.created,
+                "rows": [
+                    {
+                        "thread_id": "thread-1",
+                        "turn": "user",
+                        "identifier": str(turn.identifier),
+                        "payload": turn.to_json(),
+                        "created": turn.created,
+                    }
+                ]
             }
         ]
 

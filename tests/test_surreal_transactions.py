@@ -331,3 +331,50 @@ async def test_surreal_client_transaction_accepts_supported_identifier_shapes(
                 await transaction_session.execute("RETURN [];")
 
     assert commit_txn == transaction_id
+
+
+@pytest.mark.asyncio
+async def test_surreal_transaction_cancel_failure_keeps_original_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[RequestMethod] = []
+
+    class _FakeConnection:
+        def __init__(self, url: str) -> None:
+            self.url = url
+
+        async def connect(self, url: str | None = None) -> None:
+            self.url = url or self.url
+
+        async def _send(
+            self,
+            message: object,
+            process: str,
+            bypass: bool = False,
+        ) -> dict[str, object]:
+            _ = process, bypass
+            calls.append(message.method)
+            if message.method is RequestMethod.BEGIN:
+                return {"result": str(uuid4())}
+
+            if message.method in (RequestMethod.CANCEL, RequestMethod.DETACH):
+                raise RuntimeError("cleanup failed")
+
+            return {"result": None}
+
+        async def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(surreal_connection, "AsyncWsSurrealConnection", _FakeConnection)
+
+    class _BodyError(Exception):
+        pass
+
+    async with SurrealClient(url="ws://example.test", namespace="ns", database="db") as client:
+        with pytest.raises(_BodyError):
+            async with client.prepare_session() as session:
+                async with session.transaction():
+                    raise _BodyError()
+
+    assert RequestMethod.CANCEL in calls
+    assert RequestMethod.DETACH in calls
