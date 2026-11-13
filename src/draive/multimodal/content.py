@@ -1,5 +1,5 @@
 from collections.abc import Callable, Collection, Generator, Mapping, Sequence
-from typing import Literal, Self, cast, final, overload
+from typing import ClassVar, Literal, Self, cast, final, overload
 
 from haiway import BasicValue, Meta, MetaValues, Missing, State
 
@@ -40,7 +40,7 @@ class MultimodalContent(State, serializable=True):
         The ordered, immutable parts of this content.
     """
 
-    empty = class_constant(lambda: MultimodalContent(parts=()))
+    empty: ClassVar[MultimodalContent] = class_constant(lambda: MultimodalContent(parts=()))
 
     @classmethod
     def of(

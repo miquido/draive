@@ -12,7 +12,7 @@ from collections.abc import (
     Sequence,
 )
 from time import monotonic
-from typing import Any, NoReturn, Protocol, Self, cast, final, overload, runtime_checkable
+from typing import Any, ClassVar, NoReturn, Protocol, Self, cast, final, overload, runtime_checkable
 
 from haiway import (
     Disposable,
@@ -98,7 +98,7 @@ class Step:
     context-aware while staying easy to compose.
     """
 
-    noop = class_constant(lambda: _noop)
+    noop: ClassVar[Step] = class_constant(lambda: _noop)
 
     @classmethod
     def emitting(

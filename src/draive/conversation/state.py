@@ -1,6 +1,6 @@
 from collections.abc import Iterable, MutableSequence, Sequence
 from itertools import chain
-from typing import Any, Self
+from typing import Any, ClassVar, Self
 
 from haiway import Meta, MetaValues, Paginated, Pagination, State
 
@@ -17,7 +17,7 @@ __all__ = ("ConversationMemory",)
 
 
 class ConversationMemory(State):
-    disabled = class_constant(
+    disabled: ClassVar[ConversationMemory] = class_constant(
         lambda: ConversationMemory(fetching=_fetch, recalling=_recall, remembering=_remember)
     )
 

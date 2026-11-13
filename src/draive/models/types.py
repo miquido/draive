@@ -11,6 +11,7 @@ from collections.abc import (
 from types import TracebackType
 from typing import (
     Any,
+    ClassVar,
     Literal,
     NotRequired,
     Protocol,
@@ -385,7 +386,9 @@ class ModelTools(State, serializable=True):
         Provider-specific tool choice policy.
     """
 
-    none = class_constant(lambda: ModelTools(specification=(), selection="none"))
+    none: ClassVar[ModelTools] = class_constant(
+        lambda: ModelTools(specification=(), selection="none")
+    )
 
     @classmethod
     def of(

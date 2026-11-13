@@ -1,4 +1,4 @@
-from typing import Self, final
+from typing import ClassVar, Self, final
 
 from haiway import Meta, MetaValues, State
 
@@ -26,7 +26,7 @@ class TextContent(State, serializable=True):
         grouping operations. Defaults to an empty metadata object.
     """
 
-    empty = class_constant(lambda: TextContent(text="", meta=Meta.empty))
+    empty: ClassVar[TextContent] = class_constant(lambda: TextContent(text="", meta=Meta.empty))
 
     @classmethod
     def of(
