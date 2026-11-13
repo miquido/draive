@@ -3,10 +3,10 @@ from collections.abc import Callable, MutableSequence, Sequence
 from typing import Any, Final, final
 
 from haiway import ctx
+from haiway.types.frozen import refuse_assignment, refuse_deletion, same_copy, same_deepcopy
 
 from draive.guardrails.safety.types import GuardrailsSafetyException, GuardrailsSafetySanitization
 from draive.multimodal import MultimodalContent, MultimodalContentPart, TextContent
-from draive.utils.record import ImmutableRecord
 
 __all__ = (
     "RegexSanitizationRule",
@@ -15,7 +15,7 @@ __all__ = (
 
 
 @final
-class RegexSanitizationRule(ImmutableRecord):
+class RegexSanitizationRule:
     """
     Immutable regular-expression safety rule definition.
 
@@ -41,6 +41,11 @@ class RegexSanitizationRule(ImmutableRecord):
         "reason",
         "validator",
     )
+
+    __setattr__ = refuse_assignment
+    __delattr__ = refuse_deletion
+    __copy__ = same_copy
+    __deepcopy__ = same_deepcopy
 
     identifier: str
     pattern: re.Pattern[str]

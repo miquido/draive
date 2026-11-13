@@ -10,9 +10,9 @@ from haiway import (
     State,
     ctx,
 )
+from haiway.types.frozen import refuse_assignment, refuse_deletion, same_copy, same_deepcopy
 
 from draive.evaluation.evaluator import EvaluatorResult
-from draive.utils.record import ImmutableRecord
 
 __all__ = (
     "EvaluatorScenario",
@@ -173,7 +173,7 @@ class PreparedEvaluatorScenario[Value](Protocol):
 
 
 @final
-class EvaluatorScenario[Value, **Args](ImmutableRecord):
+class EvaluatorScenario[Value, **Args]:
     """
     Configurable evaluator scenario for running multiple evaluations.
 
@@ -198,6 +198,11 @@ class EvaluatorScenario[Value, **Args](ImmutableRecord):
         "meta",
         "name",
     )
+
+    __setattr__ = refuse_assignment
+    __delattr__ = refuse_deletion
+    __copy__ = same_copy
+    __deepcopy__ = same_deepcopy
 
     name: str
     meta: Meta
