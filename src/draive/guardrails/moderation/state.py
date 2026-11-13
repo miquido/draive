@@ -49,6 +49,22 @@ class GuardrailsModeration(State):
         /,
         **extra: Any,
     ) -> None:
+        """Check user input against the moderation rules.
+
+        Parameters
+        ----------
+        content : Multimodal
+            Content to check.
+        **extra : Any
+            Additional options forwarded to the guardrails implementation.
+
+        Raises
+        ------
+        GuardrailsInputModerationException
+            When the input violates the moderation rules.
+        GuardrailsFailure
+            When the moderation itself fails.
+        """
         content = MultimodalContent.of(content)
         try:
             await self._input_checking(
@@ -108,6 +124,22 @@ class GuardrailsModeration(State):
         /,
         **extra: Any,
     ) -> None:
+        """Check model output against the moderation rules.
+
+        Parameters
+        ----------
+        content : Multimodal
+            Content to check.
+        **extra : Any
+            Additional options forwarded to the guardrails implementation.
+
+        Raises
+        ------
+        GuardrailsOutputModerationException
+            When the output violates the moderation rules.
+        GuardrailsFailure
+            When the moderation itself fails.
+        """
         content = MultimodalContent.of(content)
         try:
             await self._output_checking(

@@ -40,6 +40,27 @@ class GuardrailsSafety(State):
         /,
         **extra: Any,
     ) -> MultimodalContent:
+        """Sanitize the content, masking unsafe parts or blocking it.
+
+        Parameters
+        ----------
+        content : Multimodal
+            Content to sanitize.
+        **extra : Any
+            Additional options forwarded to the guardrails implementation.
+
+        Returns
+        -------
+        MultimodalContent
+            Sanitized content.
+
+        Raises
+        ------
+        GuardrailsSafetyException
+            When the content is blocked.
+        GuardrailsFailure
+            When the sanitization itself fails.
+        """
         content = MultimodalContent.of(content)
         try:
             return await self._sanitization(

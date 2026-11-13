@@ -35,6 +35,21 @@ def record_model_invocation(
     output: ModelOutputSelection,
     **other: ObservabilityAttribute | Missing | None,
 ) -> None:
+    """Record attributes describing a model invocation within the current scope.
+
+    Parameters
+    ----------
+    provider : str
+        Provider identifier used for the invocation.
+    model : str
+        Provider model identifier used for the invocation.
+    tools : ModelTools
+        Tools offered to the model, recorded by name together with the selection mode.
+    output : ModelOutputSelection
+        Requested output selection.
+    **other : ObservabilityAttribute | Missing | None
+        Additional provider specific attributes recorded with the ``model.`` prefix.
+    """
     model_output: str
     if isinstance(output, type):
         model_output = f"state:{output.__name__}"
@@ -158,6 +173,17 @@ def record_guardrails_invocation(
     model: str | None = None,
     **other: ObservabilityAttribute,
 ) -> None:
+    """Record attributes describing a guardrails provider invocation.
+
+    Parameters
+    ----------
+    provider : str
+        Provider identifier used for the invocation.
+    model : str | None, default=None
+        Provider model identifier, when the provider uses a model.
+    **other : ObservabilityAttribute
+        Additional attributes recorded with the ``guardrails.`` prefix.
+    """
     ctx.record_info(
         attributes={
             "guardrails.provider": provider,
@@ -175,6 +201,21 @@ def record_embedding_invocation(
     batch_size: int,
     **other: ObservabilityAttribute,
 ) -> None:
+    """Record attributes describing an embedding invocation within the current scope.
+
+    Parameters
+    ----------
+    provider : str
+        Provider identifier used for the invocation.
+    model : str
+        Provider model identifier used for the invocation.
+    embedding_type : str
+        Kind of embedded values, i.e. ``"text"`` or ``"image"``.
+    batch_size : int
+        Maximum number of values sent within a single request.
+    **other : ObservabilityAttribute
+        Additional attributes recorded with the ``embedding.`` prefix.
+    """
     ctx.record_info(
         attributes={
             "embedding.provider": provider,
@@ -193,7 +234,25 @@ def record_embedding_metrics(
     embedding_type: str,
     items: int | None = None,
     batches: int | None = None,
+    input_tokens: int | None = None,
 ) -> None:
+    """Record counters describing the work done by an embedding request.
+
+    Parameters
+    ----------
+    provider : str
+        Provider identifier used for the request.
+    model : str
+        Provider model identifier used for the request.
+    embedding_type : str
+        Kind of embedded values, i.e. ``"text"`` or ``"image"``.
+    items : int | None, default=None
+        Number of embedded values.
+    batches : int | None, default=None
+        Number of requests the values were split into.
+    input_tokens : int | None, default=None
+        Number of input tokens reported by the provider.
+    """
     attributes: dict[str, str] = {
         "embedding.provider": provider,
         "embedding.model": model,
@@ -218,6 +277,15 @@ def record_embedding_metrics(
             attributes=attributes,
         )
 
+    if input_tokens is not None:
+        ctx.record_info(
+            metric="embedding.input_tokens",
+            value=input_tokens,
+            unit="tokens",
+            kind="counter",
+            attributes=attributes,
+        )
+
 
 def record_usage_metrics(
     *,
@@ -228,6 +296,23 @@ def record_usage_metrics(
     output_tokens: int | None = None,
     reasoning_output_tokens: int | None = None,
 ) -> None:
+    """Record token usage counters of a model invocation.
+
+    Parameters
+    ----------
+    provider : str
+        Provider identifier used for the invocation.
+    model : str
+        Provider model identifier used for the invocation.
+    input_tokens : int | None, default=None
+        Number of input tokens.
+    cached_input_tokens : int | None, default=None
+        Number of input tokens served from the provider cache.
+    output_tokens : int | None, default=None
+        Number of output tokens.
+    reasoning_output_tokens : int | None, default=None
+        Number of output tokens spent on reasoning.
+    """
     attributes: dict[str, str] = {
         "model.provider": provider,
         "model.name": model,

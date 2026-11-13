@@ -38,6 +38,20 @@ class GuardrailsAnonymization(State):
         /,
         **extra: Any,
     ) -> GuardrailsAnonymizedContent:
+        """Anonymize private information within the content.
+
+        Parameters
+        ----------
+        content : Multimodal
+            Content to anonymize.
+        **extra : Any
+            Additional options forwarded to the guardrails implementation.
+
+        Returns
+        -------
+        GuardrailsAnonymizedContent
+            Anonymized content together with the data needed to restore it.
+        """
         return await self._anonymizing(
             MultimodalContent.of(content),
             **extra,

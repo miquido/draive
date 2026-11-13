@@ -72,6 +72,13 @@ class MistralEmbedding(MistralAPI):
                 operation="embedding",
             )
 
+            record_embedding_metrics(
+                provider="mistral",
+                model=embedding_config.model,
+                embedding_type="text",
+                input_tokens=sum(response.usage.prompt_tokens or 0 for response in responses),
+            )
+
             # the api documents no ordering guarantee, the index within each entry
             # is what pairs it back with its input
             vectors: list[Sequence[float]] = []
