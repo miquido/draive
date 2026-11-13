@@ -171,3 +171,26 @@ async def test_text_only_providers_warn_when_dropping_tool_media(
 
     assert any("Ollama" in warning and "screenshot" in warning for warning in warnings)
     assert any("vLLM" in warning for warning in warnings)
+
+
+@pytest.mark.asyncio
+async def test_mistral_closes_sync_client_even_when_async_close_fails() -> None:
+    from draive.mistral.api import MistralAPI
+
+    closed: list[str] = []
+
+    class _Client:
+        async def __aexit__(self, *_: object) -> None:
+            raise RuntimeError("async close failed")
+
+        def __exit__(self, *_: object) -> None:
+            closed.append("sync")
+
+    api = object.__new__(MistralAPI)
+    api._client = _Client()  # pyright: ignore[reportAttributeAccessIssue]
+
+    with pytest.raises(RuntimeError, match="async close failed"):
+        await api._deinitialize_client()  # pyright: ignore[reportPrivateUsage]
+
+    assert closed == ["sync"]
+    assert not hasattr(api, "_client")

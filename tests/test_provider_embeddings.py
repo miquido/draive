@@ -171,3 +171,17 @@ async def test_openai_image_generation_failure_is_translated() -> None:
                 input="a cat",
                 config=OpenAIImageGenerationConfig(),
             )
+
+
+def test_cohere_billed_input_tokens_are_summed_when_reported() -> None:
+    from draive.cohere.embedding import _billed_input_tokens  # pyright: ignore[reportPrivateUsage]
+
+    def response(tokens: float | None, *, meta: bool = True) -> Any:
+        return SimpleNamespace(
+            meta=SimpleNamespace(billed_units=SimpleNamespace(input_tokens=tokens))
+            if meta
+            else None
+        )
+
+    assert _billed_input_tokens([response(3.0), response(4.0), response(None)]) == 7
+    assert _billed_input_tokens([response(None), response(1.0, meta=False)]) is None
