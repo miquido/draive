@@ -2,7 +2,7 @@ from collections.abc import Callable, Generator, Mapping, Sequence, Set
 from contextlib import contextmanager
 from inspect import Parameter, signature
 from time import monotonic
-from typing import Any
+from typing import Any, Literal
 
 from haiway import ctx
 
@@ -71,7 +71,7 @@ def qdrant_operation(
         When the wrapped operation raises any error.
     """
     started: float = monotonic()
-    outcome: str = "success"
+    outcome: Literal["success", "error", "cancelled"] = "success"
     try:
         yield
 

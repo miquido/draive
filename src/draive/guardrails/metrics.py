@@ -1,11 +1,14 @@
 from collections.abc import Awaitable, Callable
 from functools import wraps
+from typing import Literal
 
 from haiway import ctx
 
 from draive.guardrails.types import GuardrailsException, GuardrailsFailure
 
 __all__ = ("guardrails_verdict",)
+
+type _Outcome = Literal["passed", "blocked", "failed", "cancelled"]
 
 
 def guardrails_verdict[**Args, Result](
@@ -36,7 +39,7 @@ def guardrails_verdict[**Args, Result](
             *args: Args.args,
             **kwargs: Args.kwargs,
         ) -> Result:
-            outcome: str = "passed"
+            outcome: _Outcome = "passed"
             try:
                 return await function(*args, **kwargs)
 

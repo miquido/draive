@@ -37,6 +37,7 @@ from draive.steps import Step, StepState, StepStream
 from draive.tools import Tool, Toolbox, tool
 from draive.tools.types import ToolOutputChunk
 from draive.utils import ProcessingEvent
+from draive.utils.limits import verify_max_iterations
 
 __all__ = ("Agent",)
 
@@ -199,9 +200,12 @@ class Agent:
 
         Raises
         ------
+        ValueError
+            When ``max_iterations`` is lower than 1.
         AgentException
             When running the agent exceeds ``max_iterations`` completion iterations.
         """
+        verify_max_iterations(max_iterations)
         identity: AgentIdentity
         if isinstance(agent, str):
             identity = AgentIdentity.of(

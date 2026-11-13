@@ -3,7 +3,7 @@ from collections.abc import Generator, Mapping, MutableMapping, Sequence
 from importlib.util import find_spec
 from time import monotonic
 from types import TracebackType
-from typing import Any, final
+from typing import Any, Literal, final
 from uuid import UUID, uuid4
 
 from haiway import ctx
@@ -625,7 +625,7 @@ def _record_query(
     started: float,
     /,
     *,
-    outcome: str,
+    outcome: Literal["success", "error"],
     rows: int | None,
 ) -> None:
     # statements and variables are never recorded, they may contain user data

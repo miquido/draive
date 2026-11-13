@@ -75,6 +75,7 @@ from draive.steps.types import (
 )
 from draive.tools import Tool, Toolbox
 from draive.utils import ProcessingEvent
+from draive.utils.limits import verify_max_iterations
 
 __all__ = (
     "Step",
@@ -678,7 +679,7 @@ class Step:
         Rationale: enables iterative workflows while preserving structured
         context scoping per iteration.
         """
-        _validate_max_iterations(max_iterations)
+        verify_max_iterations(max_iterations)
         if not steps:
             return cast(Self, cls.noop)
 
@@ -1007,7 +1008,7 @@ class Step:
         Rationale: packages completion-and-tool loop logic into a reusable
         typed primitive.
         """
-        _validate_max_iterations(max_iterations)
+        verify_max_iterations(max_iterations)
         toolbox: Toolbox = Toolbox.of(tools)
 
         async def step(  # noqa: C901, PLR0912
@@ -2188,14 +2189,6 @@ def _retry_delay(
 
         case make_delay:
             return make_delay(attempt, exception)
-
-
-def _validate_max_iterations(
-    max_iterations: int | None,
-    /,
-) -> None:
-    if max_iterations is not None and max_iterations < 1:
-        raise ValueError("max_iterations has to be at least 1")
 
 
 async def _handling_tool_requests(

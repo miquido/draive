@@ -47,8 +47,8 @@ def CloudwatchObservability(  # noqa: C901, PLR0915
     event_source: str,
     metrics_namespace: str,
 ) -> Observability:
-    # scopes of all concurrently running root scopes, each root has its own trace
-    roots: MutableMapping[UUID, ContextIdentifier] = {}
+    # scopes of all concurrently running root scopes, each root has its own trace,
+    # a root is derived from the scope path - there is no separate registry of them
     scopes: MutableMapping[UUID, ScopeStore] = {}
 
     session_kwargs: MutableMapping[str, object] = {}
@@ -284,7 +284,6 @@ def CloudwatchObservability(  # noqa: C901, PLR0915
                 event_putting=event_putting,
                 loop=_running_loop(),
             )
-            roots[scope.scope_id] = scope
 
         else:
             assert scope.parent_id in scopes  # nosec: B101
@@ -312,19 +311,17 @@ def CloudwatchObservability(  # noqa: C901, PLR0915
             return  # not completed yet or already completed
 
         root_id: UUID = scope.path[0]
-        root_scope: ContextIdentifier = roots[root_id]
         # try complete parent scopes
-        if scope != root_scope:
+        if not scope.is_root:
             parent_id: UUID = scope.parent_id
             while scopes[parent_id].try_complete():
-                if scopes[parent_id].identifier == root_scope:
+                if parent_id == root_id:
                     break
 
                 parent_id = scopes[parent_id].identifier.parent_id
 
         # check for root completion, releasing only the scopes of its own tree
         if scopes[root_id].completed:
-            del roots[root_id]
             finished: list[UUID] = [
                 scope_id
                 for scope_id, store in scopes.items()
