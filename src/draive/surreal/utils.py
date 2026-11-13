@@ -1,5 +1,5 @@
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, Final
@@ -14,6 +14,7 @@ from draive.surreal.types import SurrealID, SurrealValue
 
 __all__ = (
     "pagination_offset",
+    "surreal_field_path",
     "surreal_identifier",
     "surreal_value",
     "surreal_variable",
@@ -40,6 +41,32 @@ def pagination_offset(
             raise ValueError("Invalid SurrealDB pagination token") from exc
 
     raise ValueError("Invalid SurrealDB pagination token")
+
+
+def surreal_field_path(
+    components: Iterable[str | int],
+    /,
+) -> str:
+    """Render a document field path for inlining into a statement.
+
+    Field names can't be bound as parameters, so each name that is not a plain
+    identifier - i.e. a mapping key containing dots or brackets - is quoted instead
+    of being allowed to change the structure of the statement.
+    """
+    path: str = ""
+    for component in components:
+        if isinstance(component, int):
+            path += f"[{component}]"
+            continue
+
+        segment: str = component
+        if not _IDENTIFIER_PATTERN.fullmatch(segment):
+            escaped: str = segment.replace("\\", "\\\\").replace("`", "\\`")
+            segment = f"`{escaped}`"
+
+        path += f".{segment}" if path else segment
+
+    return path
 
 
 def surreal_identifier(

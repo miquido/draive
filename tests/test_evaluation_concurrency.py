@@ -87,3 +87,19 @@ async def test_evaluator_result_equality_does_not_raise() -> None:
     assert result != None  # noqa: E711
     assert result != other
     assert result == result  # noqa: PLR0124
+
+
+@evaluator(name="needs_reference", threshold="perfect")
+async def _reference_evaluator(value: str, /, *, reference: str) -> float:
+    return 1.0 if value == reference else 0.0
+
+
+@pytest.mark.asyncio
+async def test_evaluator_raises_for_invalid_arguments_instead_of_scoring() -> None:
+    async with ctx.scope("test"):
+        with pytest.raises(TypeError):
+            await _reference_evaluator("text")  # pyright: ignore[reportCallIssue]
+
+        result = await _reference_evaluator("text", reference="text")
+
+    assert result.score == 1.0

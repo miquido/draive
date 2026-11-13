@@ -62,6 +62,25 @@ class ResourcesRepository(State):
         resource: ResourceReference | str,
         /,
         **extra: Any,
+    ) -> Resource: ...
+
+    @overload
+    async def fetch(
+        self,
+        resource: ResourceReference | str,
+        /,
+        **extra: Any,
+    ) -> Resource: ...
+
+    @overload
+    @classmethod
+    async def fetch(
+        cls,
+        resource: ResourceReference | str,
+        /,
+        *,
+        required: Literal[False],
+        **extra: Any,
     ) -> Resource | None: ...
 
     @overload
@@ -69,6 +88,8 @@ class ResourcesRepository(State):
         self,
         resource: ResourceReference | str,
         /,
+        *,
+        required: Literal[False],
         **extra: Any,
     ) -> Resource | None: ...
 
@@ -155,7 +176,7 @@ class ResourcesRepository(State):
         resource: Resource,
         /,
         **extra: Any,
-    ) -> None: ...
+    ) -> Meta: ...
 
     @overload
     async def upload(
@@ -163,7 +184,7 @@ class ResourcesRepository(State):
         resource: Resource,
         /,
         **extra: Any,
-    ) -> None: ...
+    ) -> Meta: ...
 
     @statemethod
     async def upload(

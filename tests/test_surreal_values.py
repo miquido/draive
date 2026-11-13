@@ -76,8 +76,8 @@ def test_prepare_filter_casts_text_match_operands() -> None:
     values have to be cast instead.
     """
     assert prepare_filter(AttributeRequirement.text_match("alpha", _SurrealValuesItem._.name)) == (
-        "string::contains(<string>name, <string>$_f0)",
-        {"_f0": "alpha"},
+        "(string::matches(<string>name, <regex>$_f0_0))",
+        {"_f0_0": r"(?i)\balpha\b"},
     )
 
 
@@ -227,3 +227,36 @@ async def test_surreal_embedded_statements_round_trip_durations() -> None:
                 ),
             )
             assert page.items == (_SurrealDurationItem(label="timed", span=timedelta(minutes=2)),)
+
+
+@pytest.mark.parametrize(
+    ("components", "expected"),
+    (
+        (("name",), "name"),
+        (("data", "key", 2, "inner"), "data.key[2].inner"),
+        (("data", "a.b[c]"), "data.`a.b[c]`"),
+        (("data", "tick`; DELETE x"), "data.`tick\\`; DELETE x`"),
+    ),
+)
+def test_surreal_field_path_quotes_unsafe_segments(
+    components: tuple[str | int, ...], expected: str
+) -> None:
+    from draive.surreal.utils import surreal_field_path
+
+    assert surreal_field_path(components) == expected
+
+
+def test_define_table_rejects_unknown_kind() -> None:
+    import asyncio
+
+    from draive.surreal.state import SurrealSession
+
+    async def execute(*args: object, **kwargs: object) -> tuple[()]:
+        return ()
+
+    session = SurrealSession(
+        statement_executing=execute,  # pyright: ignore[reportArgumentType]
+        transaction_preparing=lambda: pytest.fail("unexpected transaction"),
+    )
+    with pytest.raises(ValueError, match="table kind"):
+        asyncio.run(session.define_table("items", kind="NORMAL; DROP"))  # pyright: ignore[reportArgumentType]

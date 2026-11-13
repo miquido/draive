@@ -2,7 +2,7 @@ import sys
 from collections.abc import Mapping, Sequence
 from contextlib import AbstractAsyncContextManager
 from types import TracebackType
-from typing import Any, Literal, cast, overload
+from typing import Any, Literal, cast, get_args, overload
 from uuid import UUID, uuid4
 
 from haiway import (
@@ -28,7 +28,7 @@ from draive.surreal.types import (
     SurrealTransactionPreparing,
     SurrealValue,
 )
-from draive.surreal.utils import pagination_offset, surreal_identifier
+from draive.surreal.utils import pagination_offset, surreal_field_path, surreal_identifier
 
 __all__ = (
     "Surreal",
@@ -338,6 +338,9 @@ class SurrealSession(State):
         schema: bool = False,
         kind: SurrealTableKind = "NORMAL",
     ) -> None:
+        if kind not in get_args(SurrealTableKind.__value__):
+            raise ValueError(f"Invalid SurrealDB table kind: {kind!r}")
+
         await self._statement_executing(
             f"DEFINE TABLE IF NOT EXISTS "
             f"{surreal_identifier(table if isinstance(table, str) else table.__name__)} "
@@ -985,7 +988,7 @@ def _ordering_reference(
     /,
 ) -> str:
     # stored documents use attribute aliases, ordering has to follow them
-    return ".".join(str(component) for component in path.serialized_components)
+    return surreal_field_path(path.serialized_components)
 
 
 def _surreal_content(

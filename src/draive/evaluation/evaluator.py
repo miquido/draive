@@ -1,5 +1,6 @@
 import re
 from collections.abc import Callable, Collection, Sequence
+from inspect import signature
 from typing import Annotated, Literal, Protocol, Self, cast, final, overload, runtime_checkable
 
 from haiway import (
@@ -811,6 +812,14 @@ class Evaluator[Value, **Args]:
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> EvaluatorResult:
+        # programming errors, missing or unexpected arguments, have to surface instead
+        # of being turned into a failed evaluation
+        try:
+            signature(self._definition).bind(value, *args, **kwargs)
+
+        except ValueError:
+            pass  # signature not available, rely on the call
+
         result: EvaluationScore | EvaluationScoreValue
         try:
             result = await self._definition(

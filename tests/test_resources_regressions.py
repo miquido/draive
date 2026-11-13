@@ -287,3 +287,22 @@ async def test_http_resource_deleting_raises_inaccessible_for_auth_errors(
             await http_resource_deleting("https://example.com/resource")
 
         assert exc_info.value.description == description
+
+
+def test_resource_content_rejects_text_that_is_not_base64() -> None:
+    from draive.resources import ResourceContent
+
+    with pytest.raises(ValueError, match="base64"):
+        ResourceContent.of("plain text, not encoded!")
+
+
+def test_artifact_content_of_preserves_hidden_and_meta() -> None:
+    from draive.multimodal import ArtifactContent
+
+    source = ArtifactContent.of({"a": 1}, category="data", hidden=True, meta={"k": "v"})
+
+    copied = ArtifactContent.of(source, meta={"extra": "x"})
+
+    assert copied.hidden
+    assert copied.meta["k"] == "v"
+    assert copied.meta["extra"] == "x"
