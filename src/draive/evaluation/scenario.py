@@ -418,6 +418,7 @@ class EvaluatorScenario[Value, **Args]:
                 attributes={
                     "passed": result.passed,
                     "evaluators": [result.evaluator for result in result.results],
+                    "errored": any(result.meta.error is not None for result in result.results),
                 },
             )
         return result

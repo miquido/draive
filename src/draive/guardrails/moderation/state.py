@@ -2,6 +2,7 @@ from typing import Any, overload
 
 from haiway import State, statemethod
 
+from draive.guardrails.metrics import guardrails_verdict
 from draive.guardrails.moderation.types import (
     GuardrailsInputModerationException,
     GuardrailsModerationChecking,
@@ -41,6 +42,7 @@ class GuardrailsModeration(State):
     ) -> None: ...
 
     @statemethod
+    @guardrails_verdict("moderation.input")
     async def check_input(
         self,
         content: Multimodal,
@@ -99,6 +101,7 @@ class GuardrailsModeration(State):
     ) -> None: ...
 
     @statemethod
+    @guardrails_verdict("moderation.output")
     async def check_output(
         self,
         content: Multimodal,
