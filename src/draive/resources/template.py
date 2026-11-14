@@ -735,10 +735,10 @@ def _decoded_uri_parameter(
     if decoded in (".", ".."):
         raise ValueError(f"Resource URI path parameter contains a relative segment: {value}")
 
-    if authority and "@" in decoded:
-        # the raw capture already excludes `@`, so only an encoded `%40` reaches here - it
-        # would turn a host label into user-info the matched URI never addressed
-        raise ValueError(f"Resource URI authority parameter contains user-info: {value}")
+    if authority and not re.fullmatch(_AUTHORITY_SEGMENT, decoded):
+        # the raw capture already excludes `#`, `?` and `@`, so only an encoded form reaches
+        # here - it would turn a host label into a delimiter the matched URI never addressed
+        raise ValueError(f"Resource URI authority parameter is not a host label: {value}")
 
     return decoded
 
