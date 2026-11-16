@@ -74,7 +74,7 @@ async def test_skill_from_directory_loads_frontmatter_and_resources(
         "  author: example-org\n"
         '  version: "1.0"\n'
         "license: Apache-2.0\n"
-        "compatibility: Requires Python 3.14 or newer.\n"
+        "compatibility: Requires Python 3.15 or newer.\n"
         "allowed-tools: Read Bash(git:*)\n"
         "---\n"
         "# CSV Analysis\n"
@@ -94,7 +94,7 @@ async def test_skill_from_directory_loads_frontmatter_and_resources(
     assert skill.meta["author"] == "example-org"
     assert skill.meta["version"] == "1.0"
     assert skill.meta["license"] == "Apache-2.0"
-    assert skill.meta["compatibility"] == "Requires Python 3.14 or newer."
+    assert skill.meta["compatibility"] == "Requires Python 3.15 or newer."
     assert skill.meta["allowed-tools"] == "Read Bash(git:*)"
     assert skill.instructions is not None
     assert "Quick Start" in skill.instructions

@@ -265,3 +265,26 @@ def test_no_guardrail_is_configured_by_default() -> None:
     )
 
     assert "guardrailConfig" not in parameters
+
+
+@pytest.mark.parametrize(
+    ("code", "expected"),
+    (
+        ("ThrottlingException", ModelRateLimit),
+        ("ServiceUnavailableException", ModelRateLimit),
+        ("ModelNotReadyException", ModelRateLimit),
+        ("ValidationException", ModelInputInvalid),
+        ("InternalServerException", ModelOutputFailed),
+    ),
+)
+def test_bedrock_request_failure_maps_error_codes(code: str, expected: type[Exception]) -> None:
+    from draive.bedrock.converse import _request_failure  # pyright: ignore[reportPrivateUsage]
+
+    error = Exception("bad request")
+    error.response = {"Error": {"Code": code}}  # pyright: ignore[reportAttributeAccessIssue]
+
+    failure = _request_failure(error, model="test-model")
+
+    assert isinstance(failure, expected)
+    if isinstance(failure, ModelInputInvalid):
+        assert failure.reason == "bad request"

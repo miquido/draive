@@ -36,3 +36,27 @@ async def test_evaluator_suite_serializes_datetime(tmp_path) -> None:
 
     assert len(persisted) == 1
     assert persisted[0]["parameters"]["date"] == fixed_date.isoformat()
+
+
+@pytest.mark.asyncio
+async def test_evaluator_suite_keeps_other_cases_when_one_case_raises() -> None:
+    async def definition(
+        parameters: _DatetimeCase,
+    ) -> Sequence[EvaluatorScenarioResult | EvaluatorResult]:
+        if parameters.date.year == 2000:
+            raise RuntimeError("boom")
+
+        return [EvaluatorResult.of("ok", score=1.0, threshold=1.0)]
+
+    suite = evaluator_suite(_DatetimeCase)(definition)
+    async with ctx.scope("test"):
+        result = await suite(
+            [
+                _DatetimeCase(date=datetime(2000, 1, 1)),
+                _DatetimeCase(date=datetime(2025, 1, 1)),
+            ]
+        )
+
+    assert len(result.results) == 2
+    assert not result.passed
+    assert [case.passed for case in result.results] == [False, True]

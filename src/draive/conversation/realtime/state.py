@@ -1,3 +1,4 @@
+import sys
 from collections.abc import Iterable
 from contextlib import AbstractAsyncContextManager
 from types import TracebackType
@@ -74,20 +75,26 @@ class RealtimeConversation(State):
             nonlocal session_scope
             scope = ctx.scope("conversation.realtime")
             await scope.__aenter__()
-            if isinstance(instructions, Template):
-                ctx.record_info(
-                    attributes={"instructions.template": instructions.identifier},
-                )
-                instructions = await TemplatesRepository.resolve_str(instructions)
+            try:
+                if isinstance(instructions, Template):
+                    ctx.record_info(
+                        attributes={"instructions.template": instructions.identifier},
+                    )
+                    instructions = await TemplatesRepository.resolve_str(instructions)
 
-            session_scope = self._preparing(
-                instructions=instructions,
-                toolbox=Toolbox.of(tools),
-                memory=memory,
-                output=output,
-                **extra,
-            )
-            return await session_scope.__aenter__()
+                session_scope = self._preparing(
+                    instructions=instructions,
+                    toolbox=Toolbox.of(tools),
+                    memory=memory,
+                    output=output,
+                    **extra,
+                )
+                return await session_scope.__aenter__()
+
+            except BaseException:
+                # closing is never called when opening fails, release the scope here
+                await scope.__aexit__(*sys.exc_info())
+                raise
 
         async def closing(
             exc_type: type[BaseException] | None,

@@ -31,6 +31,7 @@ from haiway import (
     ctx,
 )
 
+from draive._constant import class_constant
 from draive.multimodal import Multimodal, MultimodalContent, TextContent
 from draive.multimodal.content import MultimodalContentPart
 
@@ -373,6 +374,13 @@ ModelToolsSelection = Literal["auto", "required", "none"] | ModelToolSpecificati
 """Strategy controlling whether and how a model may call tools."""
 
 
+def _tools(
+    specification: Sequence[ModelToolSpecification],
+    selection: ModelToolsSelection,
+) -> ModelTools:
+    return ModelTools(specification=specification, selection=selection)
+
+
 @final
 class ModelTools(State, serializable=True):
     """Toolset and selection strategy passed to model generation.
@@ -385,7 +393,7 @@ class ModelTools(State, serializable=True):
         Provider-specific tool choice policy.
     """
 
-    none: ClassVar[Self]  # defined after the class
+    none: ClassVar[ModelTools] = class_constant(_tools, specification=(), selection="none")
 
     @classmethod
     def of(
@@ -417,12 +425,6 @@ class ModelTools(State, serializable=True):
 
     def __bool__(self) -> bool:
         return bool(self.specification)
-
-
-ModelTools.none = ModelTools(
-    specification=(),
-    selection="none",
-)
 
 
 ModelToolHandling = Literal["response", "output"]

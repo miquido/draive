@@ -1,12 +1,13 @@
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 import pytest
-from haiway import AttributeRequirement, State
+from haiway import AttributeRequirement, State, ctx
 
-import draive.postgres.vector_index as postgres_vector_index
 from draive.embedding import VectorIndex
 from draive.postgres.vector_index import PostgresVectorIndex
+
+from ._postgres_connection import postgres_states
 
 
 class _Document(State):
@@ -55,26 +56,23 @@ async def test_search_orders_by_cosine_distance(
     """
     statements: list[str] = []
     arguments: list[tuple[Any, ...]] = []
-    monkeypatch.setattr(
-        postgres_vector_index.Postgres,
-        "fetch",
-        _fake_fetch(statements, arguments),
-    )
-    index: VectorIndex = PostgresVectorIndex.prepare()
 
-    await index.searching(
-        _Document,
-        query=[1.0, 0.0],
-        score_threshold=0.8,
-        limit=4,
-    )
+    async with ctx.scope("test", *postgres_states(fetch=_fake_fetch(statements, arguments))):
+        index: VectorIndex = PostgresVectorIndex.prepare()
 
-    assert len(statements) == 1
-    assert "embedding <=> $1" in statements[0]
-    assert "<#>" not in statements[0]
-    assert "ORDER BY embedding <=> $1" in statements[0]
-    # the threshold is converted to a cosine distance
-    assert arguments[0][1] == pytest.approx(1.0 - 0.8)
+        await index.searching(
+            _Document,
+            query=[1.0, 0.0],
+            score_threshold=0.8,
+            limit=4,
+        )
+
+        assert len(statements) == 1
+        assert "embedding <=> $1" in statements[0]
+        assert "<#>" not in statements[0]
+        assert "ORDER BY embedding <=> $1" in statements[0]
+        # the threshold is converted to a cosine distance
+        assert arguments[0][1] == pytest.approx(1.0 - 0.8)
 
 
 @pytest.mark.asyncio
@@ -83,36 +81,33 @@ async def test_search_rejects_unsafe_model_name(
 ) -> None:
     statements: list[str] = []
     arguments: list[tuple[Any, ...]] = []
-    monkeypatch.setattr(
-        postgres_vector_index.Postgres,
-        "fetch",
-        _fake_fetch(statements, arguments),
-    )
-    monkeypatch.setattr(
-        postgres_vector_index.Postgres,
-        "execute",
-        _fake_execute(statements, arguments),
-    )
-    index: VectorIndex = PostgresVectorIndex.prepare()
 
-    class _Unsafe(State):
-        name: str
+    async with ctx.scope(
+        "test",
+        *postgres_states(
+            fetch=_fake_fetch(statements, arguments), execute=_fake_execute(statements, arguments)
+        ),
+    ):
+        index: VectorIndex = PostgresVectorIndex.prepare()
 
-    _Unsafe.__name__ = "Document; DROP TABLE other"
-
-    with pytest.raises(ValueError, match="Invalid Postgres identifier"):
-        await index.searching(_Unsafe)
-
-    with pytest.raises(ValueError, match="Invalid Postgres identifier"):
-        await index.deleting(_Unsafe)
-
-    with pytest.raises(ValueError, match="Invalid Postgres identifier"):
-        await index.deleting(
-            _Unsafe,
-            requirements=AttributeRequirement[Any].equal("draive", _Unsafe._.name),
+        _Unsafe = cast(
+            type[State],
+            type("Document; DROP TABLE other", (State,), {"__annotations__": {"name": str}}),
         )
 
-    assert statements == []
+        with pytest.raises(ValueError, match="Invalid Postgres identifier"):
+            await index.searching(_Unsafe)
+
+        with pytest.raises(ValueError, match="Invalid Postgres identifier"):
+            await index.deleting(_Unsafe)
+
+        with pytest.raises(ValueError, match="Invalid Postgres identifier"):
+            await index.deleting(
+                _Unsafe,
+                requirements=AttributeRequirement[Any].equal("draive", _Unsafe._.name),
+            )
+
+        assert statements == []
 
 
 @pytest.mark.asyncio
@@ -139,16 +134,16 @@ async def test_reranking_search_decodes_the_embedding_as_floats(
             {"embedding": [0.0, 1.0], "payload": '{"name": "second", "count": 2}'},
         )
 
-    monkeypatch.setattr(postgres_vector_index.Postgres, "fetch", fetch)
-    index: VectorIndex = PostgresVectorIndex.prepare()
+    async with ctx.scope("test", *postgres_states(fetch=fetch)):
+        index: VectorIndex = PostgresVectorIndex.prepare()
 
-    results: Sequence[_Document] = await index.searching(
-        _Document,
-        query=[1.0, 0.0],
-        rerank=True,
-        limit=2,
-    )
+        results: Sequence[_Document] = await index.searching(
+            _Document,
+            query=[1.0, 0.0],
+            rerank=True,
+            limit=2,
+        )
 
-    assert "embedding::REAL[] AS embedding" in statements[0]
-    # the reranking consumed the decoded vectors and returned both documents
-    assert {result.name for result in results} == {"first", "second"}
+        assert "embedding::REAL[] AS embedding" in statements[0]
+        # the reranking consumed the decoded vectors and returned both documents
+        assert {result.name for result in results} == {"first", "second"}

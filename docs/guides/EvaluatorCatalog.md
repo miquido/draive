@@ -5,8 +5,8 @@ category with practical examples and real-world usage patterns.
 
 ## Overview
 
-`draive.evaluators` ships 44 ready-to-use evaluators: 23 operating on a single evaluated value and 21
-`*_context_evaluator` variants operating on a whole conversation timeline. They cover:
+`draive.evaluators` ships 44 ready-to-use evaluators: 23 operating on a single evaluated value and
+21 `*_context_evaluator` variants operating on a whole conversation timeline. They cover:
 
 - **Quality Evaluators**: Assess content structure, style, and linguistic quality
 - **Reference-Based Evaluators**: Compare generated content against reference material
@@ -37,8 +37,8 @@ Because the default threshold is the strictest one, most real usage sets an expl
 
 ### Catalog at a glance
 
-Names in the table below omit the shared `_evaluator` suffix. The evaluated value is always the first
-positional-only argument, everything else is keyword-only.
+Names in the table below omit the shared `_evaluator` suffix. The evaluated value is always the
+first positional-only argument, everything else is keyword-only.
 
 | Evaluator                 | Required              | Optional                        |
 | ------------------------- | --------------------- | ------------------------------- |
@@ -67,9 +67,9 @@ positional-only argument, everything else is keyword-only.
 | `cohen_kappa`             | `reference`           | `weighting`                     |
 
 Each of those has a context twin named `<name>_context_evaluator` except
-`text_vector_similarity_evaluator`, `image_vector_similarity_evaluator` and
-`cohen_kappa_evaluator`. `tool_usage_context_evaluator` (arguments `required`, `expected`,
-`forbidden`, `strict`) exists only as a context evaluator.
+`text_vector_similarity_evaluator`, `image_vector_similarity_evaluator` and `cohen_kappa_evaluator`.
+`tool_usage_context_evaluator` (arguments `required`, `expected`, `forbidden`, `strict`) exists only
+as a context evaluator.
 
 Content evaluators accept `Multimodal` values (plain `str` included) unless noted otherwise.
 
@@ -324,8 +324,8 @@ print(f"False: {false_result.score}")        # Output: 0.2
 
 ### Helpfulness Evaluator
 
-**Purpose**: Assesses how effectively content addresses the `user_query` - relevance, usefulness, and
-actionability.
+**Purpose**: Assesses how effectively content addresses the `user_query` - relevance, usefulness,
+and actionability.
 
 ```python
 from draive.evaluators import helpfulness_evaluator
@@ -618,9 +618,9 @@ threshold (`.with_threshold(0.8)`) usually fits them better than a level name.
 
 **Purpose**: Rule-based checking for required or forbidden keywords. No model call is involved.
 
-`required_keywords_evaluator` scores `1.0`/`0.0` for all-or-nothing matching (`require_all=True`, the
-default) or the matched fraction when `require_all=False`. `forbidden_keywords_evaluator` mirrors
-that with `require_none`: `1.0` when no forbidden keyword is present, otherwise `0.0` (or
+`required_keywords_evaluator` scores `1.0`/`0.0` for all-or-nothing matching (`require_all=True`,
+the default) or the matched fraction when `require_all=False`. `forbidden_keywords_evaluator`
+mirrors that with `require_none`: `1.0` when no forbidden keyword is present, otherwise `0.0` (or
 `1.0 - matched / total` when `require_none=False`). Both lowercase the content and the keywords by
 default; `normalization` replaces that with your own callable, applied to both sides.
 
@@ -705,8 +705,8 @@ upgrades.
 ## Context Evaluators
 
 **Purpose**: Judge a whole conversation instead of a single content value. Each context evaluator
-takes a `ModelContext` - the sequence of `ModelInput`/`ModelOutput` elements - and renders it into an
-annotated timeline for the judge, keeping tool calls and tool responses visible while skipping
+takes a `ModelContext` - the sequence of `ModelInput`/`ModelOutput` elements - and renders it into
+an annotated timeline for the judge, keeping tool calls and tool responses visible while skipping
 reasoning blocks.
 
 Context twins are named after their content counterparts: `coherence_context_evaluator`,
@@ -716,8 +716,7 @@ Context twins are named after their content counterparts: `coherence_context_eva
 `forbidden_keywords_context_evaluator`, `groundedness_context_evaluator`,
 `helpfulness_context_evaluator`, `jailbreak_context_evaluator`, `readability_context_evaluator`,
 `relevance_context_evaluator`, `required_keywords_context_evaluator`, `safety_context_evaluator`,
-`similarity_context_evaluator`, `tone_style_context_evaluator` and
-`truthfulness_context_evaluator`.
+`similarity_context_evaluator`, `tone_style_context_evaluator` and `truthfulness_context_evaluator`.
 
 The important difference: arguments that are required for a content evaluator become optional for
 most context twins (`reference` for `coherence_context_evaluator`, `user_query` for
@@ -993,9 +992,9 @@ if not result.passed:
     ctx.log_warning(f"coverage failed: {result.meta['comment']}")
 ```
 
-Failures inside an evaluator never propagate - they are logged and turned into a `0.0` score with the
-exception stored in `meta`, so a broken judge shows up as a failing evaluation rather than a crashed
-suite.
+Failures inside an evaluator never propagate - they are logged and turned into a `0.0` score with
+the exception stored in `meta`, so a broken judge shows up as a failing evaluation rather than a
+crashed suite.
 
 ## Summary
 

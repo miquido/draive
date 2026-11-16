@@ -6,7 +6,7 @@ highlights practical patterns for running repeatable quality checks.
 
 ## Prerequisites
 
-- Python 3.14+ with Draive installed and your project configured to use the shared Haiway context
+- Python 3.15+ with Draive installed and your project configured to use the shared Haiway context
     (`ctx`).
 - Provider credentials available through `load_env()` or your preferred secrets loader.
 - Familiarity with async/await. All evaluation APIs are asynchronous.
@@ -86,15 +86,16 @@ async with ctx.scope(
     print(f"Comment: {result.meta.get('comment')}")
 ```
 
-Each call returns an `EvaluatorResult`; use `.passed` to compare the score with the active threshold,
-`.performance` for the score expressed as a percentage of the threshold, and `.meta["comment"]` (when
-set by the evaluator) for human-readable feedback. `EvaluatorResult.score` is a plain `float`.
+Each call returns an `EvaluatorResult`; use `.passed` to compare the score with the active
+threshold, `.performance` for the score expressed as a percentage of the threshold, and
+`.meta["comment"]` (when set by the evaluator) for human-readable feedback. `EvaluatorResult.score`
+is a plain `float`.
 
 ## 3. Explore Built-in Evaluators
 
 Draive ships ready-to-use evaluators that cover most quality axes. Import them from
-`draive.evaluators` and configure per use case. See
-[Evaluator Catalog](EvaluatorCatalog.md) for the full list with parameters.
+`draive.evaluators` and configure per use case. See [Evaluator Catalog](EvaluatorCatalog.md) for the
+full list with parameters.
 
 **Quality and Structure**
 
@@ -288,18 +289,18 @@ Each case produces an `EvaluatorSuiteCaseResult` (with `.case_identifier`, `.res
 reports. Cases without an explicit `identifier` get a generated UUID.
 
 `with_storage(...)` (or the `storage=` argument of `@evaluator_suite`) accepts an in-memory sequence
-of cases, a `Path`/`str` pointing at a JSON file, or any custom `EvaluatorSuiteCasesStorage`. Calling
-the suite with no argument runs every stored case; pass an `int` for that many random cases, a
-`float` between 0 and 1 for a fraction of them, or a sequence of identifiers, parameters, or cases to
-run a specific selection.
+of cases, a `Path`/`str` pointing at a JSON file, or any custom `EvaluatorSuiteCasesStorage`.
+Calling the suite with no argument runs every stored case; pass an `int` for that many random cases,
+a `float` between 0 and 1 for a fraction of them, or a sequence of identifiers, parameters, or cases
+to run a specific selection.
 
 ## 6. Advanced Patterns
 
 - **Attach metadata**: `keyword_evaluator.with_meta({"version": "1.0"})` adds context that surfaces
     in result payloads.
 - **Compose evaluators**: `Evaluator.highest(...)`, `Evaluator.lowest(...)` and
-    `Evaluator.average(..., threshold=...)` combine prepared evaluators into a single one keeping the
-    best, worst, or mean outcome.
+    `Evaluator.average(..., threshold=...)` combine prepared evaluators into a single one keeping
+    the best, worst, or mean outcome.
 - **Adapt inputs**: `.contra_map(lambda doc: doc.body)` transforms incoming data before evaluation,
     perfect for domain models.
 - **Score against ground truth**: `.referenced(reference=...)` replaces the produced score with how
@@ -325,8 +326,8 @@ run a specific selection.
 
 - Continue with [Comprehensive Evaluation](ComprehensiveEvaluation.md) for suites, reference-based
     scoring, and rater agreement.
-- Browse the [Evaluator Catalog](EvaluatorCatalog.md) for every shipped evaluator and its parameters,
-    or read the sources under `src/draive/evaluators/` for inspiration.
+- Browse the [Evaluator Catalog](EvaluatorCatalog.md) for every shipped evaluator and its
+    parameters, or read the sources under `src/draive/evaluators/` for inspiration.
 - Extend scenarios with custom analytics by post-processing `EvaluatorResult.performance` across
     runs.
 

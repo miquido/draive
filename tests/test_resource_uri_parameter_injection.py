@@ -1,7 +1,7 @@
 import pytest
 
 from draive.resources import resource
-from draive.resources.types import ResourceContent
+from draive.resources.types import ResourceContent, ResourceCorrupted
 
 
 @resource(uri_template="https://api.example.com/items/{item_id}")
@@ -39,11 +39,12 @@ async def declared_query(
         "max_bytes=1",
     ],
 )
-async def test_undeclared_query_parameters_are_not_bound(query: str) -> None:
-    # the template exposes no query parameters, so defaults have to be preserved
-    resolved = await undeclared_query.resolve_from_uri(f"https://api.example.com/items/abc?{query}")
-    assert isinstance(resolved.resource, ResourceContent)
-    assert resolved.resource.to_bytes() == b"abc|False|1024|None"
+async def test_undeclared_query_parameters_are_refused(query: str) -> None:
+    # the template exposes no query parameters, a URI carrying any is not of this resource
+    uri: str = f"https://api.example.com/items/abc?{query}"
+    assert not undeclared_query.matches_uri(uri)
+    with pytest.raises(ResourceCorrupted):
+        await undeclared_query.resolve_from_uri(uri)
 
 
 @pytest.mark.asyncio

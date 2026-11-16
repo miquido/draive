@@ -11,7 +11,6 @@ from haiway import (
     State,
     as_list,
 )
-from qdrant_client.conversions.common_types import PointId
 from qdrant_client.models import (
     CollectionsResponse,
     Datatype,
@@ -100,7 +99,9 @@ class QdrantStoreMixin(QdrantSession):
         ],
         **extra: Any,
     ) -> bool:
-        assert isinstance(path, AttributePath)  # nosec: B101
+        if not isinstance(path, AttributePath):
+            raise ValueError("Payload index path has to be an AttributePath")
+
         # verified eagerly - unrecognized arguments are an error even when skipping
         arguments: Mapping[str, Any] = qdrant_arguments(self.client.create_payload_index, **extra)
 
@@ -173,7 +174,6 @@ class QdrantStoreMixin(QdrantSession):
         **extra: Any,
     ) -> Paginated[Embedded[Model]] | Paginated[Model]:
         pagination = pagination if pagination is not None else Pagination.of(limit=32)
-        assert isinstance(pagination.token, PointId | None)  # nosec: B101
         records: Sequence[Record]
         continuation_token: Any | None
         arguments: Mapping[str, Any] = qdrant_arguments(self.client.scroll, **extra)

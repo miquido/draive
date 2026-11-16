@@ -39,6 +39,22 @@ class ImageGeneration(State):
         input: Template | Multimodal,  # noqa: A002
         **extra: Any,
     ) -> ResourceContent | ResourceReference:
+        """Generate image using the configured generative model.
+
+        Parameters
+        ----------
+        instructions : Template | ModelInstructions, default=""
+            Instructions or a template resolved before generating.
+        input : Template | Multimodal
+            Input content or a template resolved before generating.
+        **extra : Any
+            Additional provider options forwarded to generation.
+
+        Returns
+        -------
+        ResourceContent | ResourceReference
+            Generated image content or a reference to it.
+        """
         async with ctx.scope("image_generation"):
             if isinstance(instructions, Template):
                 ctx.record_info(

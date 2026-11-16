@@ -1,10 +1,12 @@
 from asyncio import Lock
 from collections.abc import Generator, Mapping, MutableMapping, Sequence
 from importlib.util import find_spec
+from time import monotonic
 from types import TracebackType
-from typing import Any, final
+from typing import Any, Literal, final
 from uuid import UUID, uuid4
 
+from haiway import ctx
 from surrealdb import AsyncWsSurrealConnection
 from surrealdb.errors import parse_query_error, parse_rpc_error
 from surrealdb.request_message.message import RequestMessage
@@ -220,7 +222,7 @@ class _EmbeddedSessionContext:
                 )
 
         def transaction() -> SurrealTransactionContext:
-            raise RuntimeError(
+            raise SurrealException(
                 "Embedded SurrealDB connections do not support client-side transactions"
             )
 
@@ -296,7 +298,7 @@ class _TransactionContext:
             )
 
         def transaction() -> SurrealTransactionContext:
-            raise RuntimeError("Nested transactions are not supported")
+            raise SurrealException("Nested transactions are not supported")
 
         return SurrealSession(
             statement_executing=execute,
@@ -320,14 +322,23 @@ class _TransactionContext:
             )
 
         else:
-            await self._connection._send(  # pyright: ignore[reportPrivateUsage]
-                RequestMessage(
-                    RequestMethod.CANCEL,
-                    session=self._session_id,
-                    txn=self._transaction_id,
-                ),
-                process="",  # it is more or less ignored by surreal
-            )
+            try:
+                await self._connection._send(  # pyright: ignore[reportPrivateUsage]
+                    RequestMessage(
+                        RequestMethod.CANCEL,
+                        session=self._session_id,
+                        txn=self._transaction_id,
+                    ),
+                    process="",  # it is more or less ignored by surreal
+                )
+
+            except Exception as exc:
+                # the original error is the one to surface, the server drops
+                # an unfinished transaction together with its session anyways
+                ctx.log_error(
+                    "Failed to cancel Surreal transaction",
+                    exception=exc,
+                )
 
 
 @final
@@ -385,13 +396,22 @@ class _SessionContext:
                 )
 
         except BaseException:
-            await self._connection._send(  # pyright: ignore[reportPrivateUsage]
-                RequestMessage(
-                    RequestMethod.DETACH,
-                    session=self._session_id,
-                ),
-                process="",  # it is more or less ignored by surreal
-            )
+            try:
+                await self._connection._send(  # pyright: ignore[reportPrivateUsage]
+                    RequestMessage(
+                        RequestMethod.DETACH,
+                        session=self._session_id,
+                    ),
+                    process="",  # it is more or less ignored by surreal
+                )
+
+            except Exception as exc:
+                # the original error is the one to surface
+                ctx.log_error(
+                    "Failed to detach Surreal session",
+                    exception=exc,
+                )
+
             raise
 
         async def execute(
@@ -424,13 +444,24 @@ class _SessionContext:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        await self._connection._send(  # pyright: ignore[reportPrivateUsage]
-            RequestMessage(
-                RequestMethod.DETACH,
-                session=self._session_id,
-            ),
-            process="",  # it is more or less ignored by surreal
-        )
+        try:
+            await self._connection._send(  # pyright: ignore[reportPrivateUsage]
+                RequestMessage(
+                    RequestMethod.DETACH,
+                    session=self._session_id,
+                ),
+                process="",  # it is more or less ignored by surreal
+            )
+
+        except Exception as exc:
+            if exc_val is None:
+                raise
+
+            # do not hide the error the session was left with
+            ctx.log_error(
+                "Failed to detach Surreal session",
+                exception=exc,
+            )
 
 
 def _process_statement_result(  # noqa: C901, PLR0912
@@ -447,7 +478,7 @@ def _process_statement_result(  # noqa: C901, PLR0912
                         continue
 
                     case {**elements}:
-                        yield {key: surreal_value(element) for key, element in elements.items()}  # pyright: ignore[reportUnknownVariableType]
+                        yield {key: surreal_value(element) for key, element in elements.items()}
 
                     case _:
                         # SELECT VALUE and similar projections can return scalar list items.
@@ -510,6 +541,7 @@ async def _execute(
     variables: Mapping[str, SurrealValue],
 ) -> Sequence[SurrealObject]:
     params: Mapping[str, Any] = surreal_variable(variables)
+    started: float = monotonic()
     response: Mapping[str, Any]
     try:
         response = await connection._send(  # pyright: ignore[reportPrivateUsage]
@@ -532,9 +564,22 @@ async def _execute(
         )
 
     except Exception as exc:
+        _record_query(started, outcome="error", rows=None)
         raise SurrealException(f"Surreal execution error for: {statement}") from exc
 
-    return tuple(_process_response(response))
+    try:
+        rows: Sequence[SurrealObject] = tuple(_process_response(response))
+
+    except SurrealException:
+        _record_query(started, outcome="error", rows=None)
+        raise
+
+    except Exception as exc:
+        _record_query(started, outcome="error", rows=None)
+        raise SurrealException(f"Invalid Surreal response: {exc}") from exc
+
+    _record_query(started, outcome="success", rows=len(rows))
+    return rows
 
 
 async def _execute_embedded(
@@ -544,6 +589,7 @@ async def _execute_embedded(
     *,
     variables: Mapping[str, SurrealValue],
 ) -> Sequence[SurrealObject]:
+    started: float = monotonic()
     response: Mapping[str, Any]
     try:
         response = await connection._send(  # pyright: ignore[reportPrivateUsage]
@@ -557,6 +603,39 @@ async def _execute_embedded(
         )
 
     except Exception as exc:
+        _record_query(started, outcome="error", rows=None)
         raise SurrealException(f"Surreal execution error for: {statement}") from exc
 
-    return tuple(_process_response(response))
+    try:
+        rows: Sequence[SurrealObject] = tuple(_process_response(response))
+
+    except SurrealException:
+        _record_query(started, outcome="error", rows=None)
+        raise
+
+    except Exception as exc:
+        _record_query(started, outcome="error", rows=None)
+        raise SurrealException(f"Invalid Surreal response: {exc}") from exc
+
+    _record_query(started, outcome="success", rows=len(rows))
+    return rows
+
+
+def _record_query(
+    started: float,
+    /,
+    *,
+    outcome: Literal["success", "error"],
+    rows: int | None,
+) -> None:
+    # statements and variables are never recorded, they may contain user data
+    ctx.record_info(
+        metric="surreal.query.duration",
+        value=(monotonic() - started) * 1000,
+        unit="ms",
+        kind="histogram",
+        attributes={
+            "surreal.outcome": outcome,
+            "surreal.rows": rows,
+        },
+    )

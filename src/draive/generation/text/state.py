@@ -46,6 +46,26 @@ class TextGeneration(State):
         examples: Iterable[tuple[Multimodal, str]] = (),
         **extra: Any,
     ) -> str:
+        """Generate text using the configured generative model.
+
+        Parameters
+        ----------
+        instructions : Template | ModelInstructions, default=""
+            Instructions or a template resolved before generating.
+        input : Template | Multimodal
+            Input content or a template resolved before generating.
+        tools : Toolbox | Iterable[Tool], default=Toolbox.empty
+            Tools available to the model while generating.
+        examples : Iterable[tuple[Multimodal, str]], default=()
+            Example input and output pairs provided before the input.
+        **extra : Any
+            Additional provider options forwarded to completion.
+
+        Returns
+        -------
+        str
+            Generated text.
+        """
         async with ctx.scope("text_generation"):
             if isinstance(instructions, Template):
                 ctx.record_info(

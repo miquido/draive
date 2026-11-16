@@ -51,3 +51,49 @@ async def test_resolve_from_uri_raises_for_invalid_uri() -> None:
 
     with pytest.raises(ResourceCorrupted):
         await status.resolve_from_uri("https://api.example.com/status?unexpected=true")
+
+
+@pytest.mark.asyncio
+async def test_resource_accepts_a_prepared_uri_template() -> None:
+    from haiway import URITemplate
+
+    template = URITemplate.of("https://api.example.com/users/{user_id}{?verbose}")
+
+    @resource(uri_template=template)
+    async def user(user_id: str, verbose: bool = False) -> ResourceContent:
+        return ResourceContent.of(f"{user_id}|{verbose}".encode(), mime_type="text/plain")
+
+    assert user.declaration.template_uri == template
+    assert user.has_args
+    assert (
+        await user.resolve(user_id="a b", verbose=True)
+    ).uri == "https://api.example.com/users/a%20b?verbose=true"
+
+
+def test_resource_rejects_a_malformed_uri_template() -> None:
+    from haiway import ValidationError
+
+    with pytest.raises(ValidationError):
+
+        @resource(uri_template="https://api.example.com/{user_id")
+        async def broken(user_id: str) -> ResourceContent:
+            return ResourceContent.of(b"", mime_type="text/plain")
+
+
+def test_resource_without_variables_has_no_args() -> None:
+    @resource(uri_template="https://api.example.com/status")
+    async def status() -> ResourceContent:
+        return ResourceContent.of(b"ok", mime_type="text/plain")
+
+    assert not status.has_args
+    assert status.matches_uri("https://api.example.com/status")
+    assert not status.matches_uri("https://api.example.com/other")
+
+
+@pytest.mark.asyncio
+async def test_resolve_expands_aliased_template_variable() -> None:
+    @resource(uri_template="https://api.example.com/search{?lang}")
+    async def search(language: Annotated[str, Alias("lang")]) -> ResourceContent:
+        return ResourceContent.of(language.encode(), mime_type="text/plain")
+
+    assert (await search.resolve(language="pl")).uri == "https://api.example.com/search?lang=pl"

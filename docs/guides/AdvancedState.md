@@ -1,8 +1,8 @@
 # Advanced State
 
-Draive models are typed `State` classes. Schema and JSON support is derived from the declared
-field types. Adding `State, serializable=True` turns that into a requirement, so a class whose
-fields cannot produce a JSON schema fails at declaration time instead of silently losing it.
+Draive models are typed `State` classes. Schema and JSON support is derived from the declared field
+types. Adding `State, serializable=True` turns that into a requirement, so a class whose fields
+cannot produce a JSON schema fails at declaration time instead of silently losing it.
 
 ## Serialization And Schema
 
@@ -28,9 +28,6 @@ print(simplified_schema(Example.__SPECIFICATION__, indent=2))
 `json_schema(...)` is precise and machine-oriented; `simplified_schema(...)` is compact and often
 useful when injecting schema hints into LLM prompts.
 
-`strict_schema(...)` sits next to it and converts a JSON schema into its OpenAI strict mode
-equivalent, returning `None` when the schema holds something strict mode cannot express.
-
 ## Immutability And Updates
 
 ```python
@@ -44,6 +41,50 @@ class MutableExample(State):
 
 initial = MutableExample(identifier="pre", value=42)
 updated = initial.updating(identifier="post")
+```
+
+## Optional Values With Missing
+
+`Missing` is a sentinel which is both the value and the type, the way `None` is. Use it for
+attributes which may be left unset, and compare with `is`.
+
+```python
+from draive import Missing, State
+
+
+class Options(State):
+    temperature: float | Missing = Missing
+    seed: int | Missing = Missing
+
+
+options = Options(temperature=0.2)
+seed = None if options.seed is Missing else options.seed
+```
+
+`value is Missing` and `value is not Missing` narrow the type, so no helper is needed. `Missing` is
+truthy, so `if value:` does not tell it apart. Within `match`, use a dotted name
+(`case haiway.Missing:`), because a bare `case Missing:` captures the value.
+
+## State Class Rules
+
+- A `State` class has a single base, the `State` it refines, which declares no attributes. Share
+    behavior through an attribute-less base and compose by holding instances as attributes.
+- A `State` class cannot be changed once it is created. Declare methods and class variables in the
+    class body. Assigning an attribute to the class afterwards, including a shared instance such as
+    `Model.empty = Model(...)`, raises `TypeError`; create such a value lazily instead.
+- Function attributes are checked when the state is created: a value which cannot be called the way
+    the annotation says is refused, instead of failing once it is called.
+
+## Testing With State
+
+Because State classes cannot be patched, give a test the fakes through the state itself and run it
+inside a scope, instead of replacing methods with `mock.patch.object` or `monkeypatch`.
+
+```python
+from draive import ctx
+
+async with ctx.scope("test", GenerativeModel(generating=fake_generating)):
+    ...
 ```
 
 ## Schema Customization With Annotations

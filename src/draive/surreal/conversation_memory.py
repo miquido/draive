@@ -139,22 +139,23 @@ class SurrealConversationMemory:
             if not turns:
                 return
 
-            for turn in turns:
-                await Surreal.execute(
-                    """
-                    CREATE conversation_memory SET
-                        thread_id = $thread_id,
-                        turn = $turn,
-                        identifier = $identifier,
-                        payload = $payload,
-                        created = $created;
-                    """,
-                    thread_id=thread_id,
-                    turn=turn.turn,
-                    identifier=str(turn.identifier),
-                    payload=turn.to_json(),
-                    created=turn.created,
-                )
+            # a single statement is applied atomically, either all turns are stored or none
+            await Surreal.execute(
+                "INSERT INTO conversation_memory $rows;",
+                rows=cast(
+                    Any,
+                    [
+                        {
+                            "thread_id": thread_id,
+                            "turn": turn.turn,
+                            "identifier": str(turn.identifier),
+                            "payload": turn.to_json(),
+                            "created": turn.created,
+                        }
+                        for turn in turns
+                    ],
+                ),
+            )
 
             ctx.log_debug("...conversation memory persisted in SurrealDB.")
 
@@ -216,7 +217,7 @@ async def _fetch_turns(
     pagination: Pagination,
 ) -> Paginated[ConversationTurn]:
     if pagination.limit <= 0:
-        return Paginated[ConversationTurn].of(
+        return Paginated[ConversationTurn](
             (),
             pagination=pagination.with_token(None),
         )
@@ -262,7 +263,7 @@ async def _fetch_turns(
             cursor=cursor,
         )
         if not cursor_rows:
-            return Paginated[ConversationTurn].of(
+            return Paginated[ConversationTurn](
                 (),
                 pagination=pagination.with_token(None),
             )
@@ -305,7 +306,7 @@ async def _fetch_turns(
         next_token = f"conversation_memory:cursor:{cast(str, page_rows[-1]['identifier'])}"
 
     turns: Sequence[ConversationTurn] = tuple(_turn_from_record(row) for row in reversed(page_rows))
-    return Paginated[ConversationTurn].of(
+    return Paginated[ConversationTurn](
         turns,
         pagination=pagination.with_token(next_token),
     )

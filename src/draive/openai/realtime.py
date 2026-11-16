@@ -1,4 +1,5 @@
 import json
+import sys
 from base64 import b64decode
 from collections.abc import Generator, Mapping, MutableMapping, Sequence
 from contextlib import AbstractAsyncContextManager
@@ -8,7 +9,7 @@ from types import TracebackType
 from typing import Any, Literal
 from uuid import UUID, uuid4
 
-from haiway import MISSING, Meta, Missing, State, ctx, without_missing
+from haiway import Meta, Missing, State, ctx, without_missing
 from openai.resources.realtime.realtime import (
     AsyncRealtimeConnection,
     AsyncRealtimeConnectionManager,
@@ -34,10 +35,10 @@ from openai.types.realtime.realtime_response_status import RealtimeResponseStatu
 
 from draive.models import (
     ModelContext,
-    ModelException,
     ModelInput,
     ModelInstructions,
     ModelOutput,
+    ModelOutputFailed,
     ModelOutputInvalid,
     ModelSession,
     ModelSessionEvent,
@@ -108,27 +109,44 @@ class OpenAIRealtime(OpenAIAPI):
             # enter scope
             scope = ctx.scope("model.session")
             await scope.__aenter__()
-            record_model_invocation(
-                provider="openai",
-                model=config.model,
-                tools=tools,
-                output=output,
-            )
-            # open connection
-            connection: AsyncRealtimeConnection = await connection_manager.__aenter__()
-            # setup connection
-            await connection.session.update(session=session_config)
-
             current_items: MutableMapping[str, Meta] = {}
             # audio appended to the input buffer since its last commit
             buffered_audio: bool = False
-
-            if context:  # send initial context
-                await _send_context(
-                    context,
-                    current_items=current_items,
-                    connection=connection,
+            try:
+                record_model_invocation(
+                    provider="openai",
+                    model=config.model,
+                    tools=tools,
+                    output=output,
                 )
+                # open connection
+                connection: AsyncRealtimeConnection = await connection_manager.__aenter__()
+
+            except BaseException:
+                # close is never called when opening fails, release the scope here
+                await scope.__aexit__(*sys.exc_info())
+                raise
+
+            try:
+                # setup connection
+                await connection.session.update(session=session_config)
+
+                if context:  # send initial context
+                    await _send_context(
+                        context,
+                        current_items=current_items,
+                        connection=connection,
+                    )
+
+            except BaseException:
+                # close is never called when opening fails, release everything here
+                try:
+                    await connection_manager.__aexit__(*sys.exc_info())
+
+                finally:
+                    await scope.__aexit__(*sys.exc_info())
+
+                raise
 
             async def read() -> ModelSessionOutputChunk:  # noqa: C901, PLR0911, PLR0912, PLR0915
                 nonlocal current_items
@@ -291,11 +309,11 @@ class OpenAIRealtime(OpenAIAPI):
 
                             match event.response.status:
                                 case "failed":
-                                    raise ModelException(
-                                        "Realtime response failed: "
-                                        + _response_status_reason(event.response.status_details),
+                                    raise ModelOutputFailed(
                                         provider="openai",
                                         model=config.model,
+                                        reason="Realtime response failed: "
+                                        + _response_status_reason(event.response.status_details),
                                     )
 
                                 case "incomplete":
@@ -389,11 +407,13 @@ class OpenAIRealtime(OpenAIAPI):
                                 continue  # skip other items
 
                         case "error":
-                            raise ModelException(
-                                f"Realtime processing error:"
-                                f" {event.error.type} - {event.error.message}",
+                            raise ModelOutputFailed(
                                 provider="openai",
                                 model=config.model,
+                                reason=(
+                                    f"Realtime processing error:"
+                                    f" {event.error.type} - {event.error.message}"
+                                ),
                             )
 
                         case _:
@@ -761,8 +781,8 @@ def _prepare_session_config(
                 {
                     "type": "function",
                     "name": tool.name,
-                    "description": tool.description or MISSING,
-                    "parameters": tool.parameters or MISSING,
+                    "description": tool.description or Missing,
+                    "parameters": tool.parameters or Missing,
                 },
                 typed=RealtimeFunctionToolParam,
             )
@@ -770,21 +790,21 @@ def _prepare_session_config(
         ]
 
     else:
-        session_tools = MISSING
+        session_tools = Missing
 
     return without_missing(
         {
             "type": "realtime",
             "model": config.model,
             # an empty string would override the model's own default instructions
-            "instructions": instructions or MISSING,
+            "instructions": instructions or Missing,
             "audio": {
                 "input": config.input_parameters,
                 "output": config.output_parameters,
             },
             "output_modalities": modalities,
             "tools": session_tools,
-            "tool_choice": tool_choice if session_tools is not MISSING else MISSING,
+            "tool_choice": tool_choice if session_tools is not Missing else Missing,
         },
         typed=RealtimeSessionCreateRequestParam,
     )

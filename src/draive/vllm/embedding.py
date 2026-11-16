@@ -1,4 +1,3 @@
-from asyncio import gather
 from collections.abc import Callable, Sequence
 from itertools import chain
 from typing import Any, cast
@@ -7,7 +6,11 @@ from haiway import State, as_list, ctx
 from openai.types.create_embedding_response import CreateEmbeddingResponse
 
 from draive.embedding import Embedded
-from draive.models.metrics import record_embedding_invocation, record_embedding_metrics
+from draive.models.metrics import (
+    provider_gather,
+    record_embedding_invocation,
+    record_embedding_metrics,
+)
 from draive.vllm.api import VLLMAPI
 from draive.vllm.config import VLLMEmbeddingConfig
 from draive.vllm.utils import unwrap_missing
@@ -50,9 +53,9 @@ class VLLMEmbedding(VLLMAPI):
             if not values:
                 return ()  # empty
 
-            responses: list[CreateEmbeddingResponse]
+            responses: Sequence[CreateEmbeddingResponse]
             if attribute is None:
-                responses = await gather(
+                responses = await provider_gather(
                     *[
                         self._client.embeddings.create(
                             input=as_list(
@@ -65,11 +68,14 @@ class VLLMEmbedding(VLLMAPI):
                             encoding_format="float",
                         )
                         for index in range(0, len(values), embedding_config.batch_size)
-                    ]
+                    ],
+                    provider=self._provider,
+                    model=embedding_config.model,
+                    operation="embedding",
                 )
 
             else:
-                responses = await gather(
+                responses = await provider_gather(
                     *[
                         self._client.embeddings.create(
                             input=as_list(
@@ -81,7 +87,10 @@ class VLLMEmbedding(VLLMAPI):
                             encoding_format="float",
                         )
                         for index in range(0, len(values), embedding_config.batch_size)
-                    ]
+                    ],
+                    provider=self._provider,
+                    model=embedding_config.model,
+                    operation="embedding",
                 )
 
             return cast(

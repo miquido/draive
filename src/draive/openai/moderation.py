@@ -1,11 +1,11 @@
 from collections.abc import Generator, Sequence
 from typing import Any, Final
 
-from haiway import Missing, ctx, not_missing
+from haiway import Missing, ctx
 from openai.types import ModerationCreateResponse, ModerationMultiModalInputParam
 
 from draive.guardrails import GuardrailsModerationException
-from draive.models import record_guardrails_invocation
+from draive.models import provider_failure, record_guardrails_invocation
 from draive.multimodal import ArtifactContent, Multimodal, MultimodalContent, TextContent
 from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIModerationConfig
@@ -53,10 +53,16 @@ class OpenAIContentModeration(OpenAIAPI):
                 _moderated_parts(content)
             )
 
-            response: ModerationCreateResponse = await self._client.moderations.create(
+            response: ModerationCreateResponse
+            with provider_failure(
+                provider="openai",
                 model=moderation_config.model,
-                input=moderated_content,
-            )
+                operation="moderation",
+            ):
+                response = await self._client.moderations.create(
+                    model=moderation_config.model,
+                    input=moderated_content,
+                )
 
             violations: dict[str, float] = {}
             for result in response.results:
@@ -68,7 +74,7 @@ class OpenAIContentModeration(OpenAIAPI):
                     )
                     # a configured threshold replaces the model provided category flag,
                     # the flag is used only when no threshold was configured
-                    if not_missing(threshold):
+                    if threshold is not Missing:
                         if score >= threshold:
                             violations[category] = score
 

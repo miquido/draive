@@ -9,7 +9,7 @@ TESTS_PATH := tests
 # load environment config from .env if able
 -include .env
 
-# a UV_PYTHON set in .env (e.g. UV_PYTHON=3.14) selects the interpreter for every uv command
+# a UV_PYTHON set in .env (e.g. UV_PYTHON=3.15.2) selects the interpreter for every uv command
 ifdef UV_PYTHON
 export UV_PYTHON
 endif
@@ -90,18 +90,19 @@ lint:
 # Format Markdown docs and README
 docs-format:
 	@echo '# Formatting Markdown...'
-	@uv run --frozen mdformat README.md docs
+	@uv run --frozen mdformat --wrap 100 README.md docs
 	@echo '...finished!'
 
 # Lint Markdown docs and README
 docs-lint:
 	@echo '# Linting Markdown...'
 	@uv run --frozen pymarkdown --config .pymarkdown.json scan README.md docs
+	@uv run --frozen mdformat --wrap 100 --check README.md docs
 	@echo '...finished!'
 
 # Run tests suite.
 test:
-	@uv run --frozen python -B -m pytest -v --cov=$(SOURCES_PATH) --rootdir=$(TESTS_PATH)
+	@uv run --frozen python -B -m pytest -v --cov=$(SOURCES_PATH)
 
 # Build documentation for production
 docs:

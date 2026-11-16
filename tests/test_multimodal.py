@@ -1,3 +1,4 @@
+import pytest
 from haiway import State
 
 from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
@@ -314,3 +315,11 @@ def test_artifacts_decodes_to_target_state_with_optional_category_filter():
         DecodedArtifact(value="two"),
     )
     assert content.artifacts(DecodedArtifact, category="target") == (DecodedArtifact(value="one"),)
+
+
+@pytest.mark.parametrize("value", [42, 1.5, object(), [1, 2]])
+def test_multimodal_content_rejects_unsupported_elements_with_type_error(value: object) -> None:
+    from draive.multimodal import MultimodalContent
+
+    with pytest.raises(TypeError, match="Unsupported multimodal content element"):
+        MultimodalContent.of(value)  # pyright: ignore[reportArgumentType]

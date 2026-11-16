@@ -1,7 +1,10 @@
 from collections.abc import Callable, Generator, Mapping, Sequence, Set
 from contextlib import contextmanager
 from inspect import Parameter, signature
-from typing import Any
+from time import monotonic
+from typing import Any, Literal
+
+from haiway import ctx
 
 from draive.qdrant.types import QdrantException
 
@@ -67,18 +70,42 @@ def qdrant_operation(
     QdrantException
         When the wrapped operation raises any error.
     """
+    started: float = monotonic()
+    outcome: Literal["success", "error", "cancelled"] = "success"
     try:
         yield
 
     except QdrantException:
+        outcome = "error"
         raise  # already translated
 
     except Exception as exc:
+        outcome = "error"
+        ctx.log_error(
+            f"Qdrant {operation} failed",
+            exception=exc,
+        )
         raise QdrantException(
             f"Qdrant {operation} failed"
             if collection is None
             else f"Qdrant {operation} failed for {collection} collection"
         ) from exc
+
+    except BaseException:
+        outcome = "cancelled"
+        raise
+
+    finally:
+        ctx.record_info(
+            metric="qdrant.operation.duration",
+            value=(monotonic() - started) * 1000,
+            unit="ms",
+            kind="histogram",
+            attributes={
+                "qdrant.operation": operation,
+                "qdrant.outcome": outcome,
+            },
+        )
 
 
 def qdrant_vector(

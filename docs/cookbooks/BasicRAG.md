@@ -43,8 +43,8 @@ chunks = [
 
 ## Build In-Memory Vector Index
 
-`VectorIndex` is state-driven, so we provide both index implementation and embedding configuration in
-`ctx.scope(...)`.
+`VectorIndex` is state-driven, so we provide both index implementation and embedding configuration
+in `ctx.scope(...)`.
 
 ```python
 from draive import VectorIndex, ctx

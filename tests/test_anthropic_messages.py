@@ -1,6 +1,6 @@
 import pytest
 from anthropic import omit
-from haiway import MISSING, State, as_dict, ctx
+from haiway import Missing, State, as_dict, ctx
 
 from draive.anthropic.config import AnthropicConfig
 from draive.anthropic.messages import (
@@ -87,7 +87,7 @@ def test_output_config_carries_schema_for_state_output() -> None:
     class Example(State, serializable=True):
         name: str
 
-    assert _output_config(Example, effort=MISSING) == {
+    assert _output_config(Example, effort=Missing) == {
         "format": {
             "type": "json_schema",
             "schema": as_dict(Example.__SPECIFICATION__),
@@ -96,9 +96,9 @@ def test_output_config_carries_schema_for_state_output() -> None:
 
 
 def test_output_config_omitted_for_non_schema_output() -> None:
-    assert _output_config("json", effort=MISSING) is omit
-    assert _output_config("text", effort=MISSING) is omit
-    assert _output_config("auto", effort=MISSING) is omit
+    assert _output_config("json", effort=Missing) is omit
+    assert _output_config("text", effort=Missing) is omit
+    assert _output_config("auto", effort=Missing) is omit
 
 
 def test_output_config_carries_effort_level() -> None:
@@ -112,7 +112,7 @@ def test_thinking_config_maps_requested_mode() -> None:
 
 def test_thinking_config_omitted_without_configuration() -> None:
     # not every model accepts an explicit mode, the api default is adaptive anyway
-    assert _thinking_config(MISSING) is omit
+    assert _thinking_config(Missing) is omit
 
 
 def test_tools_none_selection_omits_declarations() -> None:

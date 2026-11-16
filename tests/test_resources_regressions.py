@@ -1,6 +1,8 @@
-from typing import Any
+from collections.abc import Awaitable, Callable
+from typing import Any, cast
 
 import pytest
+from haiway import HTTPClient, HTTPResponse, ctx
 
 from draive.resources.http import (
     http_resource_deleting,
@@ -16,6 +18,47 @@ from draive.resources.types import (
     ResourceReference,
     ResourceUnresolveable,
 )
+
+
+def http_client(
+    *,
+    get: Callable[..., Awaitable[object]] | None = None,
+    put: Callable[..., Awaitable[object]] | None = None,
+    request: Callable[..., Awaitable[object]] | None = None,
+) -> HTTPClient:
+    async def requesting(
+        method: str,
+        /,
+        *,
+        url: str,
+        query: Any,
+        headers: Any,
+        body: Any,
+        timeout: float | None,
+        follow_redirects: bool | None,
+        stream: bool,
+    ) -> HTTPResponse:
+        arguments: dict[str, Any] = {
+            "url": url,
+            "query": query,
+            "headers": headers,
+            "body": body,
+            "timeout": timeout,
+            "follow_redirects": follow_redirects,
+            "stream": stream,
+        }
+        if method == "GET" and get is not None:
+            return cast(HTTPResponse, await get(**arguments))
+
+        if method == "PUT" and put is not None:
+            return cast(HTTPResponse, await put(**arguments))
+
+        if request is not None:
+            return cast(HTTPResponse, await request(method, **arguments))
+
+        raise AssertionError(f"Unexpected request: {method} {url}")
+
+    return HTTPClient(requesting=requesting)
 
 
 class _DummyResponse:
@@ -79,9 +122,8 @@ async def test_http_resource_fetching_returns_none_for_not_found(
         _ = (url, kwargs)
         return _DummyResponse(status_code=404, body=b"")
 
-    monkeypatch.setattr("draive.resources.http.HTTPClient.get", fake_get)
-
-    assert await http_resource_fetching("https://example.com/missing") is None
+    async with ctx.scope("test", http_client(get=fake_get)):
+        assert await http_resource_fetching("https://example.com/missing") is None
 
 
 @pytest.mark.asyncio
@@ -92,10 +134,9 @@ async def test_http_resource_fetching_raises_for_non_ok_status(
         _ = (url, kwargs)
         return _DummyResponse(status_code=201, body=b"created")
 
-    monkeypatch.setattr("draive.resources.http.HTTPClient.get", fake_get)
-
-    with pytest.raises(ResourceCorrupted):
-        await http_resource_fetching("https://example.com/resource")
+    async with ctx.scope("test", http_client(get=fake_get)):
+        with pytest.raises(ResourceCorrupted):
+            await http_resource_fetching("https://example.com/resource")
 
 
 @pytest.mark.asyncio
@@ -115,12 +156,11 @@ async def test_http_resource_fetching_raises_inaccessible_for_auth_errors(
         _ = (url, kwargs)
         return _DummyResponse(status_code=status_code, body=b"")
 
-    monkeypatch.setattr("draive.resources.http.HTTPClient.get", fake_get)
+    async with ctx.scope("test", http_client(get=fake_get)):
+        with pytest.raises(ResourceInaccessible) as exc_info:
+            await http_resource_fetching("https://example.com/resource")
 
-    with pytest.raises(ResourceInaccessible) as exc_info:
-        await http_resource_fetching("https://example.com/resource")
-
-    assert exc_info.value.description == description
+        assert exc_info.value.description == description
 
 
 @pytest.mark.asyncio
@@ -144,16 +184,15 @@ async def test_http_resource_uploading_uses_put_and_returns_meta(
             headers={"etag": "abc"},
         )
 
-    monkeypatch.setattr("draive.resources.http.HTTPClient.put", fake_put)
+    async with ctx.scope("test", http_client(put=fake_put)):
+        meta = await http_resource_uploading(
+            "https://example.com/resource",
+            ResourceContent.of(b"payload", mime_type="application/json"),
+            headers={"x-test": "1"},
+        )
 
-    meta = await http_resource_uploading(
-        "https://example.com/resource",
-        ResourceContent.of(b"payload", mime_type="application/json"),
-        headers={"x-test": "1"},
-    )
-
-    assert meta["status_code"] == 201
-    assert meta["etag"] == "abc"
+        assert meta["status_code"] == 201
+        assert meta["etag"] == "abc"
 
 
 @pytest.mark.asyncio
@@ -164,13 +203,12 @@ async def test_http_resource_uploading_raises_for_non_success_status(
         _ = kwargs
         return _DummyResponse(status_code=500, body=b"")
 
-    monkeypatch.setattr("draive.resources.http.HTTPClient.put", fake_put)
-
-    with pytest.raises(ResourceCorrupted):
-        await http_resource_uploading(
-            "https://example.com/resource",
-            ResourceContent.of(b"payload", mime_type="application/octet-stream"),
-        )
+    async with ctx.scope("test", http_client(put=fake_put)):
+        with pytest.raises(ResourceCorrupted):
+            await http_resource_uploading(
+                "https://example.com/resource",
+                ResourceContent.of(b"payload", mime_type="application/octet-stream"),
+            )
 
 
 @pytest.mark.asyncio
@@ -190,15 +228,14 @@ async def test_http_resource_uploading_raises_inaccessible_for_auth_errors(
         _ = kwargs
         return _DummyResponse(status_code=status_code, body=b"")
 
-    monkeypatch.setattr("draive.resources.http.HTTPClient.put", fake_put)
+    async with ctx.scope("test", http_client(put=fake_put)):
+        with pytest.raises(ResourceInaccessible) as exc_info:
+            await http_resource_uploading(
+                "https://example.com/resource",
+                ResourceContent.of(b"payload", mime_type="application/octet-stream"),
+            )
 
-    with pytest.raises(ResourceInaccessible) as exc_info:
-        await http_resource_uploading(
-            "https://example.com/resource",
-            ResourceContent.of(b"payload", mime_type="application/octet-stream"),
-        )
-
-    assert exc_info.value.description == description
+        assert exc_info.value.description == description
 
 
 @pytest.mark.asyncio
@@ -211,9 +248,8 @@ async def test_http_resource_deleting_uses_delete_method(
         assert url == "https://example.com/resource"
         return _DummyResponse(status_code=204, body=b"")
 
-    monkeypatch.setattr("draive.resources.http.HTTPClient.request", fake_request)
-
-    await http_resource_deleting("https://example.com/resource")
+    async with ctx.scope("test", http_client(request=fake_request)):
+        await http_resource_deleting("https://example.com/resource")
 
 
 @pytest.mark.asyncio
@@ -224,10 +260,9 @@ async def test_http_resource_deleting_raises_for_non_success_status(
         _ = (method, url, kwargs)
         return _DummyResponse(status_code=409, body=b"")
 
-    monkeypatch.setattr("draive.resources.http.HTTPClient.request", fake_request)
-
-    with pytest.raises(ResourceCorrupted):
-        await http_resource_deleting("https://example.com/resource")
+    async with ctx.scope("test", http_client(request=fake_request)):
+        with pytest.raises(ResourceCorrupted):
+            await http_resource_deleting("https://example.com/resource")
 
 
 @pytest.mark.asyncio
@@ -247,9 +282,27 @@ async def test_http_resource_deleting_raises_inaccessible_for_auth_errors(
         _ = (method, url, kwargs)
         return _DummyResponse(status_code=status_code, body=b"")
 
-    monkeypatch.setattr("draive.resources.http.HTTPClient.request", fake_request)
+    async with ctx.scope("test", http_client(request=fake_request)):
+        with pytest.raises(ResourceInaccessible) as exc_info:
+            await http_resource_deleting("https://example.com/resource")
 
-    with pytest.raises(ResourceInaccessible) as exc_info:
-        await http_resource_deleting("https://example.com/resource")
+        assert exc_info.value.description == description
 
-    assert exc_info.value.description == description
+
+def test_resource_content_rejects_text_that_is_not_base64() -> None:
+    from draive.resources import ResourceContent
+
+    with pytest.raises(ValueError, match="base64"):
+        ResourceContent.of("plain text, not encoded!")
+
+
+def test_artifact_content_of_preserves_hidden_and_meta() -> None:
+    from draive.multimodal import ArtifactContent
+
+    source = ArtifactContent.of({"a": 1}, category="data", hidden=True, meta={"k": "v"})
+
+    copied = ArtifactContent.of(source, meta={"extra": "x"})
+
+    assert copied.hidden
+    assert copied.meta["k"] == "v"
+    assert copied.meta["extra"] == "x"

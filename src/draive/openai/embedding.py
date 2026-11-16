@@ -1,14 +1,17 @@
-from asyncio import gather
 from collections.abc import Callable, Sequence
 from itertools import chain
 from typing import Any, cast
 
-from haiway import State, as_list, ctx, unwrap_missing
+from haiway import Missing, State, as_list, ctx
 from openai import omit
 from openai.types.create_embedding_response import CreateEmbeddingResponse
 
 from draive.embedding import Embedded
-from draive.models.metrics import record_embedding_invocation, record_embedding_metrics
+from draive.models.metrics import (
+    provider_gather,
+    record_embedding_invocation,
+    record_embedding_metrics,
+)
 from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIEmbeddingConfig
 
@@ -59,19 +62,28 @@ class OpenAIEmbedding(OpenAIAPI):
             if not attributes:
                 return ()  # empty
 
-            responses: list[CreateEmbeddingResponse] = await gather(
+            responses: Sequence[CreateEmbeddingResponse] = await provider_gather(
                 *[
                     self._client.embeddings.create(
                         input=attributes[index : index + embedding_config.batch_size],
                         model=embedding_config.model,
-                        dimensions=unwrap_missing(
-                            embedding_config.dimensions,
-                            default=omit,
-                        ),
+                        dimensions=omit
+                        if embedding_config.dimensions is Missing
+                        else embedding_config.dimensions,
                         encoding_format="float",
                     )
                     for index in range(0, len(attributes), embedding_config.batch_size)
-                ]
+                ],
+                provider="openai",
+                model=embedding_config.model,
+                operation="embedding",
+            )
+
+            record_embedding_metrics(
+                provider="openai",
+                model=embedding_config.model,
+                embedding_type="text",
+                input_tokens=sum(response.usage.prompt_tokens for response in responses),
             )
 
             return cast(

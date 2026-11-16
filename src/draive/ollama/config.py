@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from typing import Literal
 
-from haiway import MISSING, Configuration, Missing
+from haiway import Configuration, Missing
 
 __all__ = (
     "OllamaChatConfig",
@@ -11,14 +11,14 @@ __all__ = (
 
 class OllamaChatConfig(Configuration):
     model: str
-    temperature: float | Missing = MISSING
-    top_k: int | Missing = MISSING
-    top_p: float | Missing = MISSING
-    seed: int | Missing | None = MISSING
-    max_output_tokens: int | Missing = MISSING
-    stop_sequences: Sequence[str] | Missing = MISSING
+    temperature: float | Missing = Missing
+    top_k: int | Missing = Missing
+    top_p: float | Missing = Missing
+    seed: int | Missing | None = Missing
+    max_output_tokens: int | Missing = Missing
+    stop_sequences: Sequence[str] | Missing = Missing
     # reasoning models require explicitly requesting thinking to report it
-    thinking: bool | Literal["low", "medium", "high"] | Missing = MISSING
+    thinking: bool | Literal["low", "medium", "high"] | Missing = Missing
 
 
 class OllamaEmbeddingConfig(Configuration):

@@ -2,7 +2,7 @@ Draive is a python framework helping to build high-quality Gen-AI applications. 
 
 ## Development Toolchain
 
-- Python: 3.15 by default (`.python-version`), 3.14 still supported - keep code 3.14 compatible (ruff and pyright target 3.14, CI tests both). Where 3.15 is unavailable, fall back with `UV_PYTHON=3.14` (environment or `.env`), which every uv command and make target honors
+- Python: 3.15 or newer (`.python-version`, `requires-python`) - ruff and pyright target 3.15, CI tests 3.15. Pin the interpreter with `UV_PYTHON` (environment or `.env`) if needed, every uv command and make target honors it
 - uv: pinned to 0.13.7 (`[tool.uv] required-version`, `UV_VERSION` in `Makefile`)
 - Virtualenv: managed by uv at `./.venv`; `uv sync` installs every dependency group and integration extra it needs. Run tools through make targets or `uv run`, no activation required
 - Formatting: Ruff formatter (`make format`), no other formatter
@@ -44,7 +44,7 @@ Public exports are centralized in `src/draive/__init__.py`.
 
 ### Typing & Immutability
 
-- Use strict typing and modern Python 3.14 syntax
+- Use strict typing and modern Python 3.15 syntax
 - No untyped public APIs; avoid loose `Any` except at explicit third-party boundaries
 - Prefer explicit attribute access with static types; avoid dynamic `getattr` except at narrow boundaries
 - Prefer abstract immutable protocols (`Mapping`, `Sequence`, `Iterable`) over concrete mutable collections in public APIs

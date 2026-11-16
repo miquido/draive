@@ -1,7 +1,7 @@
 # Draive
 
 [![PyPI](https://img.shields.io/pypi/v/draive)](https://pypi.org/project/draive/)
-![Python Version](https://img.shields.io/badge/Python-3.14+-blue)
+![Python Version](https://img.shields.io/badge/Python-3.15+-blue)
 [![License](https://img.shields.io/github/license/miquido/draive)](https://github.com/miquido/draive/blob/main/LICENSE)
 
 Draive is a typed Python framework for building GenAI applications with strict state modeling,
@@ -13,14 +13,14 @@ hidden global state.
 ## Why Draive
 
 - Explicitly typed API surface built on `State`, with runtime validation and JSON schema support.
-- Unified generation interfaces:
-    `TextGeneration`, `ModelGeneration`, `ImageGeneration`, and `AudioGeneration`.
+- Unified generation interfaces: `TextGeneration`, `ModelGeneration`, `ImageGeneration`, and
+    `AudioGeneration`.
 - Built-in tool orchestration through `@tool` and `Toolbox` with model-managed tool turns.
 - Shared multimodal model for text, resources, and artifacts across generation and retrieval flows.
 - First-class evaluation and guardrails integrated in the same context/state model.
 - Provider adapters for OpenAI, Anthropic, Gemini, Mistral, Cohere, Bedrock, Ollama, and vLLM.
-- Storage and infrastructure integrations for Postgres, Qdrant, SurrealDB, MCP, AWS, RabbitMQ,
-    and OpenTelemetry.
+- Storage and infrastructure integrations for Postgres, Qdrant, SurrealDB, MCP, AWS, RabbitMQ, and
+    OpenTelemetry.
 
 ## Architecture At A Glance
 

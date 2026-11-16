@@ -2,7 +2,7 @@ import sys
 from collections.abc import Mapping, Sequence
 from contextlib import AbstractAsyncContextManager
 from types import TracebackType
-from typing import Any, Literal, cast, overload
+from typing import Any, Literal, cast, get_args, overload
 from uuid import UUID, uuid4
 
 from haiway import (
@@ -19,6 +19,7 @@ from surrealdb import RecordID, Table
 from draive.surreal.filters import prepare_filter
 from draive.surreal.schema import SurrealTableKind, surreal_field_definitions
 from draive.surreal.types import (
+    SurrealException,
     SurrealID,
     SurrealObject,
     SurrealSessionContext,
@@ -28,8 +29,7 @@ from draive.surreal.types import (
     SurrealTransactionPreparing,
     SurrealValue,
 )
-from draive.surreal.utils import pagination_offset, surreal_identifier
-from draive.utils.attributes import attribute_path_segments
+from draive.surreal.utils import pagination_offset, surreal_field_path, surreal_identifier
 
 __all__ = (
     "Surreal",
@@ -205,7 +205,7 @@ class SurrealSession(State):
     ) -> Paginated[Model]:
         pagination = pagination or Pagination.of(limit=32)
         if pagination.limit <= 0:
-            return Paginated[Model].of(
+            return Paginated[Model](
                 (),
                 pagination=pagination.with_token(None),
             )
@@ -235,7 +235,7 @@ class SurrealSession(State):
         if len(records) > pagination.limit:
             next_token = start_at + pagination.limit
 
-        return Paginated[Model].of(
+        return Paginated[Model](
             tuple(model.from_mapping(record) for record in records[: pagination.limit]),
             pagination=pagination.with_token(next_token),
         )
@@ -339,6 +339,9 @@ class SurrealSession(State):
         schema: bool = False,
         kind: SurrealTableKind = "NORMAL",
     ) -> None:
+        if kind not in get_args(SurrealTableKind.__value__):
+            raise ValueError(f"Invalid SurrealDB table kind: {kind!r}")
+
         await self._statement_executing(
             f"DEFINE TABLE IF NOT EXISTS "
             f"{surreal_identifier(table if isinstance(table, str) else table.__name__)} "
@@ -535,7 +538,7 @@ class SurrealSession(State):
     ) -> Paginated[Model]:
         pagination = pagination or Pagination.of(limit=32)
         if pagination.limit <= 0:
-            return Paginated[Model].of(
+            return Paginated[Model](
                 (),
                 pagination=pagination.with_token(None),
             )
@@ -578,7 +581,7 @@ class SurrealSession(State):
         if len(rows) > pagination.limit:
             next_token = start_at + pagination.limit
 
-        return Paginated[Model].of(
+        return Paginated[Model](
             tuple(
                 target.from_mapping(cast(Mapping[str, object], record["value"]))
                 for record in page_records
@@ -633,7 +636,7 @@ class Surreal(State):
         access: str | None = None,
     ) -> SurrealSessionContext:
         if ctx.contains_state(SurrealSession):
-            raise RuntimeError("Recursive Surreal session acquiring is forbidden")
+            raise SurrealException("Recursive Surreal session acquiring is forbidden")
 
         return self._session_preparing(
             namespace=namespace,
@@ -646,7 +649,9 @@ class Surreal(State):
     @classmethod
     def transaction(cls) -> SurrealTransactionContext:
         if ctx.contains_state(SurrealSession):
-            return SurrealSession.transaction()
+            # reuse the active session but still scope the transaction session,
+            # otherwise statements executed within would run outside of the transaction
+            return _SurrealTransactionContext(session=_ActiveSessionContext())
 
         return _SurrealTransactionContext(session=cls.prepare_session())
 
@@ -880,6 +885,22 @@ class Surreal(State):
         super().__init__(_session_preparing=session_preparing)
 
 
+class _ActiveSessionContext:
+    __slots__ = ()
+
+    async def __aenter__(self) -> SurrealSession:
+        return ctx.state(SurrealSession)
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        # the session is owned by an outer scope
+        return None
+
+
 class _SurrealTransactionContext:
     __slots__ = (
         "_scope_context",
@@ -968,7 +989,7 @@ def _ordering_reference(
     /,
 ) -> str:
     # stored documents use attribute aliases, ordering has to follow them
-    return ".".join(attribute_path_segments(path))
+    return surreal_field_path(path.serialized_components)
 
 
 def _surreal_content(

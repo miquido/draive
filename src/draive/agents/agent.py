@@ -7,6 +7,7 @@ from haiway import Meta, MetaValues, ctx
 
 from draive.agents.state import AgentMemory
 from draive.agents.types import (
+    AgentException,
     AgentExecuting,
     AgentIdentity,
     AgentMessage,
@@ -36,6 +37,7 @@ from draive.steps import Step, StepState, StepStream
 from draive.tools import Tool, Toolbox, tool
 from draive.tools.types import ToolOutputChunk
 from draive.utils import ProcessingEvent
+from draive.utils.limits import verify_max_iterations
 
 __all__ = ("Agent",)
 
@@ -131,6 +133,7 @@ class Agent:
         tools: Toolbox | Iterable[Tool] = Toolbox.empty,
         memory: AgentMemory = AgentMemory.disabled,
         output: ModelOutputSelection = "auto",
+        max_iterations: int | None = 32,
     ) -> Self: ...
 
     @overload
@@ -144,6 +147,7 @@ class Agent:
         tools: Toolbox | Iterable[Tool] = Toolbox.empty,
         memory: AgentMemory = AgentMemory.disabled,
         output: ModelOutputSelection = "auto",
+        max_iterations: int | None = 32,
         meta: Meta | MetaValues | None = None,
     ) -> Self: ...
 
@@ -157,6 +161,7 @@ class Agent:
         tools: Toolbox | Iterable[Tool] = Toolbox.empty,
         memory: AgentMemory = AgentMemory.disabled,
         output: ModelOutputSelection = "auto",
+        max_iterations: int | None = 32,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """Create a model-backed agent using the completion-and-tools loop.
@@ -181,6 +186,9 @@ class Agent:
             of the turn, replacing provided tools using the same names.
         output : ModelOutputSelection, default="auto"
             Output selection mode forwarded to model completion.
+        max_iterations : int | None, default=32
+            Maximum number of completion iterations within a single turn.
+            ``None`` removes the limit.
         meta : Meta | MetaValues | None, default=None
             Additional metadata attached to the agent identity.
 
@@ -189,7 +197,15 @@ class Agent:
         Self
             Agent instance running a completion-and-tools loop step, with
             memory applied around it.
+
+        Raises
+        ------
+        ValueError
+            When ``max_iterations`` is lower than 1.
+        AgentException
+            When running the agent exceeds ``max_iterations`` completion iterations.
         """
+        verify_max_iterations(max_iterations)
         identity: AgentIdentity
         if isinstance(agent, str):
             identity = AgentIdentity.of(
@@ -239,6 +255,12 @@ class Agent:
 
                 iteration: int = 0
                 while True:  # loop until we get ModelOutput without tools
+                    if max_iterations is not None and iteration >= max_iterations:
+                        raise AgentException(
+                            f"Agent `{identity.name}` exceeded the limit of "
+                            f"{max_iterations} completion iterations"
+                        )
+
                     async with ctx.scope(f"agent.generative.turn_{iteration}"):
                         ctx.log_debug("Generating completion...")
                         chunks_accumulator: MutableSequence[ModelOutputChunk] = []

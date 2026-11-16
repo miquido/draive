@@ -4,6 +4,7 @@ from draive.conversation.state import ConversationMemory
 from draive.conversation.types import (
     ConversationAssistantTurn,
     ConversationEvent,
+    ConversationException,
     ConversationInputChunk,
     ConversationInputStream,
     ConversationOutputChunk,
@@ -16,6 +17,7 @@ __all__ = (
     "Conversation",
     "ConversationAssistantTurn",
     "ConversationEvent",
+    "ConversationException",
     "ConversationInputChunk",
     "ConversationInputStream",
     "ConversationMemory",

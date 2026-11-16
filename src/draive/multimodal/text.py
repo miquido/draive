@@ -2,7 +2,16 @@ from typing import ClassVar, Self, final
 
 from haiway import Meta, MetaValues, State
 
+from draive._constant import class_constant
+
 __all__ = ("TextContent",)
+
+
+def _text(
+    text: str,
+    meta: Meta,
+) -> TextContent:
+    return TextContent(text=text, meta=meta)
 
 
 @final
@@ -24,7 +33,7 @@ class TextContent(State, serializable=True):
         grouping operations. Defaults to an empty metadata object.
     """
 
-    empty: ClassVar[Self]  # defined after the class
+    empty: ClassVar[TextContent] = class_constant(_text, text="", meta=Meta.empty)
 
     @classmethod
     def of(
@@ -80,9 +89,3 @@ class TextContent(State, serializable=True):
             otherwise. Whitespace-only strings are considered truthy.
         """
         return bool(self.text)
-
-
-TextContent.empty = TextContent(
-    text="",
-    meta=Meta.empty,
-)

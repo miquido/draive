@@ -21,8 +21,31 @@ __all__ = ("QdrantVectorIndex",)
 @final
 class QdrantVectorIndex:
     @staticmethod
-    def prepare() -> VectorIndex:  # noqa: C901
-        """VectorIndex that manages text/image embeddings stored in Qdrant."""
+    def prepare(  # noqa: C901, PLR0915
+        *,
+        mmr_multiplier: int = 8,
+    ) -> VectorIndex:
+        """VectorIndex that manages text/image embeddings stored in Qdrant.
+
+        Parameters
+        ----------
+        mmr_multiplier
+            Multiplier applied to ``limit`` to determine how many nearest-neighbour
+            candidates are fetched before applying Maximal Marginal Relevance (MMR)
+            re-ranking.
+
+        Returns
+        -------
+        VectorIndex
+            Qdrant-backed vector index implementation.
+
+        Raises
+        ------
+        ValueError
+            If ``mmr_multiplier`` is less than ``1``.
+        """
+        if mmr_multiplier <= 0:
+            raise ValueError("mmr_multiplier has to be greater than 0")
 
         async def index[Model: State, Value: ResourceContent | TextContent | str](
             model: type[Model],
@@ -31,9 +54,11 @@ class QdrantVectorIndex:
             attribute: Callable[[Model], Value] | AttributePath[Model, Value] | Value,
             **extra: Any,
         ) -> None:
-            assert isinstance(  # nosec: B101
-                attribute, AttributePath | Callable
-            ), f"Prepare parameter path by using {model.__name__}._.path.to.property"
+            if not isinstance(attribute, AttributePath | Callable):
+                raise ValueError(
+                    f"Prepare parameter path by using {model.__name__}._.path.to.property"
+                )
+
             value_selector: Callable[[Model], Value] = cast(Callable[[Model], Value], attribute)
 
             selected_texts: list[str] = []
@@ -104,7 +129,8 @@ class QdrantVectorIndex:
             rerank: bool = False,
             **extra: Any,
         ) -> Sequence[Model]:
-            assert query is not None or (query is None and score_threshold is None)  # nosec: B101
+            if query is None and score_threshold is not None:
+                raise ValueError("score_threshold requires a query")
 
             if query is None:
                 return (
@@ -150,7 +176,7 @@ class QdrantVectorIndex:
                 query_vector=query_vector,
                 score_threshold=score_threshold,
                 requirements=requirements,
-                limit=limit or 8,
+                limit=(limit or 8) * mmr_multiplier if rerank else (limit or 8),
                 include_vector=True,
                 **extra,
             )
@@ -171,7 +197,7 @@ class QdrantVectorIndex:
                 for index in mmr_vector_similarity_search(
                     query_vector=query_vector,
                     values_vectors=[element.vector for element in matching],
-                    limit=limit,
+                    limit=limit or 8,
                 )
             )
 

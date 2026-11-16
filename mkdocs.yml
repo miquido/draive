@@ -114,6 +114,7 @@ nav:
       - Advanced State: guides/AdvancedState.md
       - Multimodal Content: guides/MultimodalContent.md
       - Templates: guides/Templates.md
+      - Resources: guides/Resources.md
       - Postgres: guides/Postgres.md
       - Qdrant: guides/Qdrant.md
       - Basics: guides/Basics.md

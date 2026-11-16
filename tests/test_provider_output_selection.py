@@ -3,7 +3,7 @@
 from typing import Any
 
 import pytest
-from haiway import MISSING, State
+from haiway import Missing, State
 from openai import Omit
 
 from draive.anthropic.messages import _output_config as _anthropic_output_config
@@ -39,7 +39,7 @@ MEDIA_ONLY: tuple[ModelOutputSelection, ...] = (
 
 
 def _anthropic(output: ModelOutputSelection) -> Any:
-    return _anthropic_output_config(output, effort=MISSING)
+    return _anthropic_output_config(output, effort=Missing)
 
 
 # every provider entry point resolving a requested output selection

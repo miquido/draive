@@ -3,7 +3,7 @@ import sys
 import types
 
 import pytest
-from haiway import MISSING
+from haiway import Missing
 
 
 def _load_cloudwatch_module(monkeypatch: pytest.MonkeyPatch):
@@ -41,7 +41,7 @@ def test_sanitize_attributes_filters_missing_and_sequences(
     attributes = {
         "name": "draive",
         "empty": None,
-        "missing": MISSING,
+        "missing": Missing,
         "numbers": [1, 2],
         "mixed": ["a", None, "b"],
         "blank": [],

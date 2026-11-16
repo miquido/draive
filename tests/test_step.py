@@ -602,20 +602,18 @@ async def test_tool_output_context_groups_interleaved_requests(
     monkeypatch: pytest.MonkeyPatch,
     looping: bool,
 ) -> None:
-    from collections.abc import AsyncGenerator, Collection
-
-    from draive.tools import Toolbox
+    from collections.abc import AsyncGenerator
 
     requests = (
         ModelToolRequest.of("r1", tool="shared", arguments={}),
         ModelToolRequest.of("r2", tool="shared", arguments={}),
     )
 
-    async def handle(
-        self: Toolbox,
-        pending: Collection[ModelToolRequest],
+    async def merging(
+        stream: AsyncGenerator[Any],
+        /,
     ) -> AsyncGenerator[TextContent | ModelToolResponse]:
-        assert tuple(pending) == requests
+        await stream.aclose()  # the real execution is replaced by the interleaved output
         yield TextContent.of("a1", meta={"request": "r2", "tool": "shared"})
         yield TextContent.of("b1", meta={"request": "r1", "tool": "shared"})
         yield TextContent.of("a2", meta={"request": "r2", "tool": "shared"})
@@ -628,7 +626,7 @@ async def test_tool_output_context_groups_interleaved_requests(
                 content=MultimodalContent.empty,
             )
 
-    monkeypatch.setattr(Toolbox, "handle", handle)
+    monkeypatch.setattr("draive.tools.toolbox._merging_output", merging)
 
     def generating(
         *,

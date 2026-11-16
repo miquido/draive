@@ -151,3 +151,19 @@ async def test_gemini_live_go_away_does_not_fail_session() -> None:
 
     assert isinstance(chunk, TextContent)
     assert chunk.text == "continuing"
+
+
+@pytest.mark.asyncio
+async def test_gemini_live_reports_malformed_context_as_input_error_before_connecting() -> None:
+    from draive.models import ModelInputInvalid
+
+    session = _FakeSession()
+    # an element which is not a model context element, the request conversion rejects it
+    scope: ModelSessionScope = _prepare(session, context=("not a context element",))
+
+    async with ctx.scope("test"):
+        with pytest.raises(ModelInputInvalid):
+            async with scope:
+                pass
+
+    assert session.client_content_calls == []

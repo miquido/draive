@@ -1,11 +1,11 @@
 import re
 from collections.abc import Callable, Collection, Sequence
-from typing import Annotated, Literal, Protocol, Self, cast, overload, runtime_checkable
+from inspect import signature
+from typing import Annotated, Literal, Protocol, Self, cast, final, overload, runtime_checkable
 
 from haiway import (
     AttributePath,
     Description,
-    Immutable,
     Meta,
     MetaValues,
     State,
@@ -13,6 +13,7 @@ from haiway import (
     concurrently,
     ctx,
 )
+from haiway.types.frozen import refuse_assignment, refuse_deletion, same_copy, same_deepcopy
 
 from draive.evaluation.reference import EvaluationReference, reference_conformance
 from draive.evaluation.score import EvaluationScore
@@ -210,11 +211,13 @@ class EvaluatorResult(State, serializable=True):
 
     def __eq__(
         self,
-        other: Self,
+        other: object,
     ) -> bool:
-        assert isinstance(other, self.__class__)  # nosec: B101
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+
         if self.evaluator != other.evaluator or self.threshold != other.threshold:
-            raise ValueError("Can't compare different evaluator results")
+            return False
 
         return self.score == other.score
 
@@ -260,7 +263,8 @@ class PreparedEvaluator[Value](Protocol):
     ) -> EvaluatorResult: ...
 
 
-class Evaluator[Value, **Args](Immutable):
+@final
+class Evaluator[Value, **Args]:
     """
     Configurable evaluator for assessing values against criteria.
 
@@ -311,19 +315,15 @@ class Evaluator[Value, **Args](Immutable):
         async def evaluate(
             value: Value,
         ) -> EvaluatorResult:
-            # Placeholder for the lowest result
-            lowest: EvaluatorResult = EvaluatorResult(
-                evaluator="lowest",
-                score=1.0,
-                threshold=0,
-                meta=Meta.empty,
-            )
-
-            for result in await concurrently(
+            results: Sequence[EvaluatorResult] = await concurrently(
                 (evaluator(value), *(evaluator(value) for evaluator in evaluators)),
                 concurrent_tasks=concurrent_tasks,
                 return_exceptions=False,
-            ):
+            )
+
+            # keep the last of equally low results to preserve previous tie-breaking
+            lowest: EvaluatorResult = results[0]
+            for result in results[1:]:
                 if result.performance <= lowest.performance:
                     lowest = result
 
@@ -431,6 +431,19 @@ class Evaluator[Value, **Args](Immutable):
             )
 
         return evaluate
+
+    __slots__ = (
+        "_definition",
+        "_state",
+        "meta",
+        "name",
+        "threshold",
+    )
+
+    __setattr__ = refuse_assignment
+    __delattr__ = refuse_deletion
+    __copy__ = same_copy
+    __deepcopy__ = same_deepcopy
 
     name: str
     threshold: float
@@ -786,6 +799,8 @@ class Evaluator[Value, **Args](Immutable):
                     "passed": result.passed,
                     "threshold": result.threshold,
                     "score": result.score,
+                    # an errored evaluation scores zero, make it distinguishable
+                    "errored": result.meta.error is not None,
                 },
             )
             return result
@@ -797,6 +812,14 @@ class Evaluator[Value, **Args](Immutable):
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> EvaluatorResult:
+        # programming errors, missing or unexpected arguments, have to surface instead
+        # of being turned into a failed evaluation
+        try:
+            signature(self._definition).bind(value, *args, **kwargs)
+
+        except ValueError:
+            pass  # signature not available, rely on the call
+
         result: EvaluationScore | EvaluationScoreValue
         try:
             result = await self._definition(

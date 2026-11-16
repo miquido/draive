@@ -1,6 +1,7 @@
 # Skills
 
-Draive supports [Agent Skills](https://agentskills.io/specification) as a file-based way to package reusable instructions and bundled resources for agents.
+Draive supports [Agent Skills](https://agentskills.io/specification) as a file-based way to package
+reusable instructions and bundled resources for agents.
 
 In Draive, skill support is centered around:
 
@@ -20,7 +21,9 @@ my-skill/
 └── assets/
 ```
 
-`Skill.from_directory(...)` scans all regular files under the root directory (including `SKILL.md`) and registers them as `SkillResource` entries keyed by relative POSIX paths. Symbolic links are skipped, so a link pointing outside the skill root can't be loaded as a resource.
+`Skill.from_directory(...)` scans all regular files under the root directory (including `SKILL.md`)
+and registers them as `SkillResource` entries keyed by relative POSIX paths. Symbolic links are
+skipped, so a link pointing outside the skill root can't be loaded as a resource.
 
 ## SKILL.md Frontmatter
 
@@ -45,19 +48,18 @@ Current Draive parsing behavior:
 - `name` is required and must match `^[a-z0-9]+(?:-[a-z0-9]+)*$` with length `1..64`.
 - `description` is required.
 - `description` must contain `1..1024` characters.
-- `metadata` is optional, must map string keys to string values, and is merged into
-    `skill.meta`.
-- `license`, `compatibility`, and `allowed-tools` are accepted and exposed through
-    `skill.meta` under their original field names. `compatibility`, when provided, must
-    contain `1..500` characters.
+- `metadata` is optional, must map string keys to string values, and is merged into `skill.meta`.
+- `license`, `compatibility`, and `allowed-tools` are accepted and exposed through `skill.meta`
+    under their original field names. `compatibility`, when provided, must contain `1..500`
+    characters.
 - Unknown top-level frontmatter fields raise an error.
 
 ## Spec Compatibility Notes
 
-Draive validates the standard `name`, `description`, `compatibility`, and `metadata`
-constraints. The frontmatter `name` has to match the parent directory name. Optional
-`license`, `compatibility`, and experimental `allowed-tools` fields are retained as metadata;
-Draive does not otherwise interpret them.
+Draive validates the standard `name`, `description`, `compatibility`, and `metadata` constraints.
+The frontmatter `name` has to match the parent directory name. Optional `license`, `compatibility`,
+and experimental `allowed-tools` fields are retained as metadata; Draive does not otherwise
+interpret them.
 
 ## Loading Skills
 
@@ -101,7 +103,9 @@ except SkillResourceMissing:
     text = "Missing reference"
 ```
 
-Resource lookup uses normalized relative POSIX paths and rejects invalid paths (absolute paths, `~`, or `..` traversal). Use `skill.has_resource(path)` to check availability without handling the exception.
+Resource lookup uses normalized relative POSIX paths and rejects invalid paths (absolute paths, `~`,
+or `..` traversal). Use `skill.has_resource(path)` to check availability without handling the
+exception.
 
 ## Creating Agents From Skills
 
@@ -127,9 +131,9 @@ async with ctx.scope(
 
 `Agent.from_skill(...)` uses the skill instructions as agent instructions, derives the agent
 identity from the skill `name`, `description` and `meta`, and automatically adds a
-`read_resource(path)` tool that lets the model read bundled files by relative path during
-execution. UTF-8 text resources are returned as text; binary resources are returned as typed
-`ResourceContent` so their original bytes and media type are preserved.
+`read_resource(path)` tool that lets the model read bundled files by relative path during execution.
+UTF-8 text resources are returned as text; binary resources are returned as typed `ResourceContent`
+so their original bytes and media type are preserved.
 
 It also accepts the remaining `Agent.generative(...)` configuration:
 

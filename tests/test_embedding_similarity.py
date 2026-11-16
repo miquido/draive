@@ -130,3 +130,17 @@ def test_mmr_promotes_diversity_with_low_lambda() -> None:
 def test_search_and_mmr_handle_empty_values() -> None:
     assert vector_similarity_search([1.0, 0.0], []) == []
     assert mmr_vector_similarity_search([1.0, 0.0], []) == []
+
+
+@pytest.mark.parametrize("limit", (0, -1))
+def test_mmr_returns_nothing_for_non_positive_limit(limit: int) -> None:
+    from draive.embedding import mmr_vector_similarity_search
+
+    assert (
+        mmr_vector_similarity_search(
+            query_vector=[1.0, 0.0],
+            values_vectors=[[1.0, 0.0], [0.0, 1.0]],
+            limit=limit,
+        )
+        == []
+    )

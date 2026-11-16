@@ -1,7 +1,7 @@
 # First Steps
 
-This guide walks through the core building blocks you will use in most Draive applications:
-context scoping, typed state, generation, tools, retrieval, and guardrails.
+This guide walks through the core building blocks you will use in most Draive applications: context
+scoping, typed state, generation, tools, retrieval, and guardrails.
 
 ## 1. Open A Context Scope
 

@@ -9,16 +9,24 @@ on:
     branches:
       - "*"
 
+# both jobs only build and test - the token reads the repository and nothing else
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ${{ matrix.os }}
     strategy:
+      # each configuration reports on its own - one failing says nothing of the rest
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python-version: ["3.14", "3.15"]
+        python-version: ["3.15"]
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Install uv and set the python version
         uses: astral-sh/setup-uv@v10.3.3
@@ -30,11 +38,15 @@ jobs:
         run: uv sync --all-groups --all-extras --frozen
 
       - name: Lint
-        run: uv run ruff check --output-format=github ./src ./tests && uv run pyright
-          --project ./
+        run: uv run bandit -q -r ./src && uv run ruff check --output-format=github ./src ./tests
+          && uv run pyright --project ./
 
       - name: Docs Lint
-        run: uv run pymarkdown --config .pymarkdown.json scan README.md docs
+        run: |
+          # Markdown style lint
+          uv run pymarkdown --config .pymarkdown.json scan README.md docs
+          # Formatting check (fails if reformatting would be needed)
+          uv run mdformat --wrap 100 --check README.md docs
 
       - name: Test
         run: uv run pytest --rootdir= ./tests --doctest-modules

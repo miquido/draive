@@ -81,7 +81,7 @@ async def test_authority_template_rejects_other_uris(uri: str) -> None:
 async def test_authority_variable_rejects_encoded_separators() -> None:
     # the authority variable spans a single label group, decoding must not escape it
     uri: str = "https://acme%2Fsecret.example.com/lib"
-    assert tenant_slash_resource.matches_uri(uri)
+    assert not tenant_slash_resource.matches_uri(uri)
     with pytest.raises(ResourceCorrupted):
         await tenant_slash_resource.resolve_from_uri(uri)
 
@@ -111,9 +111,9 @@ async def test_authority_variable_rejects_raw_user_info_with_password() -> None:
 
 @pytest.mark.asyncio
 async def test_authority_variable_rejects_encoded_user_info() -> None:
-    # the raw capture already excludes `@`, decoding `%40` must not reintroduce it
+    # decoding `%40` must not reintroduce the user-info delimiter into a host label
     uri: str = "https://evil.com%40acme.example.com/lib"
-    assert tenant_slash_resource.matches_uri(uri)
+    assert not tenant_slash_resource.matches_uri(uri)
     with pytest.raises(ResourceCorrupted):
         await tenant_slash_resource.resolve_from_uri(uri)
 
@@ -127,8 +127,8 @@ async def test_authority_variable_rejects_encoded_user_info() -> None:
     ],
 )
 async def test_authority_variable_rejects_encoded_delimiters(uri: str) -> None:
-    # the raw capture already excludes `#` and `?`, decoding must not reintroduce them
-    assert tenant_path_resource.matches_uri(uri)
+    # decoding must not reintroduce `#` and `?` into a host label
+    assert not tenant_path_resource.matches_uri(uri)
     with pytest.raises(ResourceCorrupted):
         await tenant_path_resource.resolve_from_uri(uri)
 

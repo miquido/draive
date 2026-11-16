@@ -1,3 +1,4 @@
+import sys
 from collections import deque
 from collections.abc import AsyncIterator, MutableSequence
 from contextlib import AbstractAsyncContextManager
@@ -21,7 +22,7 @@ from google.genai.types import (
     Transcription,
     TurnCompleteReason,
 )
-from haiway import MISSING, ctx
+from haiway import Missing, ctx
 
 from draive.gemini.api import GeminiAPI
 from draive.gemini.config import GeminiConfig
@@ -37,11 +38,11 @@ from draive.gemini.utils import (
     quota_limit,
     speech_config,
     thinking_config,
-    unwrap_missing,
 )
 from draive.models import (
     ModelContext,
     ModelInput,
+    ModelInputInvalid,
     ModelInstructions,
     ModelOutput,
     ModelOutputBlock,
@@ -119,30 +120,61 @@ class GeminiLive(GeminiAPI):
             # enter scope
             scope = ctx.scope("model.session")
             await scope.__aenter__()
-            record_model_invocation(
-                provider="gemini",
-                model=config.model,
-                temperature=config.temperature,
-                max_output_tokens=config.max_output_tokens,
-                tools=tools,
-                output=output,
-                # stop sequences are not supported within live sessions
-                top_p=config.top_p,
-                top_k=config.top_k,
-                seed=config.seed,
-                thinking_budget=config.thinking_budget,
-                thinking_level=config.thinking_level,
-            )
+            request_turns: list[Content | ContentDict] | None = None
+            try:
+                if context:
+                    # validate the context before connecting, a malformed context
+                    # is an input error instead of a failure of the open session
+                    try:
+                        request_turns = list(_request_content(context))
 
-            session: AsyncSession = await connection_manager.__aenter__()
+                    except Exception as exc:
+                        raise ModelInputInvalid(
+                            provider="gemini",
+                            model=config.model,
+                            reason=str(exc),
+                        ) from exc
 
-            # seed the session with prior context as an incomplete turn - the api rejects
-            # a completed client content turn, realtime input starts the turn instead
-            if context:
-                await session.send_client_content(
-                    turns=_request_content(context),
-                    turn_complete=False,
+                record_model_invocation(
+                    provider="gemini",
+                    model=config.model,
+                    temperature=config.temperature,
+                    max_output_tokens=config.max_output_tokens,
+                    tools=tools,
+                    output=output,
+                    # stop sequences are not supported within live sessions
+                    top_p=config.top_p,
+                    top_k=config.top_k,
+                    seed=config.seed,
+                    thinking_budget=config.thinking_budget,
+                    thinking_level=config.thinking_level,
                 )
+
+                session: AsyncSession = await connection_manager.__aenter__()
+
+            except BaseException:
+                # close is never called when opening fails, release the scope here
+                await scope.__aexit__(*sys.exc_info())
+                raise
+
+            try:
+                # seed the session with prior context as an incomplete turn - the api rejects
+                # a completed client content turn, realtime input starts the turn instead
+                if request_turns is not None:
+                    await session.send_client_content(
+                        turns=request_turns,
+                        turn_complete=False,
+                    )
+
+            except BaseException:
+                # close is never called when opening fails, release everything here
+                try:
+                    await connection_manager.__aexit__(*sys.exc_info())
+
+                finally:
+                    await scope.__aexit__(*sys.exc_info())
+
+                raise
 
             read_stream: AsyncIterator[LiveServerMessage] = session.receive()
             read_buffer: deque[ModelSessionOutputChunk] = deque()
@@ -453,7 +485,7 @@ class GeminiLive(GeminiAPI):
 
 
 def _resolve_media_resolution(config: GeminiConfig) -> MediaResolution | None:
-    if config.media_resolution is MISSING:
+    if config.media_resolution is Missing:
         return None
     elif config.media_resolution == "low":
         return MediaResolution.MEDIA_RESOLUTION_LOW
@@ -473,14 +505,16 @@ def _live_connect_config(
     config: GeminiConfig,
 ) -> LiveConnectConfigDict:
     live_config: LiveConnectConfigDict = {
-        "temperature": unwrap_missing(config.temperature),
-        "top_p": unwrap_missing(config.top_p),
-        "top_k": unwrap_missing(config.top_k),
-        "max_output_tokens": unwrap_missing(config.max_output_tokens),
+        "temperature": None if config.temperature is Missing else config.temperature,
+        "top_p": None if config.top_p is Missing else config.top_p,
+        "top_k": None if config.top_k is Missing else config.top_k,
+        "max_output_tokens": None
+        if config.max_output_tokens is Missing
+        else config.max_output_tokens,
         "history_config": {
             "initial_history_in_client_content": True,
         },
-        "seed": unwrap_missing(config.seed),
+        "seed": None if config.seed is Missing else config.seed,
     }
 
     if config.context_window_compression is True:

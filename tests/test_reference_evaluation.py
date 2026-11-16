@@ -43,15 +43,16 @@ def test_reference_of_rejects_negative_tolerance() -> None:
         EvaluationReference.of("good", tolerance=-0.1)
 
 
-def test_reference_between_accepts_descending_named_levels() -> None:
-    reference = EvaluationReference.between("perfect", "good")
-    assert reference.lower == pytest.approx(1.0)
-    assert reference.upper == pytest.approx(0.6)
+def test_reference_between_accepts_ascending_named_levels() -> None:
+    reference = EvaluationReference.between("good", "perfect")
+    assert reference.lower == pytest.approx(0.6)
+    assert reference.upper == pytest.approx(1.0)
+    assert reference.contains(0.7)
 
 
-def test_reference_between_rejects_ascending_bounds() -> None:
-    with pytest.raises(AssertionError):
-        EvaluationReference.between("good", "perfect")
+def test_reference_between_rejects_descending_bounds() -> None:
+    with pytest.raises(ValueError):
+        EvaluationReference.between("perfect", "good")
 
 
 def test_reference_contains_is_inclusive() -> None:
@@ -229,3 +230,9 @@ async def test_referenced_treats_raw_value_as_exact_point() -> None:
 
     assert match.score == 1.0
     assert miss.score == 0.0
+
+
+def test_empty_suite_result_does_not_pass() -> None:
+    from draive.evaluation.suite import EvaluatorSuiteResult
+
+    assert not EvaluatorSuiteResult(suite="empty", results=()).passed

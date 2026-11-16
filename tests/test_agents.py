@@ -1,4 +1,4 @@
-from collections.abc import AsyncGenerator, AsyncIterable, Collection, Sequence
+from collections.abc import AsyncGenerator, AsyncIterable, Sequence
 from typing import Any
 from uuid import uuid4
 
@@ -68,11 +68,11 @@ async def test_generative_agent_groups_interleaved_tool_output(
         ModelToolRequest.of("r2", tool="shared", arguments={}),
     )
 
-    async def handle(
-        self: Toolbox,
-        pending: Collection[ModelToolRequest],
+    async def merging(
+        stream: AsyncGenerator[Any],
+        /,
     ) -> AsyncGenerator[TextContent | ModelToolResponse]:
-        assert tuple(pending) == requests
+        await stream.aclose()  # the real execution is replaced by the interleaved output
         yield TextContent.of("a1", meta={"request": "r2"})
         yield TextContent.of("b1", meta={"request": "r1"})
         yield TextContent.of("a2", meta={"request": "r2"})
@@ -85,7 +85,7 @@ async def test_generative_agent_groups_interleaved_tool_output(
                 content=MultimodalContent.empty,
             )
 
-    monkeypatch.setattr(Toolbox, "handle", handle)
+    monkeypatch.setattr("draive.tools.toolbox._merging_output", merging)
 
     async def generating(
         *,
@@ -315,12 +315,12 @@ def test_agents_group_rejects_duplicate_agent_names() -> None:
         agent="worker",
     )
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError, match="unique names"):
         _ = AgentsGroup.of(agent_a, agent_b)
 
 
 def test_agents_group_rejects_duplicate_placeholder_names() -> None:
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError, match="unique names"):
         _ = AgentsGroup.of(
             AgentIdentity.of(uri="agent://worker-a", name="worker"),
             AgentIdentity.of(uri="agent://worker-b", name="worker"),
@@ -591,3 +591,31 @@ def test_agents_group_bind_rejects_conflicting_name(name: str) -> None:
 
     with pytest.raises(AgentException, match="is already defined"):
         group.bind(Agent.noop(AgentIdentity.of(uri=identity.uri, name=name)))
+
+
+@pytest.mark.asyncio
+async def test_generative_agent_stops_endless_tool_loop() -> None:
+    async def generating(
+        *,
+        instructions: str,
+        tools: ModelTools,
+        context: Sequence[ModelContextElement],
+        output: Any,
+        **extra: Any,
+    ) -> AsyncIterable[ModelOutputChunk]:
+        yield ModelToolRequest.of("call", tool="missing", arguments={})
+
+    agent = Agent.generative("helper", instructions="Use tools", max_iterations=3)
+    async with ctx.scope("test", GenerativeModel(generating=generating)):
+        with pytest.raises(AgentException, match="exceeded the limit of 3"):
+            _ = [chunk async for chunk in agent.call(thread=uuid4(), input="hello")]
+
+
+@pytest.mark.parametrize("max_iterations", [0, -1])
+def test_generative_agent_rejects_non_positive_iteration_limit(max_iterations: int) -> None:
+    with pytest.raises(ValueError, match="max_iterations"):
+        Agent.generative("helper", instructions="Use tools", max_iterations=max_iterations)
+
+
+def test_generative_agent_accepts_unlimited_iterations() -> None:
+    Agent.generative("helper", instructions="Use tools", max_iterations=None)

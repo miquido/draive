@@ -12,7 +12,7 @@ from draive.conversation.types import (
     ConversationOutputChunk,
     ConversationOutputStream,
 )
-from draive.models import ModelInstructions, ModelReasoningChunk
+from draive.models import ModelInstructions, ModelReasoningChunk, ModelSessionOutputSelection
 from draive.multimodal import MultimodalContentPart
 from draive.tools import Toolbox
 
@@ -196,5 +196,6 @@ class RealtimeConversationPreparing(Protocol):
         instructions: ModelInstructions,
         toolbox: Toolbox,
         memory: ConversationMemory,
+        output: ModelSessionOutputSelection,
         **extra: Any,
     ) -> AbstractAsyncContextManager[RealtimeConversationSession]: ...

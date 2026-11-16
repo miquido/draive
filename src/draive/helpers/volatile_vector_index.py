@@ -30,9 +30,8 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
         values: Collection[Model],
         **extra: Any,
     ) -> None:
-        assert isinstance(  # nosec: B101
-            attribute, AttributePath | Callable
-        ), f"Prepare parameter path by using {model.__name__}._.path.to.property"
+        if not isinstance(attribute, AttributePath | Callable):
+            raise ValueError(f"Prepare parameter path by using {model.__name__}._.path.to.property")
         value_selector: Callable[[Model], Value] = cast(Callable[[Model], Value], attribute)
 
         text_values: list[str] = []
@@ -98,7 +97,9 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
         rerank: bool = False,
         **extra: Any,
     ) -> Sequence[Model]:
-        assert query is not None or (query is None and score_threshold is None)  # nosec: B101
+        if query is None and score_threshold is not None:
+            raise ValueError("score_threshold requires a query")
+
         stored: Sequence[Embedded[Model]] | None
         async with lock:
             stored = storage.get(model)
@@ -125,10 +126,11 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
 
         query_vector: Sequence[float]
         if query is None:
-            if limit:
-                return [embedded.value for embedded in filtered[:limit]]
+            if limit is None:
+                return [embedded.value for embedded in filtered]
 
-            return [embedded.value for embedded in filtered]
+            # no limit means everything, zero or less means nothing - the same as for queries
+            return [embedded.value for embedded in filtered[: max(limit, 0)]]
 
         if isinstance(query, str):
             embedded_text: Embedded[str] = await TextEmbedding.embed(
