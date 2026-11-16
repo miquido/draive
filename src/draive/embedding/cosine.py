@@ -35,6 +35,11 @@ def cosine_similarity(
         If vectors in inputs do not all share the same dimensionality, or
         input elements have incompatible shapes and cannot be converted into
         a 2D array of vectors.
+
+    Notes
+    -----
+    Zero vectors and vectors with infinite components have no direction and
+    score ``0.0`` against everything. Vectors containing NaN yield NaN.
     """
 
     def _to_2d(arr: NDArray[Any] | Sequence[Any]) -> NDArray[Any]:
@@ -68,6 +73,11 @@ def cosine_similarity(
 
     if x.shape[1] != y.shape[1]:
         raise ValueError("Vector dimensionality must match for both arguments.")
+
+    # Rows with infinite components have no meaningful direction, treat them like zero
+    # vectors instead of letting inf / inf produce NaN. NaN components are left untouched.
+    x = np.where(np.isinf(x).any(axis=1)[:, None], 0.0, x)
+    y = np.where(np.isinf(y).any(axis=1)[:, None], 0.0, y)
 
     # Normalize rows safely to avoid NaNs/Infs for zero vectors
     x_norms: NDArray[Any] = np.linalg.norm(x, axis=1)

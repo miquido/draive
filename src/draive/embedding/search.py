@@ -44,7 +44,7 @@ def vector_similarity_search(
         Indices of `values_vectors` ordered by descending similarity to the
         query, possibly filtered by `score_threshold` and truncated by `limit`.
     """
-    if len(values_vectors) == 0:
+    if len(values_vectors) == 0 or (limit is not None and limit <= 0):
         return []
 
     # Coerce to numeric arrays and ensure 2D shape (n x d)
@@ -55,7 +55,8 @@ def vector_similarity_search(
         # handle single 1D vector provided as values
         values = np.atleast_2d(values)
     matching_scores: NDArray[Any] = np.array(similarity(values, query)).reshape(-1)
-    matching_scores = matching_scores.astype(float, copy=False)
+    # NaN scores are ranked below any real score instead of being placed first
+    matching_scores = np.nan_to_num(matching_scores.astype(float, copy=False), nan=-np.inf)
 
     n_scores = int(matching_scores.shape[0])
     if limit is not None and 0 < int(limit) < n_scores:

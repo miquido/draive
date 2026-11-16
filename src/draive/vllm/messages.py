@@ -118,7 +118,7 @@ class VLLMMessages(VLLMAPI):
                 raise ModelInputInvalid(
                     provider=self._provider,
                     model=config.model,
-                    reason=str(exc),
+                    reason=str(exc) or type(exc).__name__,
                 ) from exc
 
             # Start streaming request
@@ -176,7 +176,7 @@ class VLLMMessages(VLLMAPI):
                 raise ModelOutputFailed(
                     provider=self._provider,
                     model=config.model,
-                    reason=str(exc),
+                    reason=str(exc) or type(exc).__name__,
                 ) from exc
 
             # Accumulate tool call deltas by index and emit complete calls after stream ends.
@@ -250,7 +250,7 @@ class VLLMMessages(VLLMAPI):
                             "arguments": str() as args,
                         }:
                             try:
-                                arguments: Mapping[str, Any] = json.loads(args) if args else {}
+                                arguments: Any = json.loads(args) if args else {}
 
                             except Exception as exc:
                                 raise ModelOutputInvalid(
@@ -262,10 +262,23 @@ class VLLMMessages(VLLMAPI):
                                     ),
                                 ) from exc
 
+                            if arguments is None:
+                                arguments = {}  # an explicit null carries no arguments
+
+                            if not isinstance(arguments, Mapping):
+                                raise ModelOutputInvalid(
+                                    provider=self._provider,
+                                    model=config.model,
+                                    reason=(
+                                        "Tool arguments are not an object -"
+                                        f" {type(arguments).__name__}"
+                                    ),
+                                )
+
                             yield ModelToolRequest.of(
                                 identifier,
                                 tool=name,
-                                arguments=arguments,
+                                arguments=cast(Mapping[str, Any], arguments),
                             )
 
                         case _:
@@ -308,7 +321,7 @@ class VLLMMessages(VLLMAPI):
                 raise ModelOutputFailed(
                     provider=self._provider,
                     model=config.model,
-                    reason=str(exc),
+                    reason=str(exc) or type(exc).__name__,
                 ) from exc
 
             finally:
@@ -339,24 +352,33 @@ def _context_messages(
 
     for element in context:
         if isinstance(element, ModelInput):
-            if user_content := element.content:
-                yield ChatCompletionUserMessageParam(
-                    role="user",
-                    content=_content_parts(
-                        user_content.parts,
-                        vision_details=vision_details,
-                    ),
-                )
-
-            # provide tool responses as separate tool messages expected by the api
+            # tool messages have to directly follow the assistant message
+            # carrying the tool calls, any user content comes after them
             for tool_response in element.tool_responses:
                 yield ChatCompletionToolMessageParam(
                     role="tool",
                     tool_call_id=tool_response.identifier,
-                    content=_content_parts(
-                        tool_response.content.parts,
-                        vision_details=vision_details,
-                        text_only=True,
+                    # materialized - the sdk serializes the request again on each retry
+                    # and a generator would be exhausted by the first attempt
+                    content=list(
+                        _content_parts(
+                            tool_response.content.parts,
+                            vision_details=vision_details,
+                            text_only=True,
+                        )
+                    )
+                    # an empty content array is rejected by some servers
+                    or "",
+                )
+
+            if user_content := element.content:
+                yield ChatCompletionUserMessageParam(
+                    role="user",
+                    content=list(
+                        _content_parts(
+                            user_content.parts,
+                            vision_details=vision_details,
+                        )
                     ),
                 )
 

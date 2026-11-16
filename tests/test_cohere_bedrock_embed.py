@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 
 from draive.cohere.bedrock import CohereBedrock
+from draive.models import ModelInputInvalid, ModelRateLimit
 
 
 class _FakeBody:
@@ -232,3 +233,72 @@ async def test_concurrent_embeds_reuse_a_single_client(monkeypatch: pytest.Monke
     assert len(created) == 1
     assert created[0].closed
     assert len(created[0].requests) == 5
+
+
+class _FailingBedrockRuntime(_FakeBedrockRuntime):
+    def __init__(self, error: Exception) -> None:
+        super().__init__(payload={})
+        self._error = error
+
+    def invoke_model(self, **request: Any) -> dict[str, Any]:
+        raise self._error
+
+
+def _client_error(code: str) -> Exception:
+    from botocore.exceptions import ClientError
+
+    return ClientError(
+        {
+            "Error": {"Code": code, "Message": "failure"},
+            "ResponseMetadata": {"HTTPStatusCode": 400, "HTTPHeaders": {}},
+        },
+        "InvokeModel",
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "code",
+    [
+        "ThrottlingException",
+        "TooManyRequestsException",
+        "ServiceUnavailableException",
+        "ModelNotReadyException",
+    ],
+)
+async def test_throttling_is_reported_as_a_rate_limit(
+    monkeypatch: pytest.MonkeyPatch,
+    code: str,
+) -> None:
+    _install_fake_boto3(monkeypatch, _FailingBedrockRuntime(_client_error(code)))
+
+    async with _cohere_bedrock() as client:
+        with pytest.raises(ModelRateLimit) as caught:
+            await client.embed(model="cohere.embed-v4:0", texts=["a"], input_type="search_query")
+
+    assert caught.value.provider == "cohere"
+    assert caught.value.model == "cohere.embed-v4:0"
+    assert isinstance(caught.value.__cause__, Exception)
+
+
+@pytest.mark.asyncio
+async def test_validation_failure_is_reported_as_an_invalid_input(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_boto3(monkeypatch, _FailingBedrockRuntime(_client_error("ValidationException")))
+
+    async with _cohere_bedrock() as client:
+        with pytest.raises(ModelInputInvalid):
+            await client.embed(model="cohere.embed-v4:0", texts=["a"], input_type="search_query")
+
+
+@pytest.mark.asyncio
+async def test_other_failures_are_passed_through_for_the_caller_to_translate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    error = _client_error("AccessDeniedException")
+    _install_fake_boto3(monkeypatch, _FailingBedrockRuntime(error))
+
+    async with _cohere_bedrock() as client:
+        with pytest.raises(type(error)):
+            await client.embed(model="cohere.embed-v4:0", texts=["a"], input_type="search_query")

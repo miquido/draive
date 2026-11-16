@@ -419,7 +419,8 @@ def _stream_failure(
         if member not in event:
             continue
 
-        if code == "ThrottlingException":
+        # temporary capacity failures are retryable, same as throttling
+        if code in _THROTTLING_ERROR_CODES:
             return model_rate_limit(
                 provider="bedrock",
                 model=model,
@@ -588,21 +589,18 @@ def _context_messages(  # noqa: C901, PLR0912
         return message
 
     for element in context:
+        element_role: Literal["user", "assistant"]
+        element_content: list[ChatMessageContent] = []
         if isinstance(element, ModelInput):
-            if role != "user":
-                if message := flush(role):
-                    messages.append(message)
-
-                role = "user"
-
+            element_role = "user"
             for block in element.input:
                 if isinstance(block, MultimodalContent):
-                    content.extend(_convert_content(block.parts))
+                    element_content.extend(_convert_content(block.parts))
 
                 else:
                     assert isinstance(block, ModelToolResponse)  # nosec: B101
                     # tool response -> toolResult
-                    content.append(
+                    element_content.append(
                         {
                             "toolResult": {
                                 "toolUseId": block.identifier,
@@ -617,15 +615,10 @@ def _context_messages(  # noqa: C901, PLR0912
 
         else:
             assert isinstance(element, ModelOutput)  # nosec: B101
-            if role != "assistant":
-                if message := flush(role):
-                    messages.append(message)
-
-                role = "assistant"
-
+            element_role = "assistant"
             for block in element.output:
                 if isinstance(block, MultimodalContent):
-                    content.extend(_convert_content(block.parts))
+                    element_content.extend(_convert_content(block.parts))
 
                 elif isinstance(block, ModelReasoning):
                     continue  # skip reasoning
@@ -633,7 +626,7 @@ def _context_messages(  # noqa: C901, PLR0912
                 else:
                     assert isinstance(block, ModelToolRequest)  # nosec: B101
                     # tool request -> toolUse
-                    content.append(
+                    element_content.append(
                         {
                             "toolUse": {
                                 "toolUseId": block.identifier,
@@ -643,8 +636,33 @@ def _context_messages(  # noqa: C901, PLR0912
                         }
                     )
 
+        if not element_content:
+            # without deliverable content the turn must not break the role alternation
+            continue
+
+        if role != element_role:
+            if message := flush(role):
+                messages.append(message)
+
+            role = element_role
+
+        content.extend(element_content)
+
     if message := flush(role):
         messages.append(message)
+
+    if (
+        messages
+        and messages[-1]["role"] == "assistant"
+        and context
+        and isinstance(context[-1], ModelInput)
+    ):
+        # dropping the empty closing input would leave the request ending on
+        # an assistant message, which is not an intended prefill
+        raise ValueError(
+            "Bedrock context has to end with a model input,"
+            " the closing model input has no deliverable content"
+        )
 
     return messages
 
@@ -655,6 +673,9 @@ def _convert_content(
     converted: list[ChatMessageContent] = []
     for part in parts:
         if isinstance(part, TextContent):
+            if not part.text.strip():
+                continue  # the api rejects blank text
+
             converted.append({"text": part.text})
 
         elif isinstance(part, ResourceContent):
@@ -692,7 +713,8 @@ def _convert_content(
             if part.hidden:
                 continue
 
-            converted.append({"text": part.to_str()})
+            if (artifact_text := part.to_str()).strip():
+                converted.append({"text": artifact_text})
 
     return converted
 

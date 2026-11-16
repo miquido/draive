@@ -9,9 +9,12 @@ from qdrant_client.models import (
     DatetimeRange,
     FieldCondition,
     Filter,
+    IsEmptyCondition,
+    IsNullCondition,
     MatchAny,
     MatchText,
     MatchValue,
+    PayloadField,
     Range,
 )
 
@@ -161,8 +164,17 @@ def _match_condition(
     path: str,
     value: Any,
     /,
-) -> FieldCondition:
+) -> Condition:
     match value:
+        case None:
+            # an optional value is either stored as null or not stored at all
+            return Filter(
+                should=[
+                    IsNullCondition(is_null=PayloadField(key=path)),
+                    IsEmptyCondition(is_empty=PayloadField(key=path)),
+                ]
+            )
+
         case bool() | str():
             return FieldCondition(
                 key=path,
@@ -210,9 +222,11 @@ def _any_filter(
     values: Iterable[Any],
     /,
 ) -> Filter:
-    conditions: Sequence[FieldCondition] = tuple(_match_condition(path, value) for value in values)
+    conditions: Sequence[Condition] = tuple(_match_condition(path, value) for value in values)
     match_values: Sequence[bool | int | str] = tuple(
-        condition.match.value for condition in conditions if isinstance(condition.match, MatchValue)
+        condition.match.value
+        for condition in conditions
+        if isinstance(condition, FieldCondition) and isinstance(condition.match, MatchValue)
     )
     if len(match_values) == len(conditions):
         # a single MatchAny is served better by a payload index than a disjunction,
@@ -227,4 +241,4 @@ def _any_filter(
         )
 
     # numeric range conditions cannot be expressed by MatchAny
-    return Filter(should=cast(list[Condition], list(conditions)))
+    return Filter(should=list(conditions))

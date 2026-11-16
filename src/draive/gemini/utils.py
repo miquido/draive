@@ -9,6 +9,7 @@ from draive.gemini.config import GeminiConfig
 
 __all__ = (
     "RATE_LIMIT_STATUS_CODE",
+    "UNAVAILABLE_STATUS_CODE",
     "combined_input_tokens",
     "quota_limit",
     "speech_config",
@@ -17,6 +18,7 @@ __all__ = (
 )
 
 RATE_LIMIT_STATUS_CODE = 429
+UNAVAILABLE_STATUS_CODE = 503
 
 
 @overload

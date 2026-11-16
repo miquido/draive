@@ -78,7 +78,8 @@ def test_context_messages_keep_user_content_with_tool_responses() -> None:
         ),
     )
 
-    assert [message["role"] for message in messages] == ["system", "user", "tool"]
+    # tool messages have to directly follow the assistant tool calls
+    assert [message["role"] for message in messages] == ["system", "tool", "user"]
 
 
 def test_context_messages_omit_empty_assistant_content() -> None:

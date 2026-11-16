@@ -94,7 +94,9 @@ class AgentMemory(State):
             intended for local development, tests, and single-process
             deployments.
         """
-        assert threads_limit is None or threads_limit > 0  # nosec: B101
+        if threads_limit is not None and threads_limit <= 0:
+            raise ValueError("threads_limit must be a positive integer")
+
         initial_context: ModelContext = tuple(initial)
         memory: OrderedDict[tuple[str, UUID], ModelContext] = OrderedDict()
 

@@ -157,13 +157,12 @@ def test_overlapping_parts_with_nested_splitting() -> None:
     ) == [
         "1234",
         "56.",
-        "56.788.",
-        "788.90.",
+        "788.",
         "90.ab.",
         "ab.cd.",
         "cd.ef.",
         "ef.g.",
-        "ef.g.h",
+        "g.h",
         "ijklm",
     ]
 

@@ -62,10 +62,12 @@ class ResourceTemplate[**Args](
             if attribute.alias is not None
         }
         for template_parameter in uri_template.variables:
+            # variadic keyword arguments are left for extras, template variables identify
+            # the resource and always have to be declared
             parameter: Attribute | None = self._keyword_arguments.get(
                 template_parameter
             ) or parameters_by_alias.get(template_parameter)
-            if parameter is None and self._variadic_keyword_arguments is None:
+            if parameter is None:
                 raise ValueError(
                     f"URI template parameter {template_parameter} not found in function arguments"
                 )
@@ -182,6 +184,10 @@ class ResourceTemplate[**Args](
         value: str,
     ) -> tuple[Any, bool]:
         if "anyOf" in specification:
+            if any(self._accepts_any_text(option) for option in specification["anyOf"]):
+                # text is already a valid value, converting it would alter what was provided
+                return value, False
+
             for option in specification["anyOf"]:
                 converted, changed = self._coerce_from_specification(option, value)
                 if changed:
@@ -191,6 +197,9 @@ class ResourceTemplate[**Args](
 
         type_name: Any | None = specification.get("type")
         if isinstance(type_name, Sequence) and not isinstance(type_name, str):
+            if self._accepts_any_text(specification):
+                return value, False
+
             # alternatives of plain types are named by a list of types instead
             # of a list of alternatives - each is tried in the declared order
             for alternative in cast(Sequence[Any], type_name):
@@ -253,6 +262,19 @@ class ResourceTemplate[**Args](
                 return converted_enum, True
 
         return value, False
+
+    def _accepts_any_text(
+        self,
+        specification: TypeSpecification,
+    ) -> bool:
+        if "enum" in specification or "const" in specification:
+            return False
+
+        type_name: Any | None = specification.get("type")
+        if isinstance(type_name, Sequence) and not isinstance(type_name, str):
+            return "string" in cast(Sequence[Any], type_name)
+
+        return type_name == "string"
 
     def _parse_boolean(self, raw: str) -> bool | None:
         normalised = raw.strip().lower()
@@ -383,7 +405,8 @@ def resource[**Args](
     ----------
     uri_template : URITemplate | str
         RFC 6570 template of the resource URI, its variables have to match the function
-        arguments by name or alias. A text is verified when the resource is declared.
+        arguments by name or alias, variadic keyword arguments do not match them. A text is
+        verified when the resource is declared.
     mime_type : str | None
         Mime type of the resource content.
     name : str | None

@@ -153,3 +153,75 @@ async def test_invalid_context_reports_the_rejection_reason() -> None:
     assert error.value.reason is not None
     assert "prefill" in error.value.reason
     assert "prefill" in str(error.value)
+
+
+def test_context_messages_skip_blank_text_blocks() -> None:
+    from draive.multimodal import TextContent
+    from draive.resources import ResourceContent
+
+    messages = list(
+        _context_messages(
+            (
+                ModelInput.of(
+                    MultimodalContent.of(
+                        TextContent.of(""),
+                        ResourceContent.of(b"png", mime_type="image/png"),
+                        TextContent.of(" \n"),
+                    )
+                ),
+            ),
+        )
+    )
+
+    assert [block["type"] for block in messages[0]["content"]] == ["image"]
+
+
+def test_context_messages_skip_turns_without_deliverable_content() -> None:
+    from draive.multimodal import TextContent
+
+    messages = list(
+        _context_messages(
+            (
+                ModelInput.of(MultimodalContent.of("first")),
+                ModelOutput.of(MultimodalContent.of(TextContent.of(""))),
+                ModelInput.of(MultimodalContent.of("second")),
+            ),
+        )
+    )
+
+    assert [message["role"] for message in messages] == ["user", "user"]
+
+
+def test_context_messages_reject_context_ending_without_deliverable_input() -> None:
+    from draive.multimodal import TextContent
+
+    with pytest.raises(ValueError, match="model input"):
+        list(
+            _context_messages(
+                (
+                    ModelInput.of(MultimodalContent.of("first")),
+                    ModelOutput.of(MultimodalContent.of("answer")),
+                    ModelInput.of(MultimodalContent.of(TextContent.of(""))),
+                ),
+            )
+        )
+
+
+def test_foreign_reasoning_is_dropped() -> None:
+    messages = list(
+        _context_messages(
+            (
+                ModelInput.of(MultimodalContent.of("first")),
+                ModelOutput.of(
+                    ModelReasoning.of(MultimodalContent.of("thought"), meta={"kind": "thought"}),
+                    MultimodalContent.of("answer"),
+                ),
+                ModelInput.of(MultimodalContent.of("second")),
+            ),
+        )
+    )
+
+    assert messages[1] == {
+        "role": "assistant",
+        "content": [{"type": "text", "text": "answer"}],
+    }

@@ -421,6 +421,7 @@ def _context_messages(  # noqa: C901, PLR0912
             " a trailing model output would become an unsupported assistant prefill"
         )
 
+    last_role: Literal["user", "assistant"] | None = None
     for element in context:
         content: list[
             TextBlockParam
@@ -448,16 +449,24 @@ def _context_messages(  # noqa: C901, PLR0912
                             "tool_use_id": block.identifier,
                             "type": "tool_result",
                             "is_error": block.status == "error",
+                            # materialized, a lazy generator would be exhausted by the first
+                            # serialization of the request
                             "content": cast(  # there will be no thinking within tool results
-                                Iterable[TextBlockParam | ImageBlockParam],  # nor documents
-                                _content_elements(
-                                    block.content,
-                                    cache_type=None,
+                                list[TextBlockParam | ImageBlockParam],  # nor documents
+                                list(
+                                    _content_elements(
+                                        block.content,
+                                        cache_type=None,
+                                    )
                                 ),
                             ),
                         }
                     )
 
+            if not content:
+                continue  # the api rejects empty messages
+
+            last_role = "user"
             yield {
                 "role": "user",
                 "content": content,
@@ -497,7 +506,8 @@ def _context_messages(  # noqa: C901, PLR0912
                             )
 
                         case other:
-                            raise ValueError(f"Unsupported reasoning element: {other}")
+                            # reasoning produced by another provider can't be replayed here
+                            ctx.log_debug(f"Skipping unsupported reasoning element: {other}")
 
                 else:
                     assert isinstance(block, ModelToolRequest)  # nosec: B101
@@ -510,17 +520,28 @@ def _context_messages(  # noqa: C901, PLR0912
                         }
                     )
 
+            if not content:
+                continue  # the api rejects empty messages, consecutive ones are merged
+
+            last_role = "assistant"
             yield {
                 "role": "assistant",
                 "content": content,
             }
+
+    if last_role == "assistant":
+        # only reachable when the closing model input had nothing to deliver
+        raise ValueError(
+            "Anthropic context has to end with a model input,"
+            " the closing model input has no deliverable content"
+        )
 
 
 # documents are delivered through a dedicated block, everything else has to be an image
 _DOCUMENT_MIME_TYPES: Final[frozenset[str]] = frozenset(("application/pdf", "text/plain"))
 
 
-def _content_elements(  # noqa: C901
+def _content_elements(  # noqa: C901, PLR0912
     content: MultimodalContent,
     /,
     cache_type: str | None,
@@ -528,6 +549,9 @@ def _content_elements(  # noqa: C901
     last_cacheable: TextBlockParam | ImageBlockParam | DocumentBlockParam | None = None
     for part in content.parts:
         if isinstance(part, TextContent):
+            if not part.text.strip():
+                continue  # the api rejects blank text blocks
+
             text_block: TextBlockParam = {
                 "type": "text",
                 "text": part.text,
@@ -605,9 +629,12 @@ def _content_elements(  # noqa: C901
             if part.hidden:
                 continue
 
+            if not (artifact_text := part.to_str()).strip():
+                continue  # the api rejects blank text blocks
+
             text_block: TextBlockParam = {
                 "type": "text",
-                "text": part.to_str(),
+                "text": artifact_text,
             }
             last_cacheable = text_block
             yield text_block

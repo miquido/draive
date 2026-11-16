@@ -28,12 +28,14 @@ from draive.gemini.api import GeminiAPI
 from draive.gemini.config import GeminiConfig
 from draive.gemini.content import (
     block_parts,
+    coalesce_audio_blocks,
     function_response,
     part_as_output_blocks,
     part_as_stream_elements,
 )
 from draive.gemini.utils import (
     RATE_LIMIT_STATUS_CODE,
+    UNAVAILABLE_STATUS_CODE,
     combined_input_tokens,
     quota_limit,
     speech_config,
@@ -213,6 +215,15 @@ class GeminiLive(GeminiAPI):
                                 quota_limit=quota_limit(exc),
                             ) from exc
 
+                        if exc.code == UNAVAILABLE_STATUS_CODE or "UNAVAILABLE" in exc_details:
+                            # temporary capacity failures are retryable, same as rate limits
+                            raise model_rate_limit(
+                                provider="gemini",
+                                model=config.model,
+                                retry_after=None,
+                                error_code="unavailable",
+                            ) from exc
+
                         raise ModelOutputFailed(
                             provider="gemini",
                             model=config.model,
@@ -320,7 +331,7 @@ class GeminiLive(GeminiAPI):
                                 read_buffer.append(
                                     ModelSessionEvent.turn_completed(
                                         ModelOutput.of(
-                                            *turn_output_blocks,
+                                            *coalesce_audio_blocks(turn_output_blocks),
                                             meta={
                                                 "created": datetime.now(UTC).isoformat(),
                                                 "reason": completion_reason,
@@ -335,6 +346,12 @@ class GeminiLive(GeminiAPI):
 
                                 turn_output_blocks.clear()
                                 turn_output_transcript_parts.clear()
+
+                        if server_content.interrupted:
+                            # drop the partial output of the interrupted turn
+                            # so it never leaks into the next one
+                            turn_output_blocks.clear()
+                            turn_output_transcript_parts.clear()
 
                     if (
                         message.tool_call is not None

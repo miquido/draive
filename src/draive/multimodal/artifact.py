@@ -35,7 +35,7 @@ class ArtifactContent(State, serializable=True):
         artifact: State,
         *,
         category: str | None = None,
-        hidden: bool = False,
+        hidden: bool | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self: ...
 
@@ -46,7 +46,7 @@ class ArtifactContent(State, serializable=True):
         artifact: BasicObject,
         *,
         category: str,
-        hidden: bool = False,
+        hidden: bool | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self: ...
 
@@ -56,7 +56,7 @@ class ArtifactContent(State, serializable=True):
         artifact: State | BasicObject,
         *,
         category: str | None = None,
-        hidden: bool = False,
+        hidden: bool | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """Create artifact content from either a state object or a raw mapping.
@@ -68,8 +68,10 @@ class ArtifactContent(State, serializable=True):
         category : str | None, optional
             Artifact category. Required for raw mappings and optional for states.
             When omitted for states, the state class name is used.
-        hidden : bool, default=False
-            Whether the content should be hidden in string representation.
+        hidden : bool | None, default=None
+            Whether the content should be hidden in string representation. When omitted
+            artifact contents keep their own visibility and other sources are visible,
+            explicit ``False`` makes a hidden artifact content visible again.
         meta : Meta | MetaValues | None, optional
             Metadata attached to the resulting artifact content.
 
@@ -82,7 +84,7 @@ class ArtifactContent(State, serializable=True):
             return cls(
                 category=category if category is not None else artifact.category,
                 artifact=artifact.artifact,
-                hidden=hidden or artifact.hidden,
+                hidden=artifact.hidden if hidden is None else hidden,
                 meta=artifact.meta.merged_with(meta) if meta is not None else artifact.meta,
             )
 
@@ -90,7 +92,7 @@ class ArtifactContent(State, serializable=True):
             return cls(
                 category=category if category is not None else artifact.__class__.__name__,
                 artifact=artifact.to_basic_object(),
-                hidden=hidden,
+                hidden=bool(hidden),
                 meta=Meta.of(meta),
             )
 
@@ -99,7 +101,7 @@ class ArtifactContent(State, serializable=True):
             return cls(
                 category=category,
                 artifact=artifact,
-                hidden=hidden,
+                hidden=bool(hidden),
                 meta=Meta.of(meta),
             )
 
@@ -123,6 +125,7 @@ class ArtifactContent(State, serializable=True):
         return json.dumps(
             self.artifact,
             indent=2,
+            ensure_ascii=False,
         )
 
     def to_state[Content: State](
@@ -394,7 +397,7 @@ class ArtifactContent(State, serializable=True):
         if value is None:
             return default
 
-        if not isinstance(value, int):
+        if isinstance(value, bool) or not isinstance(value, int):
             raise TypeError(f"Unexpected value '{type(value).__name__}' for {key}, expected 'int'")
 
         return value
@@ -436,18 +439,18 @@ class ArtifactContent(State, serializable=True):
         Raises
         ------
         TypeError
-            If the stored value is not a float.
+            If the stored value is not a number, integers are accepted and converted.
         """
         value: BasicValue | None = self.artifact.get(key)
         if value is None:
             return default
 
-        if not isinstance(value, float):
+        if isinstance(value, bool) or not isinstance(value, int | float):
             raise TypeError(
                 f"Unexpected value '{type(value).__name__}' for {key}, expected 'float'"
             )
 
-        return value
+        return float(value)
 
     @overload
     def get_bool(

@@ -100,7 +100,9 @@ class ModelGeneration(State):
             Decoded instance of the requested type.
         """
         async with ctx.scope("model_generation"):
-            assert generated.__SERIALIZABLE__  # nosec: B101
+            if not generated.__SERIALIZABLE__:
+                raise TypeError(f"{generated.__qualname__} must be a serializable State")
+
             ctx.record_info(
                 attributes={
                     "generated.model": generated.__qualname__,

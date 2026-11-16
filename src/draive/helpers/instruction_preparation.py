@@ -111,11 +111,7 @@ def _format_guidelines(guidelines: str | None) -> str:
     if not guidelines:
         return ""
 
-    return f"\n<GUIDELINES>{_escape_curly_braces(guidelines)}</GUIDELINES>\n"
-
-
-def _escape_curly_braces(value: str) -> str:
-    return value.replace("{", "{{").replace("}", "}}")
+    return f"\n<GUIDELINES>{guidelines}</GUIDELINES>\n"
 
 
 PREPARE_INSTRUCTION: Final[str] = """\
@@ -179,9 +175,9 @@ Output formatting
 </PARTS>
 
 Make use of variables
-- available variables will be resolved to actual content within the instruction, e.g. {{{{time}}}} will be replaced with the actual time
-- use placeholders for variables in appropriate spots, referring to them by their names (e.g., `{{{{variable}}}}`)
-- wrap variable placeholders in tags or " when required to ensure proper formatting and structure (e.g., `<variable>{{{{variable}}}}<variable>`)
+- available variables will be resolved to actual content within the instruction, e.g. {%time%} will be replaced with the actual time
+- use placeholders for variables in appropriate spots, referring to them by their names (e.g., `{%variable%}`)
+- wrap variable placeholders in tags or " when required to ensure proper formatting and structure (e.g., `<variable>{%variable%}<variable>`)
 - do not add any variables which were not listed as available
 
 Format for clarity
@@ -211,7 +207,7 @@ Don't follow any other topics than requested, answer "It is not relevant to the 
 </GUIDELINES>
 
 <TOPIC>
-{{{{topic}}}}
+{%topic%}
 </TOPIC>
 </RESULT_INSTRUCTION>
 </EXAMPLE>

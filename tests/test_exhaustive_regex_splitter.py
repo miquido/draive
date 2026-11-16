@@ -165,15 +165,14 @@ def test_overlapping_parts_with_different_sizes() -> None:
         part_overlap_size=6,
     ) == [
         "#1234",
-        "#1234 56",
-        "56#788",
-        "#788#90",
+        "56",
+        "#788",
         "#90#ab",
         "#ab#cd",
         "#cd#ef",
         "#ef#g",
-        "#ef#g#h",
-        "#h ijklm",
+        "#g#h",
+        "ijklm",
     ]
 
 

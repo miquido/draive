@@ -89,6 +89,11 @@ class AWSSQS(State):
         The encoder is invoked for every publish and the decoder for every consumed payload.
         Entering the context establishes queue access and ensures clean teardown when
         the block exits.
+
+        Calling ``reject()`` on a consumed message sets its visibility timeout to zero, so
+        the message becomes visible again immediately and is redelivered, possibly
+        repeatedly. Configure a dead-letter queue with a ``maxReceiveCount`` on the SQS
+        queue, otherwise a message that always fails turns into a poison-message hot loop.
         """
         return await self.queue_accessing(
             queue,

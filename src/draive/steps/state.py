@@ -80,7 +80,15 @@ class StepState(State, serializable=True):
         ------
         ValueError
             If artifacts resolve to the same key within a single call.
+        TypeError
+            If ``context`` is a single ``State`` instead of a model context.
         """
+        if isinstance(context, State):
+            raise TypeError(
+                f"Expected StepState or model context, got {type(context).__name__} - "
+                "artifacts have to be passed after the context"
+            )
+
         return cls(
             context=context,
             artifacts=artifacts_mapping(artifacts, keyed_artifacts),
@@ -143,9 +151,11 @@ class StepState(State, serializable=True):
         key : str | None, optional
             Custom artifact key. Defaults to ``content.__name__``.
         default : Content | None, optional
-            Value returned when the artifact is missing and not required.
+            Value returned when the artifact is missing. Cannot be combined with
+            ``required``.
         required : bool, optional
-            Whether missing artifacts should raise ``KeyError``.
+            Whether missing artifacts should raise ``KeyError``. Cannot be combined
+            with ``default``.
 
         Returns
         -------
@@ -155,9 +165,14 @@ class StepState(State, serializable=True):
 
         Raises
         ------
+        ValueError
+            If both ``required`` and ``default`` are provided.
         KeyError
             If the artifact is missing and ``required`` is ``True``.
         """
+        if required and default is not None:
+            raise ValueError("Artifact lookup cannot combine `required` with `default`")
+
         lookup_key: str = content.__name__ if key is None else key
         current: ArtifactContent | None = self.artifacts.get(lookup_key)
         if current is not None:
@@ -174,6 +189,7 @@ class StepState(State, serializable=True):
 
     def updating_artifacts(
         self,
+        /,
         *artifacts: State,
         **keyed_artifacts: State,
     ) -> Self:

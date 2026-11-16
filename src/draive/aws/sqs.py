@@ -140,9 +140,14 @@ class AWSSQSMixin(AWSAPI):
                     )
 
                 async def reject(
+                    receipt_handle: str = receipt_handle,
                     **extra: Any,
                 ) -> None:
-                    pass  # relying on automatic retries
+                    # makes the message immediately visible to consumers again
+                    await self._reject_message(
+                        queue=queue,
+                        receipt_handle=receipt_handle,
+                    )
 
                 yield MQMessage(
                     content=decoder(message["Body"]),
@@ -202,13 +207,39 @@ class AWSSQSMixin(AWSAPI):
                 operation="delete_message",
             ) from exc
 
+    @asynchronous
+    def _reject_message(
+        self,
+        *,
+        queue: str,
+        receipt_handle: str,
+    ) -> None:
+        queue_url = self._resolve_queue_url(
+            queue=queue,
+            operation="change_message_visibility",
+        )
+
+        try:
+            self._sqs_client.change_message_visibility(
+                QueueUrl=queue_url,
+                ReceiptHandle=receipt_handle,
+                VisibilityTimeout=0,
+            )
+
+        except ClientError as exc:
+            raise _translate_sqs_client_error(
+                error=exc,
+                queue=queue,
+                operation="change_message_visibility",
+            ) from exc
+
     def _resolve_queue_url(
         self,
         *,
         queue: str,
         operation: str,
     ) -> str:
-        if queue.startswith("https://sqs"):
+        if queue.startswith(("https://", "http://")):  # full URLs, including LocalStack
             return queue
 
         # `sqs://name` is our own display form, the name still has to be resolved
@@ -252,6 +283,9 @@ def _format_attribute_value(
         case str() as value:
             return {"DataType": "String", "StringValue": value}
 
+        case bool() as value:
+            return {"DataType": "String", "StringValue": "true" if value else "false"}
+
         case int() | float() as value:
             return {"DataType": "Number", "StringValue": str(value)}
 
@@ -287,6 +321,7 @@ def _translate_sqs_client_error(
         normalized_code
         in {
             "awssimplequeueservice.nonexistentqueue",
+            "aws.simplequeueservice.nonexistentqueue",
             "nonexistentqueue",
             "nosuchqueue",
         }

@@ -1,3 +1,5 @@
+import asyncio
+from collections import deque
 from collections.abc import (
     AsyncGenerator,
     Collection,
@@ -8,7 +10,7 @@ from collections.abc import (
     Sequence,
 )
 from itertools import chain
-from typing import ClassVar, Literal, Self, final, overload
+from typing import Any, ClassVar, Literal, Self, final, overload
 
 from haiway import (
     BasicValue,
@@ -30,7 +32,13 @@ from draive.models import (
     ModelToolsSelection,
 )
 from draive.multimodal import MultimodalContent, MultimodalContentPart
-from draive.tools.types import Tool, ToolException, ToolOutputChunk, ToolsSuggesting
+from draive.tools.types import (
+    Tool,
+    ToolArgumentsException,
+    ToolException,
+    ToolOutputChunk,
+    ToolsSuggesting,
+)
 from draive.utils import ProcessingEvent
 
 __all__ = ("Toolbox",)
@@ -115,8 +123,12 @@ class Toolbox(State):
             a toolbox and metadata was provided, or the same instance otherwise.
         """
         if isinstance(tool_or_tools, Toolbox):
-            assert not tools  # nosec: B101
-            assert suggesting is None  # nosec: B101
+            if tools:
+                raise ValueError("Additional tools cannot be combined with an existing Toolbox")
+
+            if suggesting is not None:
+                raise ValueError("Tools suggesting cannot be combined with an existing Toolbox")
+
             if meta is None:
                 return tool_or_tools
 
@@ -258,10 +270,13 @@ class Toolbox(State):
     ) -> AsyncGenerator[ModelToolResponse | ProcessingEvent | MultimodalContentPart]:
         """Execute model tool requests and stream responses, events, and output.
 
-        Requests are executed concurrently. Events and responses are delivered as they
-        come, while tool output is kept contiguous per request - the first request
-        producing output streams it directly, the output of the others is accumulated
-        and appended in arrival order once the streaming one ends.
+        Requests are executed concurrently. Events are delivered as they come, while
+        tool output is kept contiguous per request - the first request producing output
+        streams it directly, the output of the others is accumulated and appended in
+        arrival order once the streaming one ends. Responses are always delivered in the
+        order of the requests, regardless of which tool finished first: a response which
+        completes early is held back only until the responses of all preceding requests
+        were delivered, execution and event delivery are never delayed by it.
 
         Parameters
         ----------
@@ -275,14 +290,17 @@ class Toolbox(State):
             Tool events and output chunks emitted during execution, followed by tool
             responses describing final status and aggregated results.
         """
-        return _merging_output(
-            stream_concurrently(
-                *(self.response_stream(request) for request in requests),
-                exhaustive=True,
-            )
+        return _ordering_responses(
+            _merging_output(
+                stream_concurrently(
+                    *(self.response_stream(request) for request in requests),
+                    exhaustive=True,
+                )
+            ),
+            order=tuple(request.identifier for request in requests),
         )
 
-    async def response_stream(
+    async def response_stream(  # noqa: C901, PLR0912
         self,
         request: ModelToolRequest,
     ) -> AsyncGenerator[ModelToolResponse | ProcessingEvent | MultimodalContentPart]:
@@ -317,7 +335,11 @@ class Toolbox(State):
                     tool=request.tool,
                     status="error",
                     content=MultimodalContent.of(
-                        "<error>Tool execution failed due to a call error</error>",
+                        # generator tools validate arguments while being called, the same
+                        # description as for coroutine tools lets the model correct the call
+                        f"<error>{_truncated(str(exc))}</error>"
+                        if isinstance(exc, ToolArgumentsException)
+                        else "<error>Tool execution failed due to a call error</error>",
                     ),
                 )
                 return  # finished handling
@@ -357,6 +379,47 @@ class Toolbox(State):
                     tool=request.tool,
                     status="success",
                     content=MultimodalContent.of(*accumulator),
+                )
+
+            except asyncio.CancelledError as exc:
+                current_task: asyncio.Task[Any] | None = asyncio.current_task()
+                if current_task is not None and current_task.cancelling() > 0:
+                    raise  # actual cancellation of the handling, propagate
+
+                # the tool awaited something cancelled, the handling itself is still active
+                ctx.log_error(
+                    f"Tool `{request.tool}` request [{request.identifier}] was cancelled"
+                    " from within",
+                    exception=exc,
+                )
+                _record_tool_invocation(request.tool, status="error")
+                yield ModelToolResponse(
+                    identifier=request.identifier,
+                    tool=request.tool,
+                    status="error",
+                    content=MultimodalContent.of(
+                        *accumulator,
+                        "<error>Tool execution was cancelled</error>",
+                    ),
+                )
+
+            except ToolArgumentsException as exc:
+                # the message describes the invalid argument only - it is safe to show
+                # it to the model so it can correct the call
+                ctx.log_error(
+                    f"Tool `{request.tool}` request [{request.identifier}] received"
+                    f" invalid arguments: {exc}",
+                    exception=exc,
+                )
+                _record_tool_invocation(request.tool, status="error")
+                yield ModelToolResponse(
+                    identifier=request.identifier,
+                    tool=request.tool,
+                    status="error",
+                    content=MultimodalContent.of(
+                        *accumulator,
+                        f"<error>{_truncated(str(exc))}</error>",
+                    ),
                 )
 
             except Exception as exc:
@@ -457,16 +520,16 @@ class Toolbox(State):
     def filtered(
         self,
         *,
-        tools: Collection[str] | None = None,
+        tools: Collection[str] | str | None = None,
         tags: MetaTags | None = None,
     ) -> Self:
         """Return a filtered view of the toolbox.
 
         Parameters
         ----------
-        tools : Collection[str] | None, default=None
-            Allowed tool names. When provided, only tools with matching names are
-            kept.
+        tools : Collection[str] | str | None, default=None
+            Allowed tool names, a single string is treated as one exact name. When
+            provided, only tools with matching names are kept.
         tags : MetaTags | None, default=None
             Required metadata tags. When provided, only tools whose specification
             metadata contains all tags are kept.
@@ -476,10 +539,13 @@ class Toolbox(State):
         Self
             Filtered toolbox instance. When no filters are provided, returns ``self``.
         """
-        assert tools is None or tags is None  # nosec: B101
+        if tools is not None and tags is not None:
+            raise ValueError("Toolbox can be filtered by tools or tags, not both")
+
         if tools is not None:
+            allowed: Collection[str] = (tools,) if isinstance(tools, str) else tools
             return self.__class__(
-                tools={name: tool for name, tool in self.tools.items() if tool.name in tools},
+                tools={name: tool for name, tool in self.tools.items() if tool.name in allowed},
                 suggesting=self.suggesting,
                 meta=self.meta,
             )
@@ -616,6 +682,44 @@ async def _merging_output(  # noqa: C901, PLR0912
     for output in pending.values():
         for part in output:
             yield part
+
+
+def _truncated(message: str, /, *, limit: int = 500) -> str:
+    if len(message) <= limit:
+        return message
+
+    return f"{message[:limit]}..."
+
+
+async def _ordering_responses(
+    stream: AsyncGenerator[ModelToolResponse | ProcessingEvent | MultimodalContentPart],
+    /,
+    *,
+    order: Sequence[str],
+) -> AsyncGenerator[ModelToolResponse | ProcessingEvent | MultimodalContentPart]:
+    # responses are released in the order of requests, early ones wait for the preceding
+    # ones, everything else passes through untouched
+    awaiting: deque[str] = deque(order)
+    held: dict[str, deque[ModelToolResponse]] = {}
+    try:
+        async for chunk in stream:
+            if not isinstance(chunk, ModelToolResponse) or chunk.identifier not in awaiting:
+                yield chunk
+                continue
+
+            held.setdefault(chunk.identifier, deque()).append(chunk)
+            while awaiting and held.get(awaiting[0]):
+                yield held[awaiting[0]].popleft()
+                awaiting.popleft()
+
+    finally:
+        await stream.aclose()  # release the merged stream
+
+    # nothing else is coming - deliver whatever is still held, i.e. when a request
+    # never produced its response
+    for waiting in held.values():
+        for response in waiting:
+            yield response
 
 
 type _ToolInvocationStatus = Literal["success", "error", "call_error", "unknown"]

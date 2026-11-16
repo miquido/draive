@@ -10,6 +10,7 @@ from draive.conversation.types import (
     ConversationMemoryRecalling,
     ConversationMemoryRemembering,
     ConversationTurn,
+    merged_model_context,
 )
 from draive.models import ModelContext
 
@@ -156,7 +157,7 @@ class ConversationMemory(State):
         pagination: Pagination | None = None,
         **extra: Any,
     ) -> ModelContext:
-        return await self._recalling(pagination=pagination, **extra)
+        return merged_model_context(await self._recalling(pagination=pagination, **extra))
 
     async def remember(
         self,

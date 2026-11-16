@@ -6,6 +6,8 @@ from typing import Any, Literal
 from cohere import EmbedByTypeResponse
 from haiway import asynchronous
 
+from draive.models import ModelException, ModelInputInvalid, model_rate_limit
+
 __all__ = ("CohereBedrock",)
 
 
@@ -103,12 +105,19 @@ class CohereBedrock:
         if truncate is not None:
             body["truncate"] = truncate
 
-        return EmbedByTypeResponse.model_validate(
-            await self._invoke_model(
+        try:
+            payload: dict[str, Any] = await self._invoke_model(
                 model=model,
                 body=body,
             )
-        )
+
+        except Exception as exc:
+            if (failure := _request_failure(exc, model=model)) is None:
+                raise  # not recognized, left for the caller to translate
+
+            raise failure from exc
+
+        return EmbedByTypeResponse.model_validate(payload)
 
     @asynchronous
     def _invoke_model(
@@ -154,3 +163,44 @@ def _response_meta(
         "tokens": tokens,
         "billed_units": tokens,
     }
+
+
+# boto reports request failures through modeled error codes instead of dedicated types
+_THROTTLING_ERROR_CODES: frozenset[str] = frozenset(
+    (
+        "ThrottlingException",
+        "TooManyRequestsException",
+        "ServiceQuotaExceededException",
+        # temporary capacity failures are retryable, same as throttling
+        "ServiceUnavailableException",
+        "ModelNotReadyException",
+    )
+)
+
+
+def _request_failure(
+    exception: Exception,
+    /,
+    *,
+    model: str,
+) -> ModelException | None:
+    match getattr(exception, "response", None):
+        case {"Error": {"Code": str() as code}}:
+            if code in _THROTTLING_ERROR_CODES:
+                return model_rate_limit(
+                    provider="cohere",
+                    model=model,
+                    retry_after=None,
+                )
+
+            if code == "ValidationException":
+                return ModelInputInvalid(
+                    provider="cohere",
+                    model=model,
+                    reason=str(exception),
+                )
+
+        case _:
+            pass
+
+    return None

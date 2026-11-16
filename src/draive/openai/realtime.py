@@ -6,7 +6,7 @@ from contextlib import AbstractAsyncContextManager
 from copy import copy
 from datetime import UTC, datetime
 from types import TracebackType
-from typing import Any, Literal
+from typing import Any, Final, Literal, cast, final
 from uuid import UUID, uuid4
 
 from haiway import Meta, Missing, State, ctx, without_missing
@@ -112,6 +112,12 @@ class OpenAIRealtime(OpenAIAPI):
             current_items: MutableMapping[str, Meta] = {}
             # audio appended to the input buffer since its last commit
             buffered_audio: bool = False
+            # assistant items already reported as completed
+            completed_items: set[str] = set()
+            # unfinished retrievals requested per item
+            retrieval_attempts: MutableMapping[str, int] = {}
+            # tool calls requested by the model and not answered yet
+            tool_calls = _ToolCalls()
             try:
                 record_model_invocation(
                     provider="openai",
@@ -156,8 +162,20 @@ class OpenAIRealtime(OpenAIAPI):
                     match event.type:
                         case "response.output_audio.delta":
                             # send the audio chunk
+                            try:
+                                audio_data: bytes = b64decode(event.delta)
+
+                            except Exception as exc:
+                                raise ModelOutputInvalid(
+                                    provider="openai",
+                                    model=config.model,
+                                    reason=(
+                                        f"Audio delta decoding error - {type(exc).__name__}: {exc}"
+                                    ),
+                                ) from exc
+
                             return ResourceContent.of(
-                                b64decode(event.delta),
+                                audio_data,
                                 mime_type=output_audio_format,
                                 meta={
                                     "identifier": event.item_id,
@@ -182,7 +200,12 @@ class OpenAIRealtime(OpenAIAPI):
                             )
 
                         case "response.output_item.done":
-                            assert event.item.id is not None  # nosec: B101
+                            if event.item.id is None:
+                                raise ModelOutputInvalid(
+                                    provider="openai",
+                                    model=config.model,
+                                    reason="Received output item without an identifier",
+                                )
 
                             match event.item.type:
                                 # received tool call
@@ -193,11 +216,18 @@ class OpenAIRealtime(OpenAIAPI):
 
                                     arguments: Mapping[str, Any] | None
                                     try:
-                                        arguments = (
+                                        decoded: Any = (
                                             json.loads(event.item.arguments)
                                             if event.item.arguments
                                             else None
                                         )
+                                        if decoded is not None and not isinstance(decoded, Mapping):
+                                            raise TypeError(
+                                                "Tool arguments have to be an object,"
+                                                f" received {type(decoded).__name__}"
+                                            )
+
+                                        arguments = cast(Mapping[str, Any] | None, decoded)
 
                                     except Exception as exc:
                                         raise ModelOutputInvalid(
@@ -209,8 +239,13 @@ class OpenAIRealtime(OpenAIAPI):
                                             ),
                                         ) from exc
 
+                                    call_id: str = event.item.call_id or str(uuid4())
+                                    tool_calls.requested(
+                                        call_id,
+                                        response_id=event.response_id,
+                                    )
                                     return ModelToolRequest.of(
-                                        event.item.call_id or str(uuid4()),
+                                        call_id,
                                         tool=event.item.name,
                                         arguments=arguments,
                                         meta={  # using predefined meta keys
@@ -261,7 +296,8 @@ class OpenAIRealtime(OpenAIAPI):
                             )
 
                         case "conversation.item.created":
-                            assert event.item.id is not None  # nosec: B101
+                            if event.item.id is None:
+                                continue  # can't track items without item id
 
                             if event.item.type != "message":
                                 continue  # skip non-message items
@@ -293,6 +329,9 @@ class OpenAIRealtime(OpenAIAPI):
                                 continue  # skip other
 
                         case "response.done":
+                            # every call of this response was already reported
+                            request_response: bool = tool_calls.finished(event.response.id)
+
                             # record token usage if able - it should appear within this event
                             if usage := event.response.usage:
                                 record_usage_metrics(
@@ -325,6 +364,9 @@ class OpenAIRealtime(OpenAIAPI):
                                 case _:
                                     pass  # nothing to report
 
+                            if request_response:
+                                await connection.response.create()
+
                             continue  # keep going, nothing to send here
 
                         case "conversation.item.input_audio_transcription.completed":
@@ -338,7 +380,10 @@ class OpenAIRealtime(OpenAIAPI):
                             if event.item.type != "message":
                                 continue  # handle only messages
 
-                            if event.item.role == "assistant":
+                            if (
+                                event.item.role == "assistant"
+                                and event.item.id not in completed_items
+                            ):
                                 await connection.conversation.item.retrieve(item_id=event.item.id)
 
                         case "conversation.item.retrieved":
@@ -350,10 +395,26 @@ class OpenAIRealtime(OpenAIAPI):
 
                             # Only record completed items, otherwise request once more
                             if event.item.status != "completed":
-                                await connection.conversation.item.retrieve(item_id=event.item.id)
-                                continue  # retry getting completed event
+                                attempts: int = retrieval_attempts.get(event.item.id, 0) + 1
+                                retrieval_attempts[event.item.id] = attempts
+                                if attempts <= _RETRIEVAL_ATTEMPTS_LIMIT:
+                                    await connection.conversation.item.retrieve(
+                                        item_id=event.item.id
+                                    )
 
-                            assert event.item.content  # nosec: B101
+                                else:
+                                    ctx.log_warning(
+                                        "Realtime item %s was not completed after %d retrievals",
+                                        event.item.id,
+                                        _RETRIEVAL_ATTEMPTS_LIMIT,
+                                    )
+
+                                continue  # wait for the completed event
+
+                            if not event.item.content:
+                                continue  # nothing to report, i.e. interrupted before any output
+
+                            retrieval_attempts.pop(event.item.id, None)
 
                             if event.item.role == "user":
                                 item_meta: Meta = current_items.get(
@@ -380,6 +441,10 @@ class OpenAIRealtime(OpenAIAPI):
                                 )
 
                             elif event.item.role == "assistant":
+                                if event.item.id in completed_items:
+                                    continue  # already reported
+
+                                completed_items.add(event.item.id)
                                 item_meta: Meta = current_items.get(
                                     event.item.id,
                                     Meta.of(
@@ -407,6 +472,14 @@ class OpenAIRealtime(OpenAIAPI):
                                 continue  # skip other items
 
                         case "error":
+                            if event.error.code in _BENIGN_ERROR_CODES:
+                                # the request had no effect, the session is still usable
+                                ctx.log_warning(
+                                    f"Realtime request ignored: {event.error.code}"
+                                    f" - {event.error.message}"
+                                )
+                                continue
+
                             raise ModelOutputFailed(
                                 provider="openai",
                                 model=config.model,
@@ -467,6 +540,7 @@ class OpenAIRealtime(OpenAIAPI):
                     await _send_tool_response(
                         input,
                         connection=connection,
+                        tool_calls=tool_calls,
                     )
 
                 else:
@@ -477,6 +551,8 @@ class OpenAIRealtime(OpenAIAPI):
                             await connection.input_audio_buffer.commit()
                             buffered_audio = False
 
+                        # a new user turn supersedes any tool calls left unanswered
+                        tool_calls.reset()
                         # committing the input does not request the response on its own
                         await connection.response.create()
 
@@ -521,6 +597,17 @@ class OpenAIRealtime(OpenAIAPI):
         )
 
 
+_RETRIEVAL_ATTEMPTS_LIMIT: int = 5
+# errors reporting a request which could not be applied, but left the session intact
+_BENIGN_ERROR_CODES: Final[frozenset[str]] = frozenset(
+    (
+        "input_audio_buffer_commit_empty",
+        "response_cancel_not_active",
+        "conversation_already_has_active_response",
+    )
+)
+
+
 async def _send_context(
     context: ModelContext,
     /,
@@ -532,18 +619,21 @@ async def _send_context(
         match element:
             case ModelInput() as input_element:
                 identifier: str = _item_identifier(input_element.meta.identifier)
-                current_items[identifier] = input_element.meta
-                await connection.conversation.item.create(
-                    item={
-                        "id": identifier,
-                        "type": "message",
-                        "status": "completed",
-                        "role": "user",
-                        "content": _user_content_parts(
-                            input_element.content,
-                        ),
-                    },
+                user_parts: Sequence[UserContentParam] = tuple(
+                    _user_content_parts(input_element.content)
                 )
+                if user_parts:  # a turn with tool responses only has no message
+                    current_items[identifier] = input_element.meta
+                    await connection.conversation.item.create(
+                        item={
+                            "id": identifier,
+                            "type": "message",
+                            "status": "completed",
+                            "role": "user",
+                            "content": user_parts,
+                        },
+                    )
+
                 # include tool responses following the output
                 for response in input_element.tool_responses:
                     item_id: str = _item_identifier(response.meta.identifier)
@@ -565,19 +655,22 @@ async def _send_context(
 
             case ModelOutput() as output_element:
                 identifier: str = _item_identifier(output_element.meta.identifier)
-                current_items[identifier] = output_element.meta
-                # prior assistant content
-                await connection.conversation.item.create(
-                    item={
-                        "id": identifier,
-                        "type": "message",
-                        "status": "completed",
-                        "role": "assistant",
-                        "content": _assistant_content_parts(
-                            output_element.content,
-                        ),
-                    },
+                assistant_parts: Sequence[AssistantContentParam] = tuple(
+                    _assistant_content_parts(output_element.content)
                 )
+                if assistant_parts:  # a turn with tool requests only has no message
+                    current_items[identifier] = output_element.meta
+                    # prior assistant content
+                    await connection.conversation.item.create(
+                        item={
+                            "id": identifier,
+                            "type": "message",
+                            "status": "completed",
+                            "role": "assistant",
+                            "content": assistant_parts,
+                        },
+                    )
+
                 # include tool requests following the output
                 for request in output_element.tool_requests:
                     item_id: str = _item_identifier(request.meta.identifier)
@@ -730,11 +823,73 @@ def _tool_result(
     return "".join(response_output)
 
 
+@final
+class _ToolCalls:
+    __slots__ = ("_deferred", "_open_responses", "_pending")
+
+    def __init__(self) -> None:
+        # calls requested by the model and not answered yet
+        self._pending: set[str] = set()
+        # responses that requested calls and were not completed yet,
+        # more calls may still arrive from each of them
+        self._open_responses: set[str] = set()
+        # all known calls were answered but the model is still producing its response
+        self._deferred: bool = False
+
+    def requested(
+        self,
+        call_id: str,
+        /,
+        *,
+        response_id: str | None,
+    ) -> None:
+        self._pending.add(call_id)
+        if response_id is not None:
+            self._open_responses.add(response_id)
+
+    def answered(
+        self,
+        call_id: str,
+        /,
+    ) -> bool:
+        """Returns True when the next model response can be requested now."""
+        self._pending.discard(call_id)
+        if self._pending:
+            return False
+
+        if self._open_responses:
+            self._deferred = True
+            return False
+
+        self._deferred = False
+        return True
+
+    def finished(
+        self,
+        response_id: str | None,
+        /,
+    ) -> bool:
+        """Returns True when a deferred model response can be requested now."""
+        if response_id is not None:
+            self._open_responses.discard(response_id)
+
+        if self._deferred and not self._pending and not self._open_responses:
+            self._deferred = False
+            return True
+
+        return False
+
+    def reset(self) -> None:
+        self._pending.clear()
+        self._deferred = False
+
+
 async def _send_tool_response(
     response: ModelToolResponse,
     /,
     *,
     connection: AsyncRealtimeConnection,
+    tool_calls: _ToolCalls,
 ) -> None:
     await connection.conversation.item.create(
         item={
@@ -743,8 +898,10 @@ async def _send_tool_response(
             "output": _tool_result(response.content),
         },
     )
-
-    await connection.response.create()
+    # a response requested before every output is delivered would see
+    # the remaining calls without any output, one request follows the last of them
+    if tool_calls.answered(response.identifier):
+        await connection.response.create()
 
 
 def _prepare_session_config(

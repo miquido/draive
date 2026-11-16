@@ -147,7 +147,7 @@ class EvaluationScore(State, serializable=True):
         bool
             True if this value is less than other
         """
-        if isinstance(other, float):
+        if isinstance(other, int | float):
             return self.value < other
 
         elif isinstance(other, EvaluationScore):
@@ -170,7 +170,7 @@ class EvaluationScore(State, serializable=True):
         bool
             True if this value is less than or equal to other
         """
-        if isinstance(other, float):
+        if isinstance(other, int | float):
             return self.value <= other
 
         elif isinstance(other, EvaluationScore):
@@ -193,7 +193,7 @@ class EvaluationScore(State, serializable=True):
         bool
             True if this value is greater than other
         """
-        if isinstance(other, float):
+        if isinstance(other, int | float):
             return self.value > other
 
         elif isinstance(other, EvaluationScore):
@@ -216,7 +216,7 @@ class EvaluationScore(State, serializable=True):
         bool
             True if this value is greater than or equal to other
         """
-        if isinstance(other, float):
+        if isinstance(other, int | float):
             return self.value >= other
 
         elif isinstance(other, EvaluationScore):

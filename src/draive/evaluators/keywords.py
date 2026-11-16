@@ -61,7 +61,7 @@ async def required_keywords_evaluator(
         text_normalization = normalization
 
     else:
-        text_normalization = _lowercased
+        text_normalization = _casefolded
 
     normalized_text: str = text_normalization(MultimodalContent.of(evaluated).to_str())
     required: int = len(keywords)
@@ -122,7 +122,7 @@ async def required_keywords_context_evaluator(
         text_normalization = normalization
 
     else:
-        text_normalization = _lowercased
+        text_normalization = _casefolded
 
     normalized_text: str = text_normalization(model_context_multimodal(evaluated).to_str())
     required: int = len(keywords)
@@ -183,7 +183,7 @@ async def forbidden_keywords_evaluator(
         text_normalization = normalization
 
     else:
-        text_normalization = _lowercased
+        text_normalization = _casefolded
 
     normalized_text: str = text_normalization(MultimodalContent.of(evaluated).to_str())
     forbidden: int = len(keywords)
@@ -244,7 +244,7 @@ async def forbidden_keywords_context_evaluator(
         text_normalization = normalization
 
     else:
-        text_normalization = _lowercased
+        text_normalization = _casefolded
 
     normalized_text: str = text_normalization(model_context_multimodal(evaluated).to_str())
     forbidden: int = len(keywords)
@@ -257,5 +257,5 @@ async def forbidden_keywords_context_evaluator(
     )
 
 
-def _lowercased(text: str) -> str:
-    return text.lower()
+def _casefolded(text: str) -> str:
+    return text.casefold()

@@ -1,9 +1,15 @@
 from base64 import b64decode, b64encode
-from collections.abc import Generator, MutableSequence
+from collections.abc import Generator, MutableSequence, Sequence
 from uuid import uuid4
 
-from google.genai.types import FunctionResponseDict, FunctionResponsePartDict, Part, PartDict
-from haiway import Meta, as_dict
+from google.genai.types import (
+    FunctionCall,
+    FunctionResponseDict,
+    FunctionResponsePartDict,
+    Part,
+    PartDict,
+)
+from haiway import Meta, as_dict, ctx
 
 from draive.models import (
     ModelInputBlocks,
@@ -20,6 +26,7 @@ from draive.resources import ResourceContent, ResourceReference
 
 __all__ = (
     "block_parts",
+    "coalesce_audio_blocks",
     "content_parts",
     "function_response",
     "part_as_output_blocks",
@@ -45,6 +52,19 @@ def _reasoning_meta(
     return Meta.of({"kind": "thought"})
 
 
+def _call_identifier(
+    call: FunctionCall,
+    /,
+) -> str:
+    # the api reports no identifier outside of live sessions, a local one is what
+    # correlates the response with its request. It is kept on the call, so each
+    # representation of the same part carries the same identifier.
+    if not call.id:
+        call.id = str(uuid4())
+
+    return call.id
+
+
 def part_as_stream_elements(
     part: Part,
     /,
@@ -64,9 +84,7 @@ def part_as_stream_elements(
 
     if part.function_call and part.function_call.name:
         yield ModelToolRequest.of(
-            # the api reports no identifier outside of live sessions, a local one
-            # is what correlates the response with its request
-            part.function_call.id or str(uuid4()),
+            _call_identifier(part.function_call),
             tool=part.function_call.name,
             arguments=part.function_call.args,
             meta=Meta.of(
@@ -108,9 +126,7 @@ def part_as_output_blocks(
 
     if part.function_call and part.function_call.name:
         yield ModelToolRequest.of(
-            # the api reports no identifier outside of live sessions, a local one
-            # is what correlates the response with its request
-            part.function_call.id or str(uuid4()),
+            _call_identifier(part.function_call),
             tool=part.function_call.name,
             arguments=part.function_call.args,
             meta=Meta.of(
@@ -137,6 +153,77 @@ def part_as_output_blocks(
                 mime_type=part.file_data.mime_type,
             )
         )
+
+
+def _audio_chunk(
+    block: ModelOutputBlock,
+    /,
+) -> ResourceContent | None:
+    if not isinstance(block, MultimodalContent) or len(block.parts) != 1:
+        return None
+
+    part = block.parts[0]
+    if isinstance(part, ResourceContent) and part.mime_type.startswith("audio/"):
+        return part
+
+    return None
+
+
+def coalesce_audio_blocks(
+    blocks: Sequence[ModelOutputBlock],
+    /,
+) -> ModelOutputBlocks:
+    """Merge adjacent inline audio chunk blocks of the same mime type into one block.
+
+    Parameters
+    ----------
+    blocks : Sequence[ModelOutputBlock]
+        Output blocks in their original order.
+
+    Returns
+    -------
+    ModelOutputBlocks
+        Blocks with each run of adjacent same-mime audio chunks replaced by a single
+        resource holding the concatenated bytes. All other blocks keep their order.
+    """
+    result: list[ModelOutputBlock] = []
+    run: list[ResourceContent] = []
+
+    def flush() -> None:
+        if not run:
+            return
+
+        if len(run) == 1:
+            result.append(MultimodalContent.of(run[0]))
+
+        else:
+            result.append(
+                MultimodalContent.of(
+                    ResourceContent.of(
+                        b"".join(chunk.to_bytes() for chunk in run),
+                        mime_type=run[0].mime_type,
+                        meta=run[0].meta,
+                    )
+                )
+            )
+
+        run.clear()
+
+    for block in blocks:
+        chunk: ResourceContent | None = _audio_chunk(block)
+        if chunk is None:
+            flush()
+            result.append(block)
+
+        elif run and run[0].mime_type != chunk.mime_type:
+            flush()
+            run.append(chunk)
+
+        else:
+            run.append(chunk)
+
+    flush()
+    return tuple(result)
 
 
 def function_response(
@@ -225,7 +312,9 @@ def block_parts(
 
         elif isinstance(block, ModelReasoning):
             if block.meta.kind != "thought":
-                raise ValueError(f"Unsupported reasoning element: {block.meta.kind}")
+                # reasoning produced by another provider can't be replayed here
+                ctx.log_debug(f"Skipping unsupported reasoning element: {block.meta.kind}")
+                continue
 
             if signature := block.meta.get_str("signature"):
                 yield {

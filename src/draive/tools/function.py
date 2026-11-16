@@ -2,7 +2,7 @@ from collections.abc import AsyncGenerator, Callable, Coroutine, MutableMapping,
 from inspect import isasyncgenfunction, iscoroutinefunction, unwrap
 from typing import Protocol, Self, final, overload
 
-from haiway import BasicValue, Function, Meta, MetaValues, TypeSpecification
+from haiway import BasicValue, Function, Meta, MetaValues, TypeSpecification, ValidationError
 
 from draive.models import (
     ModelToolFunctionSpecification,
@@ -11,7 +11,7 @@ from draive.models import (
     ModelToolSpecification,
 )
 from draive.multimodal import Multimodal, MultimodalContent
-from draive.tools.types import ToolException, ToolOutputChunk
+from draive.tools.types import ToolArgumentsException, ToolException, ToolOutputChunk
 
 __all__ = (
     "CoroutineTool",
@@ -105,6 +105,22 @@ class _ToolFunction[**Args, Output](Function[Args, Output]):
             "additionalProperties": False,
         }
 
+    def _invoke(
+        self,
+        **arguments: BasicValue,
+    ) -> Output:
+        # only the argument validation and binding failures are reported as such, the
+        # wrapped function body runs after them and its own failures stay untouched
+        try:
+            validated_args, validated_kwargs = self.validate_arguments(**arguments)  # pyright: ignore[reportCallIssue]
+            return self._call(*validated_args, **validated_kwargs)  # pyright: ignore[reportCallIssue]
+
+        except (ValidationError, TypeError) as exc:
+            raise ToolArgumentsException(
+                f"Invalid arguments of tool `{self.name}`: {exc}",
+                tool=self.name,
+            ) from exc
+
     @property
     def meta(self) -> Meta:
         """Metadata attached to the underlying model tool specification."""
@@ -177,7 +193,7 @@ class CoroutineTool[**Args, Result: Multimodal = MultimodalContent](
         ToolOutputChunk
             Content parts produced from the multimodal return value.
         """
-        result: Multimodal = await super().__call__(**arguments)  # pyright: ignore[reportCallIssue]
+        result: Multimodal = await self._invoke(**arguments)
         content: MultimodalContent
         try:
             content = MultimodalContent.of(result)
@@ -222,7 +238,7 @@ class GeneratorTool[**Args](_ToolFunction[Args, AsyncGenerator[ToolOutputChunk]]
             Original stream emitted by the wrapped tool function. Consumers stopping
             before the stream ends have to close it explicitly.
         """
-        return super().__call__(**arguments)  # pyright: ignore[reportCallIssue]
+        return self._invoke(**arguments)
 
 
 class FunctionToolWrapper(Protocol):

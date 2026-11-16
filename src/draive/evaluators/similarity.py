@@ -1,5 +1,6 @@
 from base64 import b64decode
 from collections.abc import Sequence
+from math import isnan
 
 from draive.embedding import Embedded, ImageEmbedding, TextEmbedding, vector_similarity_score
 from draive.evaluation import EvaluationScore, evaluator
@@ -13,6 +14,23 @@ from draive.models import ModelContext, ModelInput
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.resources import ResourceContent
 from draive.steps import Step
+
+_SIMILARITY_EPSILON: float = 1e-9
+
+
+def _normalized_similarity(similarity: float, /) -> float:
+    if isnan(similarity):
+        return 0.0  # undefined similarity can't be treated as a perfect match
+
+    # absorb floating point error of the cosine computation (identical vectors may end up
+    # slightly below one) without masking real differences
+    if similarity >= 1.0 - _SIMILARITY_EPSILON:
+        return 1.0
+
+    if similarity <= _SIMILARITY_EPSILON:
+        return 0.0
+
+    return similarity
 
 
 @evaluator(name="similarity")
@@ -173,7 +191,7 @@ async def text_vector_similarity_evaluator(
         reference_vector=embedding[1].vector,
     )
 
-    return max(0.0, min(1.0, similarity))
+    return _normalized_similarity(similarity)
 
 
 @evaluator(name="image_vector_similarity")
@@ -226,7 +244,7 @@ async def image_vector_similarity_evaluator(
         reference_vector=embedding[1].vector,
     )
 
-    return max(0.0, min(1.0, similarity))
+    return _normalized_similarity(similarity)
 
 
 CONTENT_INSTRUCTION: str = f"""\

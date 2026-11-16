@@ -1,6 +1,9 @@
+import math
 import random
 from collections.abc import Coroutine, Generator, Mapping, Sequence
 from contextlib import contextmanager
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import cast
 
 from haiway import Missing, ObservabilityAttribute, ctx
@@ -99,8 +102,9 @@ def model_rate_limit(
         Provider model identifier affected by the limit.
     retry_after : str | float | None
         Delay before a retry, either already resolved or as reported by the provider.
-        A missing or unparseable value falls back to a randomized short delay, which
-        spreads retries of concurrent requests instead of aligning them.
+        A missing, unparseable or non finite value falls back to a randomized short delay, which
+        spreads retries of concurrent requests instead of aligning them. Negative
+        values are clamped to zero.
     error_code : str | None, default=None
         Structured provider error code, used to recognize exhausted quota.
     quota_limit : int | None, default=None
@@ -148,10 +152,13 @@ def model_rate_limit(
                 delay = float(described)
 
             except ValueError:
-                delay = None
+                delay = _http_date_delay(described)
 
         case _:
             delay = None
+
+    if delay is not None:
+        delay = max(delay, 0.0) if math.isfinite(delay) else None
 
     ctx.record_warning(
         event="model.rate_limit",
@@ -167,6 +174,22 @@ def model_rate_limit(
         model=model,
         retry_after=delay if delay is not None else random.uniform(0.3, 3.0),  # nosec: B311
     )
+
+
+def _http_date_delay(
+    value: str,
+    /,
+) -> float | None:
+    try:
+        moment: datetime = parsedate_to_datetime(value)
+
+    except TypeError, ValueError, IndexError:
+        return None
+
+    if moment.tzinfo is None:  # HTTP dates are GMT, treat zone-less values as UTC
+        moment = moment.replace(tzinfo=UTC)
+
+    return (moment - datetime.now(UTC)).total_seconds()
 
 
 def record_guardrails_invocation(

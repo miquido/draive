@@ -21,6 +21,7 @@ from mistralai.client.models import (
     ThinkChunk,
     ThinkChunkTypedDict,
     ToolCall,
+    ToolCallTypedDict,
     ToolTypedDict,
     UsageInfo,
 )
@@ -29,6 +30,7 @@ from mistralai.client.utils.eventstreaming import EventStreamAsync
 from draive.mistral.api import MistralAPI
 from draive.mistral.config import MistralChatConfig
 from draive.mistral.utils import (
+    mistral_error_reason,
     unwrap_missing_list_to_unset,
     unwrap_missing_to_unset,
 )
@@ -289,7 +291,9 @@ class MistralCompletions(MistralAPI):
                 raise ModelOutputFailed(
                     provider="mistral",
                     model=config.model,
-                    reason=str(exc),
+                    reason=mistral_error_reason(exc)
+                    if isinstance(exc, MistralError)
+                    else str(exc) or type(exc).__name__,
                 ) from exc
 
             finally:
@@ -355,10 +359,10 @@ def _tool_request(
         )
         return None
 
-    arguments: Any = tool_call.function.arguments
-    if isinstance(arguments, str):
+    decoded: Any = tool_call.function.arguments
+    if isinstance(decoded, str):
         try:
-            arguments = json.loads(arguments) if arguments.strip() else None
+            decoded = json.loads(decoded) if decoded.strip() else None
 
         except Exception as exc:
             raise ModelOutputInvalid(
@@ -366,6 +370,20 @@ def _tool_request(
                 model=model,
                 reason=f"Tool arguments decoding error - {type(exc).__name__}: {exc}",
             ) from exc
+
+    arguments: dict[str, Any]
+    if decoded is None:
+        arguments = {}
+
+    elif isinstance(decoded, dict):
+        arguments = cast(dict[str, Any], decoded)
+
+    else:
+        raise ModelOutputInvalid(
+            provider="mistral",
+            model=model,
+            reason=f"Tool arguments are not an object - {type(decoded).__name__}",
+        )
 
     return ModelToolRequest.of(
         identifier,
@@ -379,13 +397,8 @@ def _context_messages(
 ) -> Iterable[ChatCompletionStreamRequestMessageTypedDict]:
     for element in context:
         if isinstance(element, ModelInput):
-            if user_content := element.content:
-                yield {
-                    "role": "user",
-                    "content": list(_content_chunks(user_content.parts)),
-                }
-
-            # Provide tool responses as separate tool messages expected by Mistral
+            # tool messages have to directly follow the assistant message
+            # carrying the tool calls, any user content comes after them
             for tool_response in element.tool_responses:
                 yield {
                     "role": "tool",
@@ -394,38 +407,51 @@ def _context_messages(
                     "content": list(_content_chunks(tool_response.content.parts)),
                 }
 
+            if user_content := element.content:
+                yield {
+                    "role": "user",
+                    "content": list(_content_chunks(user_content.parts)),
+                }
+
         else:
             assert isinstance(element, ModelOutput)  # nosec: B101
+            # a turn is a single assistant message, tool calls requested in parallel
+            # have to stay together to be answered by the following tool messages
+            content_chunks: list[ContentChunkTypedDict] = []
+            tool_calls: list[ToolCallTypedDict] = []
             for block in element.output:
                 if isinstance(block, MultimodalContent):
-                    yield {
-                        "role": "assistant",
-                        "content": list(_content_chunks(block.parts)),
-                    }
+                    content_chunks.extend(_content_chunks(block.parts))
 
                 elif isinstance(block, ModelReasoning):
                     # reasoning travels as a dedicated chunk type, dropping it would
                     # break the thinking continuity across turns
-                    yield {
-                        "role": "assistant",
-                        "content": [_reasoning_chunk_param(block)],
-                    }
+                    content_chunks.append(_reasoning_chunk_param(block))
 
                 else:
                     assert isinstance(block, ModelToolRequest)  # nosec: B101
-                    yield {
-                        "role": "assistant",
-                        "content": "",
-                        "tool_calls": [
-                            {
-                                "id": block.identifier,
-                                "function": {
-                                    "name": block.tool,
-                                    "arguments": json.dumps(block.arguments),
-                                },
-                            }
-                        ],
-                    }
+                    tool_calls.append(
+                        {
+                            "id": block.identifier,
+                            "function": {
+                                "name": block.tool,
+                                "arguments": json.dumps(block.arguments),
+                            },
+                        }
+                    )
+
+            if tool_calls:
+                yield {
+                    "role": "assistant",
+                    "content": content_chunks or "",
+                    "tool_calls": tool_calls,
+                }
+
+            elif content_chunks:
+                yield {
+                    "role": "assistant",
+                    "content": content_chunks,
+                }
 
 
 def _reasoning_chunk_param(
