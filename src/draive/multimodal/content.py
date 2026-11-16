@@ -1,4 +1,6 @@
 from collections.abc import Callable, Collection, Generator, Mapping, Sequence
+from re import Pattern
+from re import compile as re_compile
 from typing import ClassVar, Literal, Self, cast, final, overload
 
 from haiway import BasicValue, Meta, MetaValues, Missing, State
@@ -1260,19 +1262,19 @@ def _escape_attribute_string(value: str) -> str:
 
 
 # markup characters are escaped as entities instead of backslash sequences, reading an
-# attribute has to decode them back - `&amp;` goes last so a single escape is undone
-_ATTRIBUTE_UNESCAPE_PAIRS: tuple[tuple[str, str], ...] = (
-    ("&lt;", "<"),
-    ("&gt;", ">"),
-    ("&amp;", "&"),
-)
+# attribute has to decode them back - a single pass undoes exactly one escape level
+_ATTRIBUTE_ENTITY_PATTERN: Pattern[str] = re_compile(r"&(lt|gt|amp);")
+_ATTRIBUTE_ENTITIES: Mapping[str, str] = {"lt": "<", "gt": ">", "amp": "&"}
 
 
 def _unescaped_attribute_string(value: str) -> str:
-    for escaped, character in _ATTRIBUTE_UNESCAPE_PAIRS:
-        value = value.replace(escaped, character)
+    if "&" not in value:
+        return value
 
-    return value
+    return _ATTRIBUTE_ENTITY_PATTERN.sub(
+        lambda match: _ATTRIBUTE_ENTITIES[match.group(1)],
+        value,
+    )
 
 
 def _formatted_tag_attribute_value(
