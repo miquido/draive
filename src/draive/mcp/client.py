@@ -944,8 +944,13 @@ class MCPClients:
         uri: str,
         **extra: Any,
     ) -> Collection[ResourceReference] | ResourceContent | None:
-        if client_identifier := self._client_identifier_for_uri(uri):
-            return await self._resources[client_identifier].fetching(uri)
+        resources: ResourcesRepository | None = (
+            self._resources.get(client_identifier)
+            if (client_identifier := self._client_identifier_for_uri(uri)) is not None
+            else None
+        )
+        if resources is not None:
+            return await resources.fetching(uri)
 
         else:
             ctx.log_warning(f"Requested resource ({uri}) from unknown source")
@@ -982,8 +987,9 @@ class MCPClients:
         if parsed.netloc in self._clients.keys():
             return parsed.netloc
 
+        # a server may scope its resources under a dotted prefix, i.e. `mcp://server.item`
         match parsed.netloc.split(".", 1):
-            case [identifier, _]:
+            case [identifier, _] if identifier in self._clients.keys():
                 return identifier
 
             case _:
