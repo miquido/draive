@@ -1,5 +1,7 @@
 from itertools import pairwise
 
+import pytest
+
 from draive.bedrock.converse import _context_messages  # pyright: ignore[reportPrivateUsage]
 from draive.models import ModelInput, ModelOutput, ModelReasoning
 from draive.multimodal import MultimodalContent, TextContent
@@ -55,6 +57,46 @@ def test_turn_with_only_blank_text_is_skipped() -> None:
             ModelInput.of(MultimodalContent.of("first")),
             ModelOutput.of(MultimodalContent.of(TextContent.of(""))),
             ModelInput.of(MultimodalContent.of("second")),
+        )
+    )
+
+    assert [message["role"] for message in messages] == ["user"]
+
+
+@pytest.mark.parametrize(
+    "closing",
+    (
+        ModelInput.of(MultimodalContent.of(TextContent.of("  "))),
+        ModelInput.of(MultimodalContent.empty),
+    ),
+)
+def test_empty_closing_input_after_output_is_rejected(closing: ModelInput) -> None:
+    with pytest.raises(ValueError, match="end with a model input"):
+        _context_messages(
+            (
+                ModelInput.of(MultimodalContent.of("first")),
+                ModelOutput.of(MultimodalContent.of("answer")),
+                closing,
+            )
+        )
+
+
+def test_deliberate_assistant_prefill_is_kept() -> None:
+    messages = _context_messages(
+        (
+            ModelInput.of(MultimodalContent.of("first")),
+            ModelOutput.of(MultimodalContent.of("prefill")),
+        )
+    )
+
+    assert [message["role"] for message in messages] == ["user", "assistant"]
+
+
+def test_empty_closing_input_after_user_turn_is_dropped() -> None:
+    messages = _context_messages(
+        (
+            ModelInput.of(MultimodalContent.of("first")),
+            ModelInput.of(MultimodalContent.of(TextContent.of(""))),
         )
     )
 

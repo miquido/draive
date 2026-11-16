@@ -28,6 +28,7 @@ from draive.gemini.api import GeminiAPI
 from draive.gemini.config import GeminiConfig
 from draive.gemini.content import (
     block_parts,
+    coalesce_audio_blocks,
     function_response,
     part_as_output_blocks,
     part_as_stream_elements,
@@ -330,7 +331,7 @@ class GeminiLive(GeminiAPI):
                                 read_buffer.append(
                                     ModelSessionEvent.turn_completed(
                                         ModelOutput.of(
-                                            *turn_output_blocks,
+                                            *coalesce_audio_blocks(turn_output_blocks),
                                             meta={
                                                 "created": datetime.now(UTC).isoformat(),
                                                 "reason": completion_reason,

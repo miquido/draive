@@ -651,6 +651,19 @@ def _context_messages(  # noqa: C901, PLR0912
     if message := flush(role):
         messages.append(message)
 
+    if (
+        messages
+        and messages[-1]["role"] == "assistant"
+        and context
+        and isinstance(context[-1], ModelInput)
+    ):
+        # dropping the empty closing input would leave the request ending on
+        # an assistant message, which is not an intended prefill
+        raise ValueError(
+            "Bedrock context has to end with a model input,"
+            " the closing model input has no deliverable content"
+        )
+
     return messages
 
 

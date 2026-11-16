@@ -389,3 +389,30 @@ def test_missing_function_call_identifier_is_shared_between_stream_and_output() 
     assert len(streamed) == len(output) == 1
     assert streamed[0].identifier == output[0].identifier
     assert streamed[0].identifier
+
+
+@pytest.mark.asyncio
+async def test_audio_chunks_stream_individually_but_complete_as_one_block() -> None:
+    count = 60
+    session = _Session(
+        [
+            *[_content(model_turn=_audio(bytes([index]))) for index in range(count)],
+            _content(turn_complete=True),
+        ]
+    )
+    async with ctx.scope("test"):
+        model_session, scope = await _open(session)
+        events: list[Any] = [
+            await model_session._reading()  # pyright: ignore[reportPrivateUsage]
+            for _ in range(count + 1)
+        ]
+        await scope.__aexit__(None, None, None)
+
+    assert all(isinstance(chunk, ResourceContent) for chunk in events[:count])
+    completed = events[-1]
+    assert isinstance(completed, ModelSessionEvent)
+    assert isinstance(completed.content, ModelOutput)
+    assert len(completed.content.output) == 1
+    merged = completed.content.content.parts[0]
+    assert isinstance(merged, ResourceContent)
+    assert merged.to_bytes() == bytes(range(count))
