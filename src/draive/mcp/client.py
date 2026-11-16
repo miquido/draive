@@ -255,6 +255,7 @@ class MCPClient:
         "_session_closing",
         "_session_manager",
         "_session_owner",
+        "_uri_overrides",
         "identifier",
         "tags",
     )
@@ -273,6 +274,7 @@ class MCPClient:
         self._session_owner: Task[None]  # created on enter
         self._session_closing: Event  # created on enter
         self._features: Collection[type[ResourcesRepository] | type[ToolsProvider]] = features
+        self._uri_overrides: dict[str, str] = {}
         self.tags: MetaTags = tags
 
     def _meta(
@@ -509,8 +511,9 @@ class MCPClient:
             return uri
 
         parsed: ParseResult = urlparse(uri)
+        encoded: str
         if parsed.netloc:
-            return (
+            encoded = (
                 f"{_uri_authority_prefix(parsed)}"
                 f"{self.identifier}.{parsed.netloc}"
                 f"{parsed.path}{_uri_remainder(parsed)}"
@@ -523,7 +526,14 @@ class MCPClient:
                 path = "/" + path
 
             # default to mcp scheme if empty and use the identifier as the netloc
-            return f"{parsed.scheme or 'mcp'}://{self.identifier}{path}{_uri_remainder(parsed)}"
+            encoded = f"{parsed.scheme or 'mcp'}://{self.identifier}{path}{_uri_remainder(parsed)}"
+
+        if self._decode_uri_identifier(encoded) != uri:
+            # preserve authority-less URIs without `//` (e.g. `notes:/docs/a`) across round trips
+            if (overrides := getattr(self, "_uri_overrides", None)) is not None:
+                overrides[encoded] = uri
+
+        return encoded
 
     def _without_uri_identifier(
         self,
@@ -533,6 +543,18 @@ class MCPClient:
         if not uri:
             return uri
 
+        if (overrides := getattr(self, "_uri_overrides", None)) is not None and (
+            original := overrides.get(uri)
+        ):
+            return original
+
+        return self._decode_uri_identifier(uri)
+
+    def _decode_uri_identifier(
+        self,
+        uri: str,
+        /,
+    ) -> str:
         parsed: ParseResult = urlparse(uri)
         if not parsed.netloc:
             return uri
@@ -810,6 +832,7 @@ class MCPClients:
     __slots__ = (
         "_clients",
         "_prompts",
+        "_reference_clients",
         "_resources",
         "_tools",
     )
@@ -822,6 +845,7 @@ class MCPClients:
         self._clients: Mapping[str, MCPClient] = {c.identifier: c for c in [client, *clients]}
         self._resources: Mapping[str, ResourcesRepository]
         self._tools: Mapping[str, ToolsProvider]
+        self._reference_clients: dict[str, str] = {}
 
     async def resources_list(
         self,
@@ -845,10 +869,12 @@ class MCPClients:
             )
 
         elif resources := self._resources.get(mcp_server):
-            return await resources.fetch_list(
+            page: Paginated[ResourceReference] = await resources.fetch_list(
                 pagination=pagination,
                 **extra,
             )
+            self._record_reference_clients(page.items, mcp_server)
+            return page
 
         else:
             return Paginated[ResourceReference](
@@ -904,7 +930,9 @@ class MCPClients:
                 available: Sequence[ResourceReference] = tuple(page.items)[offset:]
                 consumed: int = min(len(available), remaining)
                 if consumed > 0:
-                    references.extend(available[:consumed])
+                    selected: Sequence[ResourceReference] = available[:consumed]
+                    self._record_reference_clients(selected, server_id)
+                    references.extend(selected)
                     remaining -= consumed
                     progress_made = True
 
@@ -976,6 +1004,19 @@ class MCPClients:
     ) -> None:
         raise NotImplementedError("Resource deleting is not supported by MCP servers")
 
+    def _record_reference_clients(
+        self,
+        references: Sequence[ResourceReference],
+        server_id: str,
+        /,
+    ) -> None:
+        if (recorded_clients := getattr(self, "_reference_clients", None)) is None:
+            return
+
+        for reference in references:
+            if self._client_identifier_for_uri(reference.uri) != server_id:
+                recorded_clients[reference.uri] = server_id
+
     def _client_identifier_for_uri(
         self,
         uri: str,
@@ -984,6 +1025,11 @@ class MCPClients:
         """Find server associated with URI."""
         if not uri:
             return None
+
+        if (recorded_clients := getattr(self, "_reference_clients", None)) is not None and (
+            recorded := recorded_clients.get(uri)
+        ):
+            return recorded
 
         parsed: ParseResult = urlparse(uri)
         if not parsed.netloc:

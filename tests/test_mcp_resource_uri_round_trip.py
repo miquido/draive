@@ -91,6 +91,9 @@ def _repository(
         "notes:///docs/a",
         "notes:///docs/a?page=2",
         "notes:///docs/a#section",
+        "notes:/docs/a",
+        "notes:/docs/a?page=2",
+        "notes:/docs/a#section",
         "ui:///screen",
         "mcp://host/details",
         "file:///tmp/item",
@@ -163,6 +166,39 @@ async def test_aggregated_resources_route_to_a_client_with_a_dotted_identifier()
 
         assert fetched is not None
         assert session.requested == ["mcp://host/details"]
+
+    finally:
+        await clients.__aexit__(None, None, None)
+
+
+@pytest.mark.parametrize(
+    "published_uri",
+    [
+        "mcp://host.api/details",
+        "mcp://source.host/details",
+    ],
+)
+@pytest.mark.asyncio
+async def test_aggregated_resources_keep_originating_client_when_identifiers_overlap(
+    published_uri: str,
+) -> None:
+    source_session = _StubSession((published_uri,))
+    nested_session = _StubSession(())
+    clients = MCPClients(
+        _client("source", source_session),
+        _client("source.host", nested_session),
+    )
+
+    try:
+        await clients.__aenter__()
+        listed = await clients.resources_list(pagination=None)
+
+        assert len(listed.items) == 1
+        fetched = await clients.resource_fetch(listed.items[0].uri)
+
+        assert fetched is not None
+        assert source_session.requested == [published_uri]
+        assert nested_session.requested == []
 
     finally:
         await clients.__aexit__(None, None, None)
