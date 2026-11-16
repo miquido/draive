@@ -91,6 +91,24 @@ async def test_updating_artifacts_and_get() -> None:
     assert state.get(BetaArtifact, key="custom", required=True).value == "beta"
 
 
+def test_get_returns_default_for_missing_optional_artifact() -> None:
+    state = StepState.of()
+    fallback = AlphaArtifact(value="fallback")
+
+    assert state.get(AlphaArtifact, default=fallback) == fallback
+
+
+def test_get_rejects_required_combined_with_default() -> None:
+    state = StepState.of()
+
+    with pytest.raises(ValueError, match="required"):
+        state.get(  # pyright: ignore[reportCallIssue]
+            AlphaArtifact,
+            required=True,
+            default=AlphaArtifact(value="fallback"),
+        )
+
+
 @pytest.mark.asyncio
 async def test_appending_and_mutating_context() -> None:
     initial_context = (ModelInput.of(MultimodalContent.of("input")),)

@@ -151,9 +151,11 @@ class StepState(State, serializable=True):
         key : str | None, optional
             Custom artifact key. Defaults to ``content.__name__``.
         default : Content | None, optional
-            Value returned when the artifact is missing and not required.
+            Value returned when the artifact is missing. Cannot be combined with
+            ``required``.
         required : bool, optional
-            Whether missing artifacts should raise ``KeyError``.
+            Whether missing artifacts should raise ``KeyError``. Cannot be combined
+            with ``default``.
 
         Returns
         -------
@@ -163,9 +165,14 @@ class StepState(State, serializable=True):
 
         Raises
         ------
+        ValueError
+            If both ``required`` and ``default`` are provided.
         KeyError
             If the artifact is missing and ``required`` is ``True``.
         """
+        if required and default is not None:
+            raise ValueError("Artifact lookup cannot combine `required` with `default`")
+
         lookup_key: str = content.__name__ if key is None else key
         current: ArtifactContent | None = self.artifacts.get(lookup_key)
         if current is not None:
