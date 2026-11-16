@@ -530,7 +530,7 @@ wheels = [
 
 [[package]]
 name = "draive"
-version = "0.119.0"
+version = "0.120.0"
 source = { editable = "." }
 default-groups = "all"
 dependencies = [
