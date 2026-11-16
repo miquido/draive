@@ -6,7 +6,7 @@ from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from itertools import chain
 from types import TracebackType
 from typing import Any, Self, cast, final
-from urllib.parse import ParseResult, urlparse, urlunparse
+from urllib.parse import ParseResult, urlparse
 from uuid import uuid4
 
 from haiway import (
@@ -510,15 +510,10 @@ class MCPClient:
 
         parsed: ParseResult = urlparse(uri)
         if parsed.netloc:
-            return urlunparse(
-                (
-                    parsed.scheme,
-                    f"{self.identifier}.{parsed.netloc}",
-                    parsed.path,
-                    parsed.params,
-                    parsed.query,
-                    parsed.fragment,
-                )
+            return (
+                f"{_uri_authority_prefix(parsed)}"
+                f"{self.identifier}.{parsed.netloc}"
+                f"{parsed.path}{_uri_remainder(parsed)}"
             )
 
         else:
@@ -527,18 +522,8 @@ class MCPClient:
             if not path.startswith("/"):
                 path = "/" + path
 
-            return urlunparse(
-                (
-                    # default to mcp scheme if empty
-                    parsed.scheme or "mcp",
-                    # use identifier as domain/netloc
-                    self.identifier,
-                    path,
-                    parsed.params,
-                    parsed.query,
-                    parsed.fragment,
-                )
-            )
+            # default to mcp scheme if empty and use the identifier as the netloc
+            return f"{parsed.scheme or 'mcp'}://{self.identifier}{path}{_uri_remainder(parsed)}"
 
     def _without_uri_identifier(
         self,
@@ -552,33 +537,28 @@ class MCPClient:
         if not parsed.netloc:
             return uri
 
+        # a bare identifier stands for an uri without an authority
+        netloc: str | None = None
         if parsed.netloc == self.identifier:
-            return urlunparse(
-                (
-                    parsed.scheme if parsed.scheme != "mcp" else "",
-                    "",
-                    parsed.path,
-                    parsed.params,
-                    parsed.query,
-                    parsed.fragment,
-                )
-            )
+            netloc = ""
 
-        match parsed.netloc.split(".", 1):
-            case [identifier, netloc] if identifier == self.identifier:
-                return urlunparse(
-                    (
-                        parsed.scheme,
-                        netloc,
-                        parsed.path,
-                        parsed.params,
-                        parsed.query,
-                        parsed.fragment,
-                    )
-                )
+        # identifiers can contain dots themselves, the whole one has to be matched
+        elif parsed.netloc.startswith(f"{self.identifier}."):
+            netloc = parsed.netloc[len(self.identifier) + 1 :]
 
-            case _:
-                return uri
+        if netloc is None:
+            return uri
+
+        if not netloc:
+            if parsed.scheme in ("", "mcp"):
+                # `mcp` is the local scheme, it is not sent to the server
+                return f"{parsed.path}{_uri_remainder(parsed)}"
+
+            # the scheme stays, only the artificial authority is dropped - it is kept
+            # within the url as `//` to not change the scheme specific part
+            return f"{parsed.scheme}://{parsed.path}{_uri_remainder(parsed)}"
+
+        return f"{_uri_authority_prefix(parsed)}{netloc}{parsed.path}{_uri_remainder(parsed)}"
 
     def _convert_resource_content(
         self,
@@ -671,6 +651,31 @@ class MCPClient:
         # the transport is closed regularly instead of being thrown into - it only
         # has to release the connection, while the cause propagates through the scope
         await self._close_session()
+
+
+def _uri_authority_prefix(
+    parsed: ParseResult,
+    /,
+) -> str:
+    # an uri without a scheme keeps its authority as `//host`, with a scheme the
+    # authority is introduced by `scheme://`
+    return f"{parsed.scheme}://" if parsed.scheme else "//"
+
+
+def _uri_remainder(
+    parsed: ParseResult,
+    /,
+) -> str:
+    # `urlunparse` drops the authority separator for schemes it does not know,
+    # assembling the uri by hand keeps every part exactly as parsed
+    remainder: str = f";{parsed.params}" if parsed.params else ""
+    if parsed.query:
+        remainder += f"?{parsed.query}"
+
+    if parsed.fragment:
+        remainder += f"#{parsed.fragment}"
+
+    return remainder
 
 
 async def _convert_content(  # noqa: C901, PLR0911
@@ -984,16 +989,15 @@ class MCPClients:
         if not parsed.netloc:
             return None
 
-        if parsed.netloc in self._clients.keys():
+        if parsed.netloc in self._clients:
             return parsed.netloc
 
         # a server may scope its resources under a dotted prefix, i.e. `mcp://server.item`
-        match parsed.netloc.split(".", 1):
-            case [identifier, _] if identifier in self._clients.keys():
-                return identifier
-
-            case _:
-                return None
+        # while identifiers can contain dots themselves - the longest one wins
+        prefixes: list[str] = [
+            identifier for identifier in self._clients if parsed.netloc.startswith(f"{identifier}.")
+        ]
+        return max(prefixes, key=len) if prefixes else None
 
     async def tools_fetch(
         self,
