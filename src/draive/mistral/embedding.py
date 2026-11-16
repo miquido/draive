@@ -7,6 +7,7 @@ from mistralai.client.models import EmbeddingResponse
 from draive.embedding import Embedded
 from draive.mistral.api import MistralAPI
 from draive.mistral.config import MistralEmbeddingConfig
+from draive.mistral.utils import mistral_failures
 from draive.models import ModelOutputInvalid
 from draive.models.metrics import (
     provider_gather,
@@ -62,9 +63,9 @@ class MistralEmbedding(MistralAPI):
 
             responses: Sequence[EmbeddingResponse] = await provider_gather(
                 *[
-                    self._client.embeddings.create_async(
+                    self._create_batch(
+                        attributes[index : index + embedding_config.batch_size],
                         model=embedding_config.model,
-                        inputs=attributes[index : index + embedding_config.batch_size],
                     )
                     for index in range(0, len(attributes), embedding_config.batch_size)
                 ],
@@ -116,4 +117,17 @@ class MistralEmbedding(MistralAPI):
                         strict=True,
                     )
                 ],
+            )
+
+    async def _create_batch(
+        self,
+        inputs: Sequence[str],
+        /,
+        *,
+        model: str,
+    ) -> EmbeddingResponse:
+        with mistral_failures(model=model):
+            return await self._client.embeddings.create_async(
+                model=model,
+                inputs=list(inputs),
             )

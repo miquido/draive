@@ -113,6 +113,8 @@
   score per category across inputs. Cohere on Bedrock: throttling and capacity errors raise
   `ModelRateLimit`, validation errors `ModelInputInvalid`. Mistral and Cohere embeddings raise
   `ModelOutputInvalid` for inconsistent responses instead of `ValueError`.
+  Mistral HTTP errors report only the status and the short provider message, never the
+  response body.
 - Realtime conversation memory remembers tool exchanges observed from the session (OpenAI
   Realtime) and flushes pending assistant output on session close and once a tool-using turn
   completes (Gemini Live), deduplicating requests and responses by identifier. User text

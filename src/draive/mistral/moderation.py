@@ -7,6 +7,7 @@ from mistralai.client.models import ModerationResponse
 from draive.guardrails import GuardrailsModerationException
 from draive.mistral.api import MistralAPI
 from draive.mistral.config import MistralModerationConfig
+from draive.mistral.utils import mistral_failures
 from draive.models import provider_failure, record_guardrails_invocation
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.multimodal.artifact import ArtifactContent
@@ -63,10 +64,11 @@ class MistralContentModeration(MistralAPI):
                 model=moderation_config.model,
                 operation="moderation",
             ):
-                response = await self._client.classifiers.moderate_async(
-                    model=moderation_config.model,
-                    inputs=moderated_content,
-                )
+                with mistral_failures(model=moderation_config.model):
+                    response = await self._client.classifiers.moderate_async(
+                        model=moderation_config.model,
+                        inputs=moderated_content,
+                    )
 
             violations: dict[str, float] = {}
             for result in response.results:

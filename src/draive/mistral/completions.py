@@ -30,6 +30,7 @@ from mistralai.client.utils.eventstreaming import EventStreamAsync
 from draive.mistral.api import MistralAPI
 from draive.mistral.config import MistralChatConfig
 from draive.mistral.utils import (
+    mistral_error_reason,
     unwrap_missing_list_to_unset,
     unwrap_missing_to_unset,
 )
@@ -290,7 +291,9 @@ class MistralCompletions(MistralAPI):
                 raise ModelOutputFailed(
                     provider="mistral",
                     model=config.model,
-                    reason=str(exc),
+                    reason=mistral_error_reason(exc)
+                    if isinstance(exc, MistralError)
+                    else str(exc) or type(exc).__name__,
                 ) from exc
 
             finally:
