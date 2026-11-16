@@ -977,13 +977,20 @@ class MCPClients:
         uri: str,
         **extra: Any,
     ) -> Collection[ResourceReference] | ResourceContent | None:
+        client_identifier: str | None = self._client_identifier_for_uri(uri)
         resources: ResourcesRepository | None = (
             self._resources.get(client_identifier)
-            if (client_identifier := self._client_identifier_for_uri(uri)) is not None
+            if client_identifier is not None
             else None
         )
-        if resources is not None:
-            return await resources.fetching(uri)
+        if resources is not None and client_identifier is not None:
+            fetched: Collection[ResourceReference] | ResourceContent | None = (
+                await resources.fetching(uri)
+            )
+            if isinstance(fetched, Sequence):
+                self._record_reference_clients(fetched, client_identifier)
+
+            return fetched
 
         else:
             ctx.log_warning(f"Requested resource ({uri}) from unknown source")
