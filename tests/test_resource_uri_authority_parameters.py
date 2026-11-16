@@ -127,8 +127,8 @@ async def test_authority_variable_rejects_encoded_user_info() -> None:
     ],
 )
 async def test_authority_variable_rejects_encoded_delimiters(uri: str) -> None:
-    # the raw capture already excludes `#` and `?`, decoding must not reintroduce them
-    assert tenant_path_resource.matches_uri(uri)
+    # decoding must not reintroduce `#` and `?` into a host label
+    assert not tenant_path_resource.matches_uri(uri)
     with pytest.raises(ResourceCorrupted):
         await tenant_path_resource.resolve_from_uri(uri)
 
