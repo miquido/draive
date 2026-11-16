@@ -449,11 +449,15 @@ def _context_messages(  # noqa: C901, PLR0912
                             "tool_use_id": block.identifier,
                             "type": "tool_result",
                             "is_error": block.status == "error",
+                            # materialized, a lazy generator would be exhausted by the first
+                            # serialization of the request
                             "content": cast(  # there will be no thinking within tool results
-                                Iterable[TextBlockParam | ImageBlockParam],  # nor documents
-                                _content_elements(
-                                    block.content,
-                                    cache_type=None,
+                                list[TextBlockParam | ImageBlockParam],  # nor documents
+                                list(
+                                    _content_elements(
+                                        block.content,
+                                        cache_type=None,
+                                    )
                                 ),
                             ),
                         }

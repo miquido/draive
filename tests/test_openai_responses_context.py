@@ -85,3 +85,24 @@ def test_output_image_preceding_a_tool_request_keeps_its_order() -> None:
     assert [param["type"] for param in params] == ["message", "function_call"]
     assert params[0]["role"] == "user"
     assert params[1]["call_id"] == "call_1"
+
+
+def test_function_output_and_message_content_survive_request_retries() -> None:
+    from openai._utils import maybe_transform
+    from openai.types.responses.response_create_params import ResponseCreateParamsStreaming
+
+    from draive.models import ModelToolResponse
+
+    items = _params(
+        ModelInput.of(
+            ModelToolResponse.of("c", tool="t", content=MultimodalContent.of("result")),
+            MultimodalContent.of("question"),
+        )
+    )
+    # the sdk serializes the request on each attempt, retries included
+    first = maybe_transform({"input": items, "model": "m"}, ResponseCreateParamsStreaming)
+    second = maybe_transform({"input": items, "model": "m"}, ResponseCreateParamsStreaming)
+    assert first == second
+    assert second is not None
+    assert second["input"][0]["output"] == [{"type": "input_text", "text": "result"}]
+    assert second["input"][1]["content"] == [{"type": "input_text", "text": "question"}]

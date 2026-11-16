@@ -94,7 +94,7 @@ class OllamaChat(OllamaAPI):
                 raise ModelInputInvalid(
                     provider="ollama",
                     model=config.model,
-                    reason=str(exc),
+                    reason=str(exc) or type(exc).__name__,
                 ) from exc
 
             input_tokens: int | None = None
@@ -172,7 +172,7 @@ class OllamaChat(OllamaAPI):
                 raise ModelOutputFailed(
                     provider="ollama",
                     model=config.model,
-                    reason=str(exc),
+                    reason=str(exc) or type(exc).__name__,
                 ) from exc
 
             finally:
@@ -248,15 +248,9 @@ def _context_messages(
 
     for element in context:
         if isinstance(element, ModelInput):
-            if content := element.content:
-                yield Message(
-                    role="user",
-                    content=_message_text(content),
-                    images=_content_images(content),
-                )
-
             if responses := element.tool_responses:
-                # Include any tool responses that follow the user message
+                # tool messages have to directly follow the assistant message
+                # carrying the tool calls, any user content comes after them
                 for tool_resp in responses:
                     if tool_resp.content.contains_resources:
                         ctx.log_warning(
@@ -270,6 +264,13 @@ def _context_messages(
                         content=_message_text(tool_resp.content),
                     )
 
+            if content := element.content:
+                yield Message(
+                    role="user",
+                    content=_message_text(content),
+                    images=_content_images(content),
+                )
+
         else:
             assert isinstance(element, ModelOutput)  # nosec: B101
             content = element.content
@@ -280,6 +281,9 @@ def _context_messages(
                 for block in element.output
                 if isinstance(block, ModelReasoning)
             )
+            if not content and not reasoning and not element.tool_requests:
+                continue  # an empty assistant message carries nothing
+
             yield Message(
                 role="assistant",
                 content=_message_text(content),
