@@ -260,10 +260,10 @@ class MCPServer:
                     if resource.has_args:
                         resource_template_declarations.append(
                             MCPResourceTemplate(
-                                uri_template=resource.declaration.template_uri,
+                                uri_template=str(resource.declaration.template_uri),
                                 mime_type=resource.declaration.mime_type,
                                 name=resource.declaration.meta.name
-                                or resource.declaration.template_uri,
+                                or str(resource.declaration.template_uri),
                                 description=resource.declaration.meta.description,
                             )
                         )
@@ -273,15 +273,15 @@ class MCPServer:
                     else:
                         resource_declarations.append(
                             MCPResource(
-                                uri=resource.declaration.template_uri,
+                                uri=str(resource.declaration.template_uri),
                                 mime_type=resource.declaration.mime_type,
                                 name=resource.declaration.meta.name
-                                or resource.declaration.template_uri,
+                                or str(resource.declaration.template_uri),
                                 description=resource.declaration.meta.description,
                             )
                         )
                         # we treat it as a regular resource if template has no arguments
-                        available_resources[resource.declaration.template_uri] = resource
+                        available_resources[str(resource.declaration.template_uri)] = resource
 
         # the resources capability is derived from the `resources/list` handler registration,
         # it has to be always available to let clients discover resource templates as well

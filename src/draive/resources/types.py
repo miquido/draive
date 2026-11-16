@@ -2,7 +2,7 @@ from base64 import b64decode, b64encode
 from collections.abc import Collection
 from typing import Any, Literal, Protocol, Self, final, overload, runtime_checkable
 
-from haiway import Meta, MetaValues, Paginated, Pagination, State
+from haiway import Meta, MetaValues, Paginated, Pagination, State, URITemplate
 
 __all__ = (
     "MimeType",
@@ -154,7 +154,7 @@ class ResourceReferenceTemplate(State, serializable=True):
     def of(
         cls,
         /,
-        template_uri: str,
+        template_uri: URITemplate | str,
         *,
         name: str | None = None,
         description: str | None = None,
@@ -162,7 +162,11 @@ class ResourceReferenceTemplate(State, serializable=True):
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         return cls(
-            template_uri=template_uri,
+            template_uri=(
+                template_uri
+                if isinstance(template_uri, URITemplate)
+                else URITemplate.of(template_uri)
+            ),
             mime_type=mime_type if mime_type is not None else "application/octet-stream",
             meta=Meta.of(meta).updating(
                 name=name,
@@ -170,7 +174,7 @@ class ResourceReferenceTemplate(State, serializable=True):
             ),
         )
 
-    template_uri: str
+    template_uri: URITemplate
     mime_type: MimeType
     meta: Meta = Meta.empty
 
