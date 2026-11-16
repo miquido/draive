@@ -10,6 +10,7 @@ from haiway import Pagination, ctx
 from haiway.postgres.types import PostgresTransactionContext
 
 from draive.conversation.types import ConversationTurn, ConversationUserTurn
+from draive.models import ModelInput
 from draive.multimodal import MultimodalContent
 from draive.postgres.conversation_memory import PostgresConversationMemory
 
@@ -165,7 +166,15 @@ async def test_postgres_conversation_memory_recall_uses_latest_turns_in_order(
 
         context = await memory.recall(Pagination.of(limit=2))
 
-        assert [element.content.to_str() for element in context] == ["second", "third"]
+        # adjacent user turns are merged into one input, keeping their order
+        assert len(context) == 1
+        assert isinstance(context[0], ModelInput)
+        assert [
+            block.to_str() for block in context[0].input if isinstance(block, MultimodalContent)
+        ] == [
+            "second",
+            "third",
+        ]
 
 
 @pytest.mark.asyncio

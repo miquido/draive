@@ -1,17 +1,21 @@
 import mimetypes
+import os
 import re
+import stat
 from asyncio import gather
 from collections.abc import Collection, Mapping, Sequence
 from io import BytesIO
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import Any
-from urllib.parse import ParseResult, urlparse
+from urllib.parse import ParseResult, quote, unquote, urlparse
+from uuid import uuid4
 
 from botocore.exceptions import ClientError
 from haiway import BasicValue, Meta, Paginated, Pagination, asynchronous
 
 from draive.aws.api import AWSAPI
-from draive.aws.types import AWSAccessDenied, AWSError, AWSResourceNotFound
+from draive.aws.types import AWSAccessDenied, AWSError, AWSInvalidArgument, AWSResourceNotFound
 from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("AWSS3Mixin",)
@@ -57,9 +61,7 @@ class AWSS3Mixin(AWSAPI):
         if not uri.startswith("s3://"):
             raise ValueError("Unsupported list uri scheme")
 
-        parsed_uri: ParseResult = urlparse(uri)  # s3://bucket/prefix
-        bucket: str = parsed_uri.netloc
-        prefix: str = parsed_uri.path.lstrip("/")
+        bucket, prefix = _parse_s3_uri(uri)  # s3://bucket/prefix
         references, token = await self._list_page(
             bucket=bucket,
             prefix=prefix,
@@ -119,9 +121,7 @@ class AWSS3Mixin(AWSAPI):
         if not uri.startswith("s3://"):
             raise ValueError("Unsupported list uri scheme")
 
-        parsed_uri: ParseResult = urlparse(uri)  # s3://bucket/prefix
-        bucket: str = parsed_uri.netloc
-        prefix: str = parsed_uri.path.lstrip("/")
+        bucket, prefix = _parse_s3_uri(uri)  # s3://bucket/prefix
         return await self._list(
             bucket=bucket,
             prefix=prefix,
@@ -161,9 +161,7 @@ class AWSS3Mixin(AWSAPI):
         if not uri.startswith("s3://"):
             raise ValueError("Unsupported fetch uri scheme")
 
-        parsed_uri: ParseResult = urlparse(uri)  # s3://bucket/name
-        bucket: str = parsed_uri.netloc
-        name: str = parsed_uri.path.lstrip("/")
+        bucket, name = _parse_s3_uri(uri)  # s3://bucket/name
         content, object_info = await gather(
             self._fetch(
                 bucket=bucket,
@@ -235,9 +233,7 @@ class AWSS3Mixin(AWSAPI):
         if not uri.startswith("s3://"):
             raise ValueError("Unsupported download uri scheme")
 
-        parsed_uri: ParseResult = urlparse(uri)  # s3://bucket/name
-        bucket: str = parsed_uri.netloc
-        name: str = parsed_uri.path.lstrip("/")
+        bucket, name = _parse_s3_uri(uri)  # s3://bucket/name
         return await self._download(
             bucket=bucket,
             name=name,
@@ -251,7 +247,15 @@ class AWSS3Mixin(AWSAPI):
         name: str,
         save_path: Path | str,
     ) -> None:
-        with open(save_path, "wb") as file:
+        target: Path = Path(save_path)
+        with NamedTemporaryFile(
+            mode="wb",
+            dir=target.parent,
+            prefix=f".{target.name}.",
+            suffix=".part",
+            delete=False,
+        ) as file:
+            temporary_path: Path = Path(file.name)
             try:
                 self._s3_client.download_fileobj(
                     Bucket=bucket,
@@ -259,12 +263,25 @@ class AWSS3Mixin(AWSAPI):
                     Fileobj=file,
                 )
 
-            except ClientError as exc:
-                raise _translate_client_error(
-                    error=exc,
-                    bucket=bucket,
-                    key=name,
-                ) from exc
+            except BaseException as exc:
+                file.close()
+                temporary_path.unlink(missing_ok=True)
+                if isinstance(exc, ClientError):
+                    raise _translate_client_error(
+                        error=exc,
+                        bucket=bucket,
+                        key=name,
+                    ) from exc
+
+                raise
+
+        try:
+            temporary_path.chmod(_download_mode(target))
+            temporary_path.replace(target)
+
+        except BaseException:
+            temporary_path.unlink(missing_ok=True)
+            raise
 
     @asynchronous
     def _get_object_info(
@@ -301,7 +318,9 @@ class AWSS3Mixin(AWSAPI):
         uri
             Destination S3 URI (``s3://bucket/key``).
         content
-            Data and metadata to upload.
+            Data and metadata to upload. Metadata keys and values are sent as S3 user
+            metadata, which must be ASCII: control characters are stripped, whitespace is
+            collapsed, values over 1,024 bytes are truncated and empty entries are skipped.
 
         Returns
         -------
@@ -313,6 +332,9 @@ class AWSS3Mixin(AWSAPI):
         ------
         ValueError
             If the ``uri`` does not use the ``s3://`` scheme.
+        AWSInvalidArgument
+            If any metadata key or value contains non-ASCII characters. Raised before
+            any request is made; the message names the offending key but not its value.
         AWSAccessDenied
             If S3 rejects the request due to missing or invalid credentials.
         AWSResourceNotFound
@@ -323,9 +345,7 @@ class AWSS3Mixin(AWSAPI):
         if not uri.startswith("s3://"):
             raise ValueError("Unsupported upload uri scheme")
 
-        parsed_uri: ParseResult = urlparse(uri)  # s3://bucket/name
-        bucket: str = parsed_uri.netloc
-        name: str = parsed_uri.path.lstrip("/")
+        bucket, name = _parse_s3_uri(uri)  # s3://bucket/name
         await self._upload(
             bucket=bucket,
             name=name,
@@ -346,6 +366,9 @@ class AWSS3Mixin(AWSAPI):
         limit: int | None,
         **extra: Any,
     ) -> Sequence[ResourceReference]:
+        if limit is not None and limit <= 0:
+            return ()  # S3 rejects zero page sizes, there is nothing to request
+
         try:
             paginator = self._s3_client.get_paginator("list_objects_v2")
             pagination_config: dict[str, int] = {}
@@ -397,7 +420,7 @@ class AWSS3Mixin(AWSAPI):
 
                     references.append(
                         ResourceReference.of(
-                            f"s3://{bucket}/{prefix_key}",
+                            _s3_uri(bucket, prefix_key),
                             name=_object_name(prefix_key),
                             meta=Meta.of({"type": "prefix"}),
                         )
@@ -463,7 +486,7 @@ class AWSS3Mixin(AWSAPI):
 
                 references.append(
                     ResourceReference.of(
-                        f"s3://{bucket}/{prefix_key}",
+                        _s3_uri(bucket, prefix_key),
                         name=_object_name(prefix_key),
                         meta=Meta.of({"type": "prefix"}),
                     )
@@ -497,13 +520,10 @@ class AWSS3Mixin(AWSAPI):
             return references
 
         except ClientError as exc:
-            error_info: Mapping[str, Any] = getattr(exc, "response", {}).get("Error", {})
-            code: str = str(error_info.get("Code") or "").strip()
-            message: str = str(error_info.get("Message") or str(exc)).strip()
-            raise AWSError(
-                uri="s3://",
-                code=code or None,
-                message=message,
+            raise _translate_client_error(
+                error=exc,
+                bucket="",
+                key="",
             ) from exc
 
     @asynchronous
@@ -520,7 +540,7 @@ class AWSS3Mixin(AWSAPI):
             "Bucket": bucket,
             "Body": content,
             "Key": name,
-            "Metadata": _sanitize_metadata(meta),
+            "Metadata": _sanitize_metadata(meta, uri=_s3_uri(bucket, name)),
         }
         if content_type:
             parameters["ContentType"] = content_type
@@ -536,7 +556,37 @@ class AWSS3Mixin(AWSAPI):
             ) from exc
 
 
-def _sanitize_metadata_value(value: Any) -> str:
+def _download_mode(
+    target: Path,
+    /,
+) -> int:
+    # temporary files are created owner-only, final file should look like any other new one
+    try:
+        return stat.S_IMODE(target.stat().st_mode)  # keep the mode of the replaced file
+
+    except FileNotFoundError:
+        pass
+
+    # a probe file picks the umask default without touching the process-wide mask,
+    # which can't be read without changing it and would race with other threads
+    probe: str = str(target.parent / f".{target.name}.{uuid4().hex}.mode")
+    descriptor: int = os.open(probe, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o666)
+    try:
+        return stat.S_IMODE(os.fstat(descriptor).st_mode)
+
+    finally:
+        os.close(descriptor)
+        os.unlink(probe)
+
+
+def _sanitize_metadata_text(
+    value: Any,
+    /,
+    *,
+    key: str,
+    uri: str,
+    subject: str,
+) -> str:
     # Convert to string first
     text: str = str(value)
 
@@ -549,21 +599,28 @@ def _sanitize_metadata_value(value: Any) -> str:
     # Collapse multiple spaces
     text = re.sub(r"\s+", " ", text).strip()
 
+    # S3 user metadata travels in HTTP headers and botocore rejects anything but ASCII
+    if not text.isascii():
+        raise AWSInvalidArgument(
+            uri=uri,
+            message=(
+                f"S3 metadata {subject} for key {key!r} contains non-ASCII characters,"
+                " encode it (e.g. percent-encoding) before passing it as metadata"
+            ),
+        )
+
     # S3 metadata value limit is 1,024 bytes per value
     max_bytes = 1021  # Reserve 3 bytes for "..."
-    text_bytes = text.encode("utf-8")
-
-    if len(text_bytes) > max_bytes:
-        # Truncate at byte level and ensure valid UTF-8
-        truncated_bytes = text_bytes[:max_bytes]
-        # Decode with 'ignore' to handle partial characters at the end
-        text = truncated_bytes.decode("utf-8", "ignore") + "..."
+    if len(text) > max_bytes:
+        text = text[:max_bytes] + "..."
 
     return text
 
 
 def _sanitize_metadata(
     meta: Mapping[str, BasicValue] | None,
+    *,
+    uri: str = "",
 ) -> dict[str, str]:
     if not meta:
         return {}
@@ -571,12 +628,34 @@ def _sanitize_metadata(
     sanitized: dict[str, str] = {}
     for key, value in meta.items():
         # Sanitize both key and value
-        sanitized_key = _sanitize_metadata_value(key)
-        sanitized_value = _sanitize_metadata_value(value)
+        sanitized_key = _sanitize_metadata_text(key, key=str(key), uri=uri, subject="key")
+        sanitized_value = _sanitize_metadata_text(
+            value,
+            key=str(key),
+            uri=uri,
+            subject="value",
+        )
         if sanitized_key and sanitized_value:  # Skip empty keys/values
             sanitized[sanitized_key] = sanitized_value
 
     return sanitized
+
+
+def _s3_uri(
+    bucket: str,
+    key: str,
+) -> str:
+    if not key:
+        return f"s3://{bucket}"
+
+    return f"s3://{bucket}/{quote(key, safe='/')}"
+
+
+def _parse_s3_uri(
+    uri: str,
+) -> tuple[str, str]:
+    parsed_uri: ParseResult = urlparse(uri)  # s3://bucket/key
+    return parsed_uri.netloc, unquote(parsed_uri.path.lstrip("/"))
 
 
 def _object_name(key: str) -> str | None:
@@ -606,7 +685,7 @@ def _object_reference(
         meta_values["mime_type"] = mime_type
 
     return ResourceReference.of(
-        f"s3://{bucket}/{key}",
+        _s3_uri(bucket, key),
         name=_object_name(key),
         meta=Meta.of(meta_values),
     )
@@ -643,9 +722,16 @@ def _translate_client_error(
     code: str = str(error_info.get("Code") or "").strip()
     message: str = str(error_info.get("Message") or str(error)).strip()
     status_code = response_metadata.get("HTTPStatusCode")
-    uri: str = f"s3://{bucket}/{key}"
+    uri: str = _s3_uri(bucket, key)
 
     normalized_code: str = code.lower()
+    if normalized_code == "nosuchbucket":
+        return AWSResourceNotFound(
+            uri=f"s3://{bucket}",
+            code=code or None,
+            message=message,
+        )
+
     if normalized_code in {"nosuchkey", "notfound", "404"} or status_code == 404:  # noqa: PLR2004
         return AWSResourceNotFound(
             uri=uri,
@@ -661,13 +747,6 @@ def _translate_client_error(
     } or status_code in {401, 403}:
         return AWSAccessDenied(
             uri=uri,
-            code=code or None,
-            message=message,
-        )
-
-    if normalized_code == "nosuchbucket":
-        return AWSResourceNotFound(
-            uri=f"s3://{bucket}",
             code=code or None,
             message=message,
         )

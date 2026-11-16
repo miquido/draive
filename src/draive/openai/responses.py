@@ -21,6 +21,7 @@ from openai.types.responses import (
     ResponseOutputTextParam,
     ResponseReasoningItem,
     ResponseReasoningItemParam,
+    ResponseReasoningSummaryPartAddedEvent,
     ResponseReasoningSummaryTextDeltaEvent,
     ResponseReasoningTextDeltaEvent,
     ResponseRefusalDoneEvent,
@@ -128,6 +129,7 @@ class OpenAIResponses(OpenAIAPI):
                     reason=str(exc),
                 ) from exc
 
+            terminated: bool = False
             try:
                 async with self._client.responses.stream(
                     model=config.model,
@@ -177,6 +179,16 @@ class OpenAIResponses(OpenAIAPI):
                                     TextContent.of(event.delta),
                                     meta={"kind": "reasoning_chunk"},
                                 )
+
+                            case "response.reasoning_summary_part.added":
+                                assert isinstance(event, ResponseReasoningSummaryPartAddedEvent)  # nosec: B101
+                                # parts of a summary are distinct paragraphs, they would
+                                # run together once aggregated into a single text
+                                if event.summary_index > 0:
+                                    yield ModelReasoningChunk.of(
+                                        TextContent.of("\n\n"),
+                                        meta={"kind": "reasoning_summary_chunk"},
+                                    )
 
                             case "response.reasoning_summary_text.delta":
                                 assert isinstance(event, ResponseReasoningSummaryTextDeltaEvent)  # nosec: B101
@@ -259,6 +271,14 @@ class OpenAIResponses(OpenAIAPI):
 
                             case "error":
                                 assert isinstance(event, ResponseErrorEvent)  # nosec: B101
+                                if event.code == "rate_limit_exceeded":
+                                    raise model_rate_limit(
+                                        provider="openai",
+                                        model=config.model,
+                                        retry_after=None,
+                                        error_code=event.code,
+                                    )
+
                                 raise ModelOutputFailed(
                                     provider="openai",
                                     model=config.model,
@@ -280,7 +300,16 @@ class OpenAIResponses(OpenAIAPI):
                                         ),
                                     )
 
+                                terminated = True
                                 if error := event.response.error:
+                                    if error.code in ("rate_limit_exceeded", "insufficient_quota"):
+                                        raise model_rate_limit(
+                                            provider="openai",
+                                            model=config.model,
+                                            retry_after=None,
+                                            error_code=error.code,
+                                        )
+
                                     raise ModelOutputFailed(
                                         provider="openai",
                                         model=config.model,
@@ -315,6 +344,13 @@ class OpenAIResponses(OpenAIAPI):
 
                             case _:
                                 continue  # skip other events
+
+                    if not terminated:
+                        raise ModelOutputFailed(
+                            provider="openai",
+                            model=config.model,
+                            reason="stream ended without a terminal event",
+                        )
 
             except OpenAIRateLimitError as exc:
                 quota_capacity: int | None = None
@@ -590,15 +626,18 @@ def _model_output_to_params(
                         summary=[
                             {
                                 "type": "summary_text",
-                                "text": part.to_str(),
+                                "text": text,
                             }
                             for part in block.reasoning.parts
+                            if (text := part.to_str())
                         ],
                         encrypted_content=encrypted,
                     )
 
                 case other:
-                    raise ValueError(f"Unsupported reasoning element: {other}")
+                    # reasoning produced by another provider can't be replayed here
+                    ctx.log_debug(f"Skipping unsupported reasoning element: {other}")
+                    continue
 
         else:
             assert isinstance(block, ModelToolRequest)  # nosec: B101

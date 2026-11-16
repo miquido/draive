@@ -1,4 +1,11 @@
-from collections.abc import AsyncGenerator, AsyncIterable, Generator, MutableSequence, Sequence
+from collections.abc import (
+    AsyncGenerator,
+    AsyncIterable,
+    Generator,
+    Iterable,
+    MutableSequence,
+    Sequence,
+)
 from datetime import UTC, datetime
 from typing import Any, Literal, Protocol, Self, final, runtime_checkable
 from uuid import UUID, uuid4
@@ -252,6 +259,53 @@ class ConversationMemoryFetching(Protocol):
         pagination: Pagination,
         **extra: Any,
     ) -> Paginated[ConversationTurn]: ...
+
+
+def merged_model_context(
+    context: Iterable[ModelContextElement],
+    /,
+) -> ModelContext:
+    """Normalize a context so inputs and outputs strictly alternate.
+
+    Consecutive elements of the same kind (for example an input carrying tool responses followed
+    by the next user input after an interrupted turn, or inputs separated by an empty assistant
+    reply) are merged into a single element. Blocks are concatenated in their original order and
+    metadata is merged with later values taking precedence.
+    Contexts which already alternate are returned unchanged.
+
+    Parameters
+    ----------
+    context
+        Context elements in chronological order.
+
+    Returns
+    -------
+    ModelContext
+        Context without adjacent elements of the same kind.
+    """
+    merged: MutableSequence[ModelContextElement] = []
+    for element in context:
+        if merged:
+            previous: ModelContextElement = merged[-1]
+            if isinstance(previous, ModelInput) and isinstance(element, ModelInput):
+                merged[-1] = ModelInput.of(
+                    *previous.input,
+                    *element.input,
+                    meta=previous.meta.merged_with(element.meta),
+                )
+                continue
+
+            if isinstance(previous, ModelOutput) and isinstance(element, ModelOutput):
+                merged[-1] = ModelOutput.of(
+                    *previous.output,
+                    *element.output,
+                    meta=previous.meta.merged_with(element.meta),
+                )
+                continue
+
+        merged.append(element)
+
+    return tuple(merged)
 
 
 def _tool_response_from_event(

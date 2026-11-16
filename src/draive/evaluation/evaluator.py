@@ -1,6 +1,8 @@
 import re
 from collections.abc import Callable, Collection, Sequence
+from html import escape
 from inspect import signature
+from math import fsum
 from typing import Annotated, Literal, Protocol, Self, cast, final, overload, runtime_checkable
 
 from haiway import (
@@ -143,10 +145,11 @@ class EvaluatorResult(State, serializable=True):
 
         meta: list[str] = []
         for key, value in self.meta.items():
-            meta.append(f"<{key}>{value}</{key}>")
+            tag: str = escape(str(key))
+            meta.append(f"<{tag}>{escape(str(value))}</{tag}>")
 
         return (
-            f"<evaluator name='{self.evaluator}' status='{status}'"
+            f"<evaluator name='{escape(self.evaluator)}' status='{status}'"
             f" performance='{self.performance:.2f}%'>"
             f"\n<score>{self.score:.3f}</score>"
             f"\n<threshold>{self.threshold:.3f}</threshold>"
@@ -165,7 +168,8 @@ class EvaluatorResult(State, serializable=True):
             Performance percentage, may go above 100% if score is higher than threshold
         """
         if self.threshold <= 0:
-            return self.score * 100.0
+            # nothing is required, the requirement is always fully met
+            return 100.0
 
         return (self.score / self.threshold) * 100.0
 
@@ -173,7 +177,9 @@ class EvaluatorResult(State, serializable=True):
         self,
         other: Self,
     ) -> bool:
-        assert isinstance(other, self.__class__)  # nosec: B101
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+
         if self.evaluator != other.evaluator or self.threshold != other.threshold:
             raise ValueError("Can't compare different evaluator results")
 
@@ -183,7 +189,9 @@ class EvaluatorResult(State, serializable=True):
         self,
         other: Self,
     ) -> bool:
-        assert isinstance(other, self.__class__)  # nosec: B101
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+
         if self.evaluator != other.evaluator or self.threshold != other.threshold:
             raise ValueError("Can't compare different evaluator results")
 
@@ -193,7 +201,9 @@ class EvaluatorResult(State, serializable=True):
         self,
         other: Self,
     ) -> bool:
-        assert isinstance(other, self.__class__)  # nosec: B101
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+
         if self.evaluator != other.evaluator or self.threshold != other.threshold:
             raise ValueError("Can't compare different evaluator results")
 
@@ -203,7 +213,9 @@ class EvaluatorResult(State, serializable=True):
         self,
         other: Self,
     ) -> bool:
-        assert isinstance(other, self.__class__)  # nosec: B101
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+
         if self.evaluator != other.evaluator or self.threshold != other.threshold:
             raise ValueError("Can't compare different evaluator results")
 
@@ -414,20 +426,27 @@ class Evaluator[Value, **Args]:
         async def evaluate(
             value: Value,
         ) -> EvaluatorResult:
-            scores: Sequence[float] = [
-                result.score
-                for result in await concurrently(
-                    (evaluator(value), *(evaluator(value) for evaluator in evaluators)),
-                    concurrent_tasks=concurrent_tasks,
-                    return_exceptions=False,
-                )
+            results: Sequence[EvaluatorResult] = await concurrently(
+                (evaluator(value), *(evaluator(value) for evaluator in evaluators)),
+                concurrent_tasks=concurrent_tasks,
+                return_exceptions=False,
+            )
+            scores: Sequence[float] = [result.score for result in results]
+            # an errored evaluation scores zero, keep the cause visible in the average
+            # custom evaluators may store anything within meta, only text is kept
+            errors: Sequence[str] = [
+                error
+                for result in results
+                if isinstance(error := result.meta.get("error"), str) and error
             ]
 
+            # the mean can't leave the range of averaged scores, rounding errors might
+            # push it out though, i.e. equal scores ending up below their own value
             return EvaluatorResult(
                 evaluator="average",
-                score=sum(scores) / len(scores),
+                score=max(min(scores), min(max(scores), fsum(scores) / len(scores))),
                 threshold=evaluation_score_value(threshold),
-                meta=Meta.empty,
+                meta=Meta.empty.with_error("; ".join(errors)) if errors else Meta.empty,
             )
 
         return evaluate
@@ -820,12 +839,18 @@ class Evaluator[Value, **Args]:
         except ValueError:
             pass  # signature not available, rely on the call
 
-        result: EvaluationScore | EvaluationScoreValue
         try:
-            result = await self._definition(
-                value,
-                *args,
-                **kwargs,
+            # score conversion is part of the isolated evaluation, a malformed score
+            # becomes an errored result instead of aborting sibling evaluations
+            return EvaluatorResult.of(
+                self.name,
+                score=await self._definition(
+                    value,
+                    *args,
+                    **kwargs,
+                ),
+                threshold=self.threshold,
+                meta=self.meta,
             )
 
         except Exception as exc:
@@ -833,17 +858,15 @@ class Evaluator[Value, **Args]:
                 f"Evaluator `{self.name}` failed due to an error",
                 exception=exc,
             )
-            result = EvaluationScore.of(
-                0.0,
-                meta=Meta.empty.with_error(exc),
+            return EvaluatorResult.of(
+                self.name,
+                score=EvaluationScore.of(
+                    0.0,
+                    meta=Meta.empty.with_error(exc),
+                ),
+                threshold=self.threshold,
+                meta=self.meta,
             )
-
-        return EvaluatorResult.of(
-            self.name,
-            score=result,
-            threshold=self.threshold,
-            meta=self.meta,
-        )
 
 
 @overload

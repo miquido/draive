@@ -6,10 +6,12 @@ from draive.generation.model import (
     ModelGenerationDecoder,
 )
 from draive.generation.text import TextGenerating, TextGeneration
+from draive.generation.types import GenerationOutputMissing
 
 __all__ = (
     "AudioGenerating",
     "AudioGeneration",
+    "GenerationOutputMissing",
     "ImageGenerating",
     "ImageGeneration",
     "ModelGenerating",

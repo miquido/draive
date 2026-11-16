@@ -80,7 +80,15 @@ class StepState(State, serializable=True):
         ------
         ValueError
             If artifacts resolve to the same key within a single call.
+        TypeError
+            If ``context`` is a single ``State`` instead of a model context.
         """
+        if isinstance(context, State):
+            raise TypeError(
+                f"Expected StepState or model context, got {type(context).__name__} - "
+                "artifacts have to be passed after the context"
+            )
+
         return cls(
             context=context,
             artifacts=artifacts_mapping(artifacts, keyed_artifacts),
@@ -174,6 +182,7 @@ class StepState(State, serializable=True):
 
     def updating_artifacts(
         self,
+        /,
         *artifacts: State,
         **keyed_artifacts: State,
     ) -> Self:

@@ -2,8 +2,14 @@ from base64 import b64decode, b64encode
 from collections.abc import Generator, MutableSequence
 from uuid import uuid4
 
-from google.genai.types import FunctionResponseDict, FunctionResponsePartDict, Part, PartDict
-from haiway import Meta, as_dict
+from google.genai.types import (
+    FunctionCall,
+    FunctionResponseDict,
+    FunctionResponsePartDict,
+    Part,
+    PartDict,
+)
+from haiway import Meta, as_dict, ctx
 
 from draive.models import (
     ModelInputBlocks,
@@ -45,6 +51,19 @@ def _reasoning_meta(
     return Meta.of({"kind": "thought"})
 
 
+def _call_identifier(
+    call: FunctionCall,
+    /,
+) -> str:
+    # the api reports no identifier outside of live sessions, a local one is what
+    # correlates the response with its request. It is kept on the call, so each
+    # representation of the same part carries the same identifier.
+    if not call.id:
+        call.id = str(uuid4())
+
+    return call.id
+
+
 def part_as_stream_elements(
     part: Part,
     /,
@@ -64,9 +83,7 @@ def part_as_stream_elements(
 
     if part.function_call and part.function_call.name:
         yield ModelToolRequest.of(
-            # the api reports no identifier outside of live sessions, a local one
-            # is what correlates the response with its request
-            part.function_call.id or str(uuid4()),
+            _call_identifier(part.function_call),
             tool=part.function_call.name,
             arguments=part.function_call.args,
             meta=Meta.of(
@@ -108,9 +125,7 @@ def part_as_output_blocks(
 
     if part.function_call and part.function_call.name:
         yield ModelToolRequest.of(
-            # the api reports no identifier outside of live sessions, a local one
-            # is what correlates the response with its request
-            part.function_call.id or str(uuid4()),
+            _call_identifier(part.function_call),
             tool=part.function_call.name,
             arguments=part.function_call.args,
             meta=Meta.of(
@@ -225,7 +240,9 @@ def block_parts(
 
         elif isinstance(block, ModelReasoning):
             if block.meta.kind != "thought":
-                raise ValueError(f"Unsupported reasoning element: {block.meta.kind}")
+                # reasoning produced by another provider can't be replayed here
+                ctx.log_debug(f"Skipping unsupported reasoning element: {block.meta.kind}")
+                continue
 
             if signature := block.meta.get_str("signature"):
                 yield {

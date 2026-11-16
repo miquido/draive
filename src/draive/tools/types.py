@@ -17,6 +17,7 @@ from draive.utils import ProcessingEvent
 
 __all__ = (
     "Tool",
+    "ToolArgumentsException",
     "ToolException",
     "ToolOutputChunk",
     "ToolsLoading",
@@ -38,6 +39,16 @@ class ToolException(Exception):
         super().__init__(*args)
         self.tool: str = tool
         self.meta: Meta = Meta.of(meta)
+
+
+class ToolArgumentsException(ToolException):
+    """Raised when tool arguments do not match the tool parameters.
+
+    The message describes which argument is invalid and why, it never contains
+    the whole arguments payload, so it is safe to be presented to the model.
+    """
+
+    __slots__ = ()
 
 
 ToolOutputChunk = MultimodalContentPart | ProcessingEvent

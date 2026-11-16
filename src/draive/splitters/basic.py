@@ -114,22 +114,25 @@ def _merge(  # noqa: C901, PLR0912
             if chunk := accumulator.strip():
                 result.append(chunk)
 
-            # clear accumulator - we will fill it now
+            # rebuild the accumulator from the tail of previous parts,
+            # the result including the current part must still fit
+            overlapped: list[str] = []
             accumulator = ""
             for element in reversed(overlap_accumulator):
                 merged_accumulator: str = element + accumulator
 
                 if (
                     count_size(merged_accumulator) < part_overlap_size
-                    and count_size(accumulator + current_part) <= part_size
+                    and count_size(merged_accumulator + current_part) <= part_size
                 ):
-                    overlap_accumulator = [element, *overlap_accumulator]
+                    overlapped.insert(0, element)
                     accumulator = merged_accumulator
 
                 else:
                     break
 
-            overlap_accumulator.append(current_part)
+            overlapped.append(current_part)
+            overlap_accumulator = overlapped
             accumulator = accumulator + current_part
 
         # otherwise make start a new part out of current

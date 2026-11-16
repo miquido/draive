@@ -82,7 +82,7 @@ class MCPServer:
         name: str,
         version: str | None = None,
         instructions: str | None = None,
-        resources: Iterable[ResourceTemplate[Any] | Resource] = (),
+        resources: Iterable[ResourceTemplate[...] | Resource] = (),
         tools: Toolbox | Iterable[Tool] = Toolbox.empty,
         disposables: Collection[Disposable] = (),
     ) -> None:
@@ -95,7 +95,7 @@ class MCPServer:
         on_list_resources: _ListResourcesHandler | None = None
         on_list_resource_templates: _ListResourceTemplatesHandler | None = None
         on_read_resource: _ReadResourceHandler | None = None
-        available_resources: Sequence[ResourceTemplate[Any] | Resource] = tuple(resources)
+        available_resources: Sequence[ResourceTemplate[...] | Resource] = tuple(resources)
         if available_resources:
             (
                 on_list_resources,
@@ -378,6 +378,19 @@ class MCPServer:
                 "call_tool",
                 *context.lifespan_context,
             ):
+                arguments: Mapping[str, Any] = params.arguments or {}
+                if (missing := _missing_argument(toolbox, params.name, arguments)) is not None:
+                    return CallToolResult(
+                        content=[
+                            MCPTextContent(
+                                type="text",
+                                text=f"Validation of .{missing} failed: required argument"
+                                " is missing",
+                            )
+                        ],
+                        is_error=True,
+                    )
+
                 # the lowlevel server no longer converts exceptions to an error result
                 try:
                     return CallToolResult(
@@ -385,7 +398,7 @@ class MCPServer:
                             _convert_multimodal_content(
                                 await toolbox.call(
                                     params.name,
-                                    arguments=params.arguments or {},
+                                    arguments=arguments,
                                 )
                             )
                         ),
@@ -408,6 +421,27 @@ class MCPServer:
         return (list_tools, call_tool)
 
 
+def _missing_argument(
+    toolbox: Toolbox,
+    name: str,
+    arguments: Mapping[str, Any],
+    /,
+) -> str | None:
+    selected: Tool | None = toolbox.tools.get(name)
+    if selected is None:
+        return None  # unknown tools are reported by the toolbox
+
+    parameters: Mapping[str, Any] | None = selected.specification.parameters
+    if not parameters:
+        return None
+
+    for required in parameters.get("required", ()):
+        if required not in arguments:
+            return str(required)
+
+    return None
+
+
 def _resource_content(
     resource: Resource,
     /,
@@ -415,25 +449,67 @@ def _resource_content(
     uri: str,
 ) -> Iterable[TextResourceContents | BlobResourceContents]:
     if isinstance(resource.resource, ResourceContent):
-        match resource.resource.mime_type:
-            case "text/plain" | "application/json":
-                yield TextResourceContents(
-                    uri=uri,
-                    mime_type=resource.resource.mime_type,
-                    text=b64decode(resource.resource.data).decode(),
-                )
+        mime_type: str = resource.resource.mime_type
+        text: str | None = (
+            _decode_text(resource.resource.data, mime_type=mime_type)
+            if _is_text_mime_type(mime_type)
+            else None
+        )
+        if text is not None:
+            yield TextResourceContents(
+                uri=uri,
+                mime_type=mime_type,
+                text=text,
+            )
 
-            case _:
-                yield BlobResourceContents(
-                    uri=uri,
-                    mime_type=resource.resource.mime_type,
-                    # blob carries the base64 payload, which is what we already hold
-                    blob=resource.resource.data,
-                )
+        else:
+            yield BlobResourceContents(
+                uri=uri,
+                mime_type=resource.resource.mime_type,
+                # blob carries the base64 payload, which is what we already hold
+                blob=resource.resource.data,
+            )
 
     else:
         # Multi-content resources (lists of references) are not supported for server reads
         raise NotImplementedError("Multi-content resources are not supported yet")
+
+
+def _media_type(mime_type: str, /) -> str:
+    return mime_type.partition(";")[0].strip().lower()
+
+
+def _is_text_mime_type(mime_type: str, /) -> bool:
+    media_type: str = _media_type(mime_type)
+    return (
+        media_type.startswith("text/")
+        or media_type == "application/json"
+        or media_type.endswith("+json")
+    )
+
+
+def _decode_text(data: str, /, *, mime_type: str) -> str | None:
+    charset: str = "utf-8"
+    for parameter in mime_type.split(";")[1:]:
+        key, _, value = parameter.partition("=")
+        if key.strip().lower() == "charset" and value.strip():
+            charset = value.strip().strip('"')
+
+    payload: bytes = b64decode(data)
+    try:
+        return payload.decode(charset)
+
+    except LookupError:
+        pass  # unknown charset, fallback to the default one
+
+    except UnicodeDecodeError:
+        return None  # not a text in the declared charset, to be served as a blob
+
+    try:
+        return payload.decode()
+
+    except UnicodeDecodeError:
+        return None
 
 
 def _convert_multimodal_content(
@@ -469,11 +545,14 @@ def _convert_multimodal_content(
                     )
                 )
 
-            elif mime == "text/plain":
+            elif (
+                _media_type(mime).startswith("text/")
+                and (decoded_text := _decode_text(part.data, mime_type=mime)) is not None
+            ):
                 converted.append(
                     MCPTextContent(
                         type="text",
-                        text=b64decode(part.data).decode(),
+                        text=decoded_text,
                     )
                 )
 

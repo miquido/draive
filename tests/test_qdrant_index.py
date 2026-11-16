@@ -638,3 +638,53 @@ async def test_qdrant_index_rejects_invalid_inputs_with_value_errors() -> None:
                 attribute="label",  # pyright: ignore[reportArgumentType]
                 values=[],
             )
+
+
+class _Note(State):
+    label: str
+    owner: str | None = None
+
+
+@asynccontextmanager
+async def _note_scope() -> AsyncGenerator[None]:
+    async with ctx.scope(
+        "qdrant-test",
+        QdrantVectorIndex.prepare(),
+        disposables=[QdrantClient(in_memory=True)],
+    ):
+        await Qdrant.create_collection(_Note, vector_size=2, in_ram=True)
+        await Qdrant.store(
+            _Note,
+            objects=[
+                Embedded(
+                    value=_Note(label=f"label-{index}", owner="me" if index % 2 else None),
+                    vector=[float(index), 1.0],
+                )
+                for index in range(4)
+            ],
+        )
+        yield
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("operator", "expected"),
+    (
+        ("equal", {"label-0", "label-2"}),
+        ("not_equal", {"label-1", "label-3"}),
+    ),
+)
+async def test_qdrant_requirement_with_none_matches_empty_values(
+    operator: str,
+    expected: set[str],
+) -> None:
+    requirement = getattr(AttributeRequirement[_Note], operator)(None, path=_Note._.owner)
+
+    async with _note_scope():
+        results: Sequence[_Note] = await VectorIndex.search(
+            _Note,
+            requirements=requirement,
+            limit=8,
+        )
+
+    assert {element.label for element in results} == expected

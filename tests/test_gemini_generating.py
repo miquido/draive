@@ -23,7 +23,6 @@ from draive.gemini.content import block_parts
 from draive.gemini.generating import GeminiGenerating, _request_config
 from draive.models import (
     ModelInputInvalid,
-    ModelOutput,
     ModelOutputFailed,
     ModelReasoning,
     ModelReasoningChunk,
@@ -211,29 +210,43 @@ async def test_gemini_stream_keeps_a_tool_request_signature() -> None:
 
 
 @pytest.mark.asyncio
-async def test_gemini_reports_invalid_context_as_input_failure() -> None:
+async def test_gemini_reports_invalid_context_as_input_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _failing(_: Any) -> Any:
+        raise ValueError("unsupported")
+
+    monkeypatch.setattr("draive.gemini.generating._request_content", _failing)
     model = object.__new__(GeminiGenerating)
     model._client = _fake_client([])
 
     async with ctx.scope("test"):
-        with pytest.raises(ModelInputInvalid):
+        with pytest.raises(ModelInputInvalid, match="unsupported"):
             _ = [
                 element
                 async for element in model.completion(
                     instructions="",
-                    context=(
-                        ModelOutput.of(
-                            ModelReasoning.of(
-                                MultimodalContent.of("secret"),
-                                meta={"kind": "encrypted"},
-                            )
-                        ),
-                    ),
+                    context=(),
                     tools=ModelTools.none,
                     output="text",
                     config=GeminiConfig(model="gemini-test"),
                 )
             ]
+
+
+@pytest.mark.asyncio
+async def test_gemini_drops_reasoning_of_other_providers() -> None:
+    async with ctx.scope("test"):
+        parts = list(
+            block_parts(
+                (
+                    ModelReasoning.of(MultimodalContent.of("secret"), meta={"kind": "encrypted"}),
+                    MultimodalContent.of("answer"),
+                )
+            )
+        )
+
+    assert parts == [{"text": "answer"}]
 
 
 def test_request_config_rejects_unsupported_output() -> None:
@@ -261,3 +274,32 @@ def test_request_config_gives_parameterless_tools_an_empty_object_schema() -> No
 
     declaration = configuration["tools"][0]["function_declarations"][0]
     assert declaration["parameters_json_schema"] == {"type": "object", "properties": {}}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("code", (503,))
+async def test_gemini_unavailable_is_a_retryable_failure(code: int) -> None:
+    from google.genai.errors import ServerError
+
+    from draive.models import ModelRateLimit
+
+    async def _generate_content_stream(**_: Any) -> AsyncIterator[Any]:
+        raise ServerError(code, {"message": "The model is overloaded", "status": "UNAVAILABLE"})
+
+    model = object.__new__(GeminiGenerating)
+    model._client = SimpleNamespace(
+        aio=SimpleNamespace(
+            models=SimpleNamespace(generate_content_stream=_generate_content_stream)
+        )
+    )
+
+    async with ctx.scope("test"):
+        stream = model.completion(
+            instructions="system",
+            context=(),
+            tools=ModelTools.none,
+            output="text",
+            config=GeminiConfig(model="gemini-test"),
+        )
+        with pytest.raises(ModelRateLimit):
+            _ = [element async for element in stream]

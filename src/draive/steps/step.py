@@ -11,6 +11,7 @@ from collections.abc import (
     MutableSequence,
     Sequence,
 )
+from math import inf
 from time import monotonic
 from typing import Any, ClassVar, NoReturn, Protocol, Self, cast, final, overload, runtime_checkable
 
@@ -159,6 +160,7 @@ class Step:
     @classmethod
     def updating_artifacts(
         cls,
+        /,
         *artifacts: State,
         **keyed_artifacts: State,
     ) -> Self:
@@ -1350,10 +1352,10 @@ class Step:
         Raises
         ------
         ValueError
-            When ``seconds`` is not positive.
+            When ``seconds`` is not positive and finite.
         """
-        if seconds <= 0:
-            raise ValueError("Step timeout has to be positive")
+        if not 0 < seconds < inf:
+            raise ValueError("Step timeout has to be a positive finite number of seconds")
 
         executing: StepExecuting = self._executing
 

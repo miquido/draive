@@ -14,6 +14,7 @@ from draive.aws.types import (
     AWSCloudwatchLogPutting,
     AWSCloudwatchMetricPutting,
     AWSError,
+    AWSInvalidArgument,
     AWSResourceNotFound,
     AWSSQSQueueAccessing,
 )
@@ -27,6 +28,7 @@ __all__ = (
     "AWSCloudwatchLogPutting",
     "AWSCloudwatchMetricPutting",
     "AWSError",
+    "AWSInvalidArgument",
     "AWSResourceNotFound",
     "AWSSQSQueueAccessing",
     "CloudwatchObservability",

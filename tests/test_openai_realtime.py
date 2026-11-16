@@ -491,6 +491,7 @@ async def test_send_context_uses_short_item_identifiers() -> None:
         SimpleNamespace(
             type="response.done",
             response=SimpleNamespace(
+                id="resp-1",
                 usage=None,
                 status="failed",
                 status_details=SimpleNamespace(
@@ -502,7 +503,7 @@ async def test_send_context_uses_short_item_identifiers() -> None:
         ),
         SimpleNamespace(
             type="error",
-            error=SimpleNamespace(type="invalid_request_error", message="bad event"),
+            error=SimpleNamespace(type="invalid_request_error", code=None, message="bad event"),
         ),
     ),
 )

@@ -1118,7 +1118,7 @@ class ModelSessionEvent(State, serializable=True):
     @classmethod
     def turn_completed(
         cls,
-        content: State,
+        content: ModelInput | ModelOutput,
         *,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
@@ -1164,7 +1164,7 @@ class ModelSessionEvent(State, serializable=True):
         ]
         | str
     )
-    content: State | ModelContext | None = None
+    content: ModelInput | ModelOutput | ModelContext | State | None = None
     meta: Meta = Meta.empty
 
 

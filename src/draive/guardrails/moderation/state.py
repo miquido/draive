@@ -84,6 +84,9 @@ class GuardrailsModeration(State):
                 meta=exc.meta,
             ) from exc
 
+        except GuardrailsFailure:
+            raise
+
         except GuardrailsException as exc:
             raise GuardrailsInputModerationException(
                 f"Input moderation guardrails triggered: {exc}",
@@ -158,6 +161,9 @@ class GuardrailsModeration(State):
                 replacement=exc.replacement,
                 meta=exc.meta,
             ) from exc
+
+        except GuardrailsFailure:
+            raise
 
         except GuardrailsException as exc:
             raise GuardrailsOutputModerationException(

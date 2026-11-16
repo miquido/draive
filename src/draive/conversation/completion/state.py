@@ -67,7 +67,7 @@ class Conversation(State):
                 ctx.record_info(
                     attributes={"message.template": message.identifier},
                 )
-                message = await TemplatesRepository.resolve_str(message)
+                message = await TemplatesRepository.resolve(message)
 
             if not isinstance(memory, ConversationMemory):
                 memory = ConversationMemory.constant(memory)

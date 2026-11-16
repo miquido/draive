@@ -339,16 +339,8 @@ def _context_messages(
 
     for element in context:
         if isinstance(element, ModelInput):
-            if user_content := element.content:
-                yield ChatCompletionUserMessageParam(
-                    role="user",
-                    content=_content_parts(
-                        user_content.parts,
-                        vision_details=vision_details,
-                    ),
-                )
-
-            # provide tool responses as separate tool messages expected by the api
+            # tool messages have to directly follow the assistant message
+            # carrying the tool calls, any user content comes after them
             for tool_response in element.tool_responses:
                 yield ChatCompletionToolMessageParam(
                     role="tool",
@@ -357,6 +349,15 @@ def _context_messages(
                         tool_response.content.parts,
                         vision_details=vision_details,
                         text_only=True,
+                    ),
+                )
+
+            if user_content := element.content:
+                yield ChatCompletionUserMessageParam(
+                    role="user",
+                    content=_content_parts(
+                        user_content.parts,
+                        vision_details=vision_details,
                     ),
                 )
 

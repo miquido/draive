@@ -323,3 +323,15 @@ def test_multimodal_content_rejects_unsupported_elements_with_type_error(value: 
 
     with pytest.raises(TypeError, match="Unsupported multimodal content element"):
         MultimodalContent.of(value)  # pyright: ignore[reportArgumentType]
+
+
+def test_split_by_meta_drops_parts_without_the_key_by_design() -> None:
+    content = MultimodalContent.of(
+        TextContent.of("a", meta={"category": "x"}),
+        TextContent.of("keyless"),
+        TextContent.of("b", meta={"category": "x"}),
+    )
+
+    groups = content.split_by_meta(key="category")
+
+    assert [[part.to_str() for part in group.parts] for group in groups] == [["a", "b"]]

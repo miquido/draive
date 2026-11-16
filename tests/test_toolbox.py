@@ -10,6 +10,7 @@ from draive import (
     ModelToolRequest,
     ModelToolResponse,
     ModelTools,
+    Multimodal,
     MultimodalContent,
     MultimodalContentPart,
     ProcessingEvent,
@@ -26,7 +27,12 @@ def _text_of(parts: Sequence[MultimodalContentPart]) -> str:
 
 
 def _multimodal_text_of(*elements: object) -> str:
-    return MultimodalContent.of(*elements).to_str()
+    parts: list[Multimodal] = []
+    for element in elements:
+        assert isinstance(element, MultimodalContentPart)
+        parts.append(element)
+
+    return MultimodalContent.of(*parts).to_str()
 
 
 @pytest.mark.asyncio
@@ -410,3 +416,132 @@ async def test_handle_keeps_output_contiguous_per_request() -> None:
     responses = [chunk for chunk in chunks if isinstance(chunk, ModelToolResponse)]
     assert {response.identifier for response in responses} == {"r1", "r2"}
     assert all(response.status == "success" for response in responses)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("arguments", "expected"),
+    [
+        ({"count": "many", "label": "x"}, "Validation of .count failed"),
+        ({"label": "x"}, "missing 1 required positional argument: 'count'"),
+        ({"count": 1, "label": "x", "extra": 1}, "Unexpected keyword argument 'extra'"),
+    ],
+)
+async def test_handle_invalid_arguments_reports_actionable_error(
+    arguments: Mapping[str, Any],
+    expected: str,
+) -> None:
+    @tool
+    async def counting(count: int, label: str) -> str:
+        return label * count
+
+    async with ctx.scope("test"):
+        chunks = [
+            chunk
+            async for chunk in Toolbox.of(counting).handle(
+                (ModelToolRequest.of("r1", tool="counting", arguments=arguments),)
+            )
+        ]
+
+    (response,) = chunks
+    assert isinstance(response, ModelToolResponse)
+    assert response.status == "error"
+    text = response.content.to_str()
+    assert expected in text
+    assert "Traceback" not in text
+
+
+@pytest.mark.asyncio
+async def test_handle_invalid_arguments_message_does_not_echo_values() -> None:
+    @tool
+    async def counting(count: int) -> str:
+        return "x" * count
+
+    async with ctx.scope("test"):
+        chunks = [
+            chunk
+            async for chunk in Toolbox.of(counting).handle(
+                (ModelToolRequest.of("r1", tool="counting", arguments={"count": "s3cr3t-value"}),)
+            )
+        ]
+
+    (response,) = chunks
+    assert isinstance(response, ModelToolResponse)
+    assert "s3cr3t-value" not in response.content.to_str()
+
+
+@pytest.mark.asyncio
+async def test_handle_type_error_inside_tool_body_stays_opaque() -> None:
+    @tool
+    async def broken(value: int) -> str:
+        raise TypeError(f"unsupported {value}")
+
+    async with ctx.scope("test"):
+        chunks = [
+            chunk
+            async for chunk in Toolbox.of(broken).handle(
+                (ModelToolRequest.of("r1", tool="broken", arguments={"value": 1}),)
+            )
+        ]
+
+    (response,) = chunks
+    assert isinstance(response, ModelToolResponse)
+    assert response.content.to_str() == "<error>Tool execution failed due to an error</error>"
+
+
+@pytest.mark.asyncio
+async def test_handle_returns_responses_in_request_order() -> None:
+    gates: Mapping[str, asyncio.Event] = {name: asyncio.Event() for name in ("a", "b", "c")}
+
+    @tool
+    async def waiting(name: str) -> str:
+        await gates[name].wait()
+        return name
+
+    @tool
+    async def eventful(name: str):
+        yield ProcessingEvent.of("started", name)
+        await gates[name].wait()
+        yield TextContent.of(name)
+
+    toolbox = Toolbox.of(waiting, eventful)
+    async with ctx.scope("test"):
+        stream = toolbox.handle(
+            (
+                ModelToolRequest.of("r1", tool="eventful", arguments={"name": "a"}),
+                ModelToolRequest.of("r2", tool="waiting", arguments={"name": "b"}),
+                ModelToolRequest.of("r3", tool="waiting", arguments={"name": "c"}),
+            )
+        )
+        first = await asyncio.wait_for(anext(stream), 1)  # event is not held back
+        assert isinstance(first, ProcessingEvent)
+        gates["c"].set()
+        gates["b"].set()
+        await asyncio.sleep(0.05)
+        gates["a"].set()
+        rest = [chunk async for chunk in stream]
+
+    responses = [chunk.identifier for chunk in rest if isinstance(chunk, ModelToolResponse)]
+    assert responses == ["r1", "r2", "r3"]
+
+
+@pytest.mark.asyncio
+async def test_handle_generator_tool_reports_invalid_arguments_to_the_model() -> None:
+    async with ctx.scope("test"):
+
+        @tool
+        async def amplify(value: str):
+            yield TextContent.of(value)
+
+        chunks = [
+            chunk
+            async for chunk in Toolbox.of(amplify).handle(
+                (ModelToolRequest.of("r1", tool="amplify", arguments={}),)
+            )
+        ]
+
+    assert len(chunks) == 1
+    response = chunks[0]
+    assert isinstance(response, ModelToolResponse)
+    assert response.status == "error"
+    assert "Invalid arguments of tool `amplify`" in response.content.to_str()

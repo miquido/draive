@@ -2,7 +2,7 @@ import mimetypes
 import re
 from collections.abc import Iterator, Mapping, MutableSequence, Sequence
 from pathlib import Path, PurePosixPath
-from typing import Annotated, Self, final
+from typing import Annotated, Any, Self, cast, final
 
 import yaml
 from haiway import (
@@ -242,7 +242,9 @@ class Skill(State, serializable=True):
         ValueError
             If `SKILL.md` is missing or its contents are invalid.
         """
-        root_path: Path = Path(path)
+        requested_path: Path = Path(path)
+        # haiway Files refuses symlinked ancestors, resolve them up front
+        root_path: Path = requested_path.resolve()
         skill_file_path: Path = root_path / "SKILL.md"
         try:
             root_entries = await Files.traverse(root_path)
@@ -256,7 +258,7 @@ class Skill(State, serializable=True):
             async with Files.access(skill_file_path) as file:
                 parsed_skill = ParsedSkillFile.from_file((await file.read()).decode("utf-8"))
 
-            directory_name: str = root_path.name or root_path.absolute().name
+            directory_name: str = requested_path.name or requested_path.absolute().name
             if parsed_skill.frontmatter.name != directory_name:
                 raise ValueError(
                     "SKILL.md frontmatter name must match its parent directory: "
@@ -283,7 +285,7 @@ class Skill(State, serializable=True):
                     )
 
         except FileException as exc:
-            raise SkillLoadingFailed(root_path) from exc
+            raise SkillLoadingFailed(requested_path) from exc
 
         return cls.of(
             name=parsed_skill.frontmatter.name,
@@ -294,7 +296,7 @@ class Skill(State, serializable=True):
                 {
                     **parsed_skill.frontmatter.metadata,
                     **parsed_skill.frontmatter.optional_metadata,
-                    "skill_source": str(root_path),
+                    "skill_source": str(requested_path),
                 }
             ),
         )
@@ -425,6 +427,11 @@ def _verified_compatibility(value: str | None) -> str | None:
     return value
 
 
+_FRONTMATTER_KEYS: frozenset[str] = frozenset(
+    ("name", "description", "license", "compatibility", "metadata", "allowed-tools")
+)
+
+
 @final
 class ParsedFrontmatter(State):
     name: Annotated[str, Verifier(_verified_name)]
@@ -452,6 +459,7 @@ class ParsedSkillFile(State):
         cls,
         content: str,
     ) -> ParsedSkillFile:
+        content = content.removeprefix("﻿")
         if not content:
             raise ValueError("SKILL.md is empty")
 
@@ -481,6 +489,14 @@ class ParsedSkillFile(State):
             raise ValueError("SKILL.md frontmatter is malformed") from exc
 
         try:
+            if isinstance(frontmatter, Mapping):
+                # other agent skill formats define additional keys, ignore what is unknown
+                frontmatter = {
+                    key: value
+                    for key, value in cast(Mapping[Any, Any], frontmatter).items()
+                    if key in _FRONTMATTER_KEYS
+                }
+
             parsed_frontmatter = ParsedFrontmatter.from_mapping(frontmatter)
 
         except (TypeError, ValueError, ValidationError) as exc:

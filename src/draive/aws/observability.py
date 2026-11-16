@@ -634,36 +634,45 @@ def _sanitized_attributes(
 ) -> Mapping[str, Any]:
     sanitized: dict[str, Any] = {}
     for key, value in attributes.items():
-        if value is None or value is Missing:
-            continue  # skip missing/empty
-
         if isinstance(value, Sequence) and not isinstance(value, str | bytes | bytearray):
-            elements: list[Any] = []
-            for item in cast(Sequence[Any], value):
-                if item is None or item is Missing:
-                    continue  # skip missing/empty
-
-                assert isinstance(item, str | float | int | bool)  # nosec: B101
-                elements.append(item)
-
-            if not elements:
-                continue  # skip missing/empty
-
-            sanitized[key] = tuple(elements)
+            elements: tuple[Any, ...] = tuple(
+                element
+                for element in map(_attribute_value, cast(Sequence[Any], value))
+                if element is not None
+            )
+            if elements:
+                sanitized[key] = elements
 
         elif isinstance(value, Mapping):
             for name, item in cast(Mapping[str, Any], value).items():
-                if item is None or item is Missing:
-                    continue  # skip missing/empty
+                if (element := _attribute_value(item)) is not None:
+                    sanitized[f"{key}.{name}"] = element
 
-                assert isinstance(item, str | float | int | bool)  # nosec: B101
-                sanitized[f"{key}.{name}"] = item
-
-        else:
-            assert isinstance(value, str | float | int | bool)  # nosec: B101
-            sanitized[key] = value
+        elif (element := _attribute_value(value)) is not None:
+            sanitized[key] = element
 
     return sanitized
+
+
+def _attribute_value(
+    value: Any,
+    /,
+) -> str | float | int | bool | None:
+    if value is None or value is Missing:
+        return None  # skip missing/empty
+
+    if isinstance(value, str | float | int | bool):
+        return value
+
+    # unsupported values may hold secrets or huge payloads, only their type is reported
+    return _type_label(value)
+
+
+def _type_label(
+    value: Any,
+    /,
+) -> str:
+    return f"<{type(value).__name__}>"
 
 
 def _json_dumps(
@@ -674,7 +683,7 @@ def _json_dumps(
         payload,
         ensure_ascii=True,
         separators=(",", ":"),
-        default=str,
+        default=_type_label,
     )
 
 

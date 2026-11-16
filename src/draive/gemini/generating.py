@@ -29,6 +29,7 @@ from draive.gemini.config import (
 from draive.gemini.content import block_parts, part_as_stream_elements
 from draive.gemini.utils import (
     RATE_LIMIT_STATUS_CODE,
+    UNAVAILABLE_STATUS_CODE,
     combined_input_tokens,
     quota_limit,
     speech_config,
@@ -69,7 +70,7 @@ _SAFETY_FINISH_REASONS: Final[frozenset[FinishReason]] = frozenset(
 
 
 class GeminiGenerating(GeminiAPI):
-    async def completion(  # noqa: C901, PLR0912
+    async def completion(  # noqa: C901, PLR0912, PLR0915
         self,
         *,
         instructions: ModelInstructions,
@@ -215,6 +216,15 @@ class GeminiGenerating(GeminiAPI):
                         model=config.model,
                         retry_after=None,
                         quota_limit=quota_limit(exc),
+                    ) from exc
+
+                if exc.code == UNAVAILABLE_STATUS_CODE or exc.status == "UNAVAILABLE":
+                    # temporary capacity failures are retryable, same as rate limits
+                    raise model_rate_limit(
+                        provider="gemini",
+                        model=config.model,
+                        retry_after=None,
+                        error_code="unavailable",
                     ) from exc
 
                 raise ModelOutputFailed(

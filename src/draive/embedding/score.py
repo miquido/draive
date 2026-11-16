@@ -25,4 +25,8 @@ def vector_similarity_score(
         value = np.expand_dims(value, axis=0)
 
     sim: NDArray[Any] = np.array(similarity(value, reference)).reshape(-1)
+    if sim.size == 0:
+        # nothing to compare - no similarity
+        return 0.0
+
     return float(sim[0])

@@ -34,6 +34,7 @@ from draive.gemini.content import (
 )
 from draive.gemini.utils import (
     RATE_LIMIT_STATUS_CODE,
+    UNAVAILABLE_STATUS_CODE,
     combined_input_tokens,
     quota_limit,
     speech_config,
@@ -213,6 +214,15 @@ class GeminiLive(GeminiAPI):
                                 quota_limit=quota_limit(exc),
                             ) from exc
 
+                        if exc.code == UNAVAILABLE_STATUS_CODE or "UNAVAILABLE" in exc_details:
+                            # temporary capacity failures are retryable, same as rate limits
+                            raise model_rate_limit(
+                                provider="gemini",
+                                model=config.model,
+                                retry_after=None,
+                                error_code="unavailable",
+                            ) from exc
+
                         raise ModelOutputFailed(
                             provider="gemini",
                             model=config.model,
@@ -335,6 +345,12 @@ class GeminiLive(GeminiAPI):
 
                                 turn_output_blocks.clear()
                                 turn_output_transcript_parts.clear()
+
+                        if server_content.interrupted:
+                            # drop the partial output of the interrupted turn
+                            # so it never leaks into the next one
+                            turn_output_blocks.clear()
+                            turn_output_transcript_parts.clear()
 
                     if (
                         message.tool_call is not None

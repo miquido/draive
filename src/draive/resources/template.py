@@ -182,6 +182,10 @@ class ResourceTemplate[**Args](
         value: str,
     ) -> tuple[Any, bool]:
         if "anyOf" in specification:
+            if any(self._accepts_any_text(option) for option in specification["anyOf"]):
+                # text is already a valid value, converting it would alter what was provided
+                return value, False
+
             for option in specification["anyOf"]:
                 converted, changed = self._coerce_from_specification(option, value)
                 if changed:
@@ -191,6 +195,9 @@ class ResourceTemplate[**Args](
 
         type_name: Any | None = specification.get("type")
         if isinstance(type_name, Sequence) and not isinstance(type_name, str):
+            if self._accepts_any_text(specification):
+                return value, False
+
             # alternatives of plain types are named by a list of types instead
             # of a list of alternatives - each is tried in the declared order
             for alternative in cast(Sequence[Any], type_name):
@@ -253,6 +260,19 @@ class ResourceTemplate[**Args](
                 return converted_enum, True
 
         return value, False
+
+    def _accepts_any_text(
+        self,
+        specification: TypeSpecification,
+    ) -> bool:
+        if "enum" in specification or "const" in specification:
+            return False
+
+        type_name: Any | None = specification.get("type")
+        if isinstance(type_name, Sequence) and not isinstance(type_name, str):
+            return "string" in cast(Sequence[Any], type_name)
+
+        return type_name == "string"
 
     def _parse_boolean(self, raw: str) -> bool | None:
         normalised = raw.strip().lower()

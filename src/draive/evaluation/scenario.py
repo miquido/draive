@@ -1,5 +1,7 @@
 import re
 from collections.abc import Callable, Sequence
+from html import escape
+from inspect import signature
 from typing import Annotated, Protocol, Self, cast, final, overload, runtime_checkable
 
 from haiway import (
@@ -102,7 +104,7 @@ class EvaluatorScenarioResult(State, serializable=True):
 
         if results_report:
             return (
-                f"<evaluator_scenario name='{self.scenario}' status='{status}'"
+                f"<evaluator_scenario name='{escape(self.scenario)}' status='{status}'"
                 f" performance='{self.performance:.2f}%'>"
                 f"\n<evaluators>\n{results_report}\n</evaluators>"
                 "\n</evaluator_scenario>"
@@ -110,7 +112,7 @@ class EvaluatorScenarioResult(State, serializable=True):
 
         else:
             return (
-                f"<evaluator_scenario name='{self.scenario}' status='{status}'"
+                f"<evaluator_scenario name='{escape(self.scenario)}' status='{status}'"
                 f" performance='{self.performance:.2f}%'/>"
             )
 
@@ -216,14 +218,15 @@ class EvaluatorScenario[Value, **Args]:
         state: Sequence[State],
         meta: Meta,
     ) -> None:
+        normalized_name: str = name.lower().replace(" ", "_")
         assert re.match(  # nosec: B101
-            r"^[a-z][a-z0-9_]*$", name.lower()
+            r"^[a-z][a-z0-9_]*$", normalized_name
         ), "Evaluator name should follow snake case rules"
 
         object.__setattr__(
             self,
             "name",
-            name.lower().replace(" ", "_"),
+            normalized_name,
         )
         object.__setattr__(
             self,
@@ -430,6 +433,14 @@ class EvaluatorScenario[Value, **Args]:
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> EvaluatorScenarioResult:
+        # programming errors, missing or unexpected arguments, have to surface instead
+        # of being turned into a failed scenario
+        try:
+            signature(self._definition).bind(value, *args, **kwargs)
+
+        except ValueError:
+            pass  # signature not available, rely on the call
+
         results: Sequence[EvaluatorResult]
         try:
             results = await self._definition(

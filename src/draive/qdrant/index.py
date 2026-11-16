@@ -132,12 +132,15 @@ class QdrantVectorIndex:
             if query is None and score_threshold is not None:
                 raise ValueError("score_threshold requires a query")
 
+            if limit == 0:
+                return ()
+
             if query is None:
                 return (
                     await Qdrant.fetch(
                         model,
                         requirements=requirements,
-                        pagination=Pagination.of(limit=limit or 32),
+                        pagination=Pagination.of(limit=32 if limit is None else limit),
                         include_vector=False,
                         **extra,
                     )
@@ -171,12 +174,13 @@ class QdrantVectorIndex:
             else:
                 query_vector = query
 
+            effective_limit: int = 8 if limit is None else limit
             search_results: Sequence[QdrantResult[Model]] = await Qdrant.search(
                 model,
                 query_vector=query_vector,
                 score_threshold=score_threshold,
                 requirements=requirements,
-                limit=(limit or 8) * mmr_multiplier if rerank else (limit or 8),
+                limit=effective_limit * mmr_multiplier if rerank else effective_limit,
                 include_vector=True,
                 **extra,
             )
@@ -197,7 +201,7 @@ class QdrantVectorIndex:
                 for index in mmr_vector_similarity_search(
                     query_vector=query_vector,
                     values_vectors=[element.vector for element in matching],
-                    limit=limit or 8,
+                    limit=effective_limit,
                 )
             )
 

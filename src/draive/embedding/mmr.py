@@ -73,7 +73,11 @@ def mmr_vector_similarity_search(  # noqa: C901
     values: NDArray[Any] = np.array(values_vectors)
 
     # count similarity
-    current_similarity: NDArray[Any] = np.array(similarity(values, query)).reshape(-1)
+    # NaN scores are ranked below any real score instead of winning the comparisons
+    current_similarity: NDArray[Any] = np.nan_to_num(
+        np.array(similarity(values, query)).reshape(-1).astype(float, copy=False),
+        nan=-np.inf,
+    )
     # find most similar match for query
     most_similar: int = int(np.argmax(current_similarity))
     selected_indices: list[int] = [most_similar]
@@ -98,13 +102,17 @@ def mmr_vector_similarity_search(  # noqa: C901
             if idx in selected_indices:
                 continue  # skip already added
 
-            max_similarity_to_selected: float = float(np.max(similarity_to_selected[idx]))
-            equation_score = (
-                lambda_multiplier * float(similarity_score)
-                - (1 - lambda_multiplier) * max_similarity_to_selected
+            max_similarity_to_selected: float = float(
+                np.max(np.nan_to_num(similarity_to_selected[idx], nan=0.0))
             )
-            # check if has better score
-            if equation_score > best_score:
+            equation_score: float = _marginal_relevance(
+                float(similarity_score),
+                max_similarity_to_selected,
+                lambda_multiplier=lambda_multiplier,
+            )
+
+            # check if has better score, any remaining candidate is better than none
+            if best_index < 0 or equation_score > best_score:
                 best_score = equation_score
                 best_index = idx
 
@@ -119,3 +127,16 @@ def mmr_vector_similarity_search(  # noqa: C901
         )
 
     return selected_indices
+
+
+def _marginal_relevance(
+    similarity_score: float,
+    max_similarity_to_selected: float,
+    *,
+    lambda_multiplier: float,
+) -> float:
+    score: float = (
+        lambda_multiplier * similarity_score - (1 - lambda_multiplier) * max_similarity_to_selected
+    )
+    # undefined scores are ranked below any real score
+    return -np.inf if np.isnan(score) else score

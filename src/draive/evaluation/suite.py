@@ -2,6 +2,7 @@ import json
 import random
 from asyncio import Lock
 from collections.abc import Callable, Iterable, Sequence
+from html import escape
 from pathlib import Path
 from typing import Annotated, Protocol, Self, cast, final, runtime_checkable
 from uuid import uuid4
@@ -130,21 +131,23 @@ class EvaluatorSuiteCaseResult(State, serializable=True):
 
         if not detailed:
             if results_report:
-                return f"{self.case_identifier}: {status} ({self.performance}%)\n{results_report}"
+                return (
+                    f"{self.case_identifier}: {status} ({self.performance:.2f}%)\n{results_report}"
+                )
 
             else:
-                return f"{self.case_identifier}: {status} ({self.performance}%)"
+                return f"{self.case_identifier}: {status} ({self.performance:.2f}%)"
 
         if results_report:
             return (
-                f"<evaluator_suite case='{self.case_identifier}' status='{status}'"
+                f"<evaluator_suite case='{escape(self.case_identifier)}' status='{status}'"
                 f" performance='{self.performance:.2f}%'>"
                 f"\n<results>\n{results_report}\n</results>"
                 "\n</evaluator_suite>"
             )
 
         else:
-            return f"<evaluator_suite case='{self.case_identifier}' status='{status}' />"
+            return f"<evaluator_suite case='{escape(self.case_identifier)}' status='{status}' />"
 
     @property
     def performance(self) -> float:
@@ -238,7 +241,7 @@ class EvaluatorSuiteResult(State, serializable=True):
 
         if results_report:
             return (
-                f"<evaluator_suite name='{self.suite}' status='{status}'"
+                f"<evaluator_suite name='{escape(self.suite)}' status='{status}'"
                 f" performance='{self.performance:.2f}%'>"
                 f"\n<results>\n{results_report}\n</results>"
                 "\n</evaluator_suite>"
@@ -246,7 +249,7 @@ class EvaluatorSuiteResult(State, serializable=True):
 
         else:
             return (
-                f"<evaluator_suite name='{self.suite}' status='{status}'"
+                f"<evaluator_suite name='{escape(self.suite)}' status='{status}'"
                 f" performance='{self.performance:.2f}%' />"
             )
 
@@ -300,7 +303,8 @@ class EvaluatorSuiteCasesStorage[Parameters: State](Protocol):
     Methods
     -------
     load()
-        Load all test cases from storage
+        Load all test cases from storage, any failure including ``FileNotFoundError``
+        is propagated to the caller and never treated as empty storage
     save(cases)
         Persist test cases to storage
     """
@@ -515,8 +519,9 @@ class EvaluatorSuite[**Args, Parameters: State]:
         ----------
         cases : Sequence[EvaluatorSuiteCase | Parameters | str] | float | int | None
             Cases to evaluate - explicit cases, parameters or identifiers of stored cases,
-            a fraction of the stored cases within ``(0, 1]``, their count, or all of them
-            when omitted.
+            a fraction of the stored cases within ``(0, 1]`` when given as ``float``, their
+            count when given as ``int`` - note ``1`` selects a single case while ``1.0``
+            selects all of them - or all of them when omitted.
         *args : Args.args
             Additional positional arguments forwarded to the suite definition.
         **kwargs : Args.kwargs
@@ -822,11 +827,27 @@ class EvaluatorSuite[**Args, Parameters: State]:
             Parameters of the new case.
         identifier : str | None, default=None
             Case identifier, generated when omitted.
+
+        Raises
+        ------
+        ValueError
+            When a case with the same identifier already exists in the suite.
         """
         async with self._lock:
-            current_cases: Sequence[EvaluatorSuiteCase[Parameters]] = await self._available_cases(
-                reload=True
-            )
+            current_cases: Sequence[EvaluatorSuiteCase[Parameters]]
+            try:
+                current_cases = await self._available_cases(reload=True)
+
+            except _EvaluatorSuiteFileMissing:
+                # only the built-in file storage is bootstrapped by the first added case,
+                # custom storages decide on their own how to handle missing data
+                current_cases = ()
+
+            if identifier is not None and any(
+                case.identifier == identifier for case in current_cases
+            ):
+                raise ValueError(f"Evaluator suite case `{identifier}` already exists")
+
             object.__setattr__(
                 self,
                 "_cases_cache",
@@ -1067,6 +1088,10 @@ class _EvaluatorSuiteMemoryStorage[Parameters: State]:
         )
 
 
+class _EvaluatorSuiteFileMissing(FileNotFoundError):
+    pass
+
+
 @final
 class _EvaluatorSuiteFileStorage[Parameters: State]:
     __slots__ = (
@@ -1136,7 +1161,7 @@ class _EvaluatorSuiteFileStorage[Parameters: State]:
                         raise RuntimeError(f"Invalid evaluation suite data at {self._path}")
 
         else:
-            raise RuntimeError(f"Missing evaluation suite data at {self._path}")
+            raise _EvaluatorSuiteFileMissing(f"Missing evaluation suite data at {self._path}")
 
     async def save(
         self,
@@ -1150,8 +1175,16 @@ class _EvaluatorSuiteFileStorage[Parameters: State]:
         cases: Sequence[EvaluatorSuiteCase[Parameters]],
     ) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self._path, mode="wb+") as file:
-            file.write(json.dumps([case.to_basic_object() for case in cases]).encode("utf-8"))
+        # write atomically to avoid leaving a truncated file behind
+        temporary_path: Path = self._path.with_name(f".{self._path.name}.{uuid4().hex}.tmp")
+        try:
+            with open(temporary_path, mode="wb") as file:
+                file.write(json.dumps([case.to_basic_object() for case in cases]).encode("utf-8"))
+
+            temporary_path.replace(self._path)
+
+        finally:
+            temporary_path.unlink(missing_ok=True)
 
 
 def _select_cases[Parameters: State](
@@ -1162,8 +1195,9 @@ def _select_cases[Parameters: State](
         return available_cases
 
     if isinstance(cases, int):
-        if cases <= 0:
-            raise ValueError("Number of selected cases must be greater than zero")
+        # bool is an int, ``True`` would silently select a single case
+        if isinstance(cases, bool) or cases <= 0:
+            raise ValueError("Number of selected cases must be a positive integer")
 
         return random.sample(  # nosec: B311
             available_cases,

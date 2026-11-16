@@ -1,7 +1,9 @@
+import asyncio
 import json
 from collections.abc import Mapping, MutableMapping, Sequence
 from pathlib import Path
 from typing import Any, NamedTuple, Self, cast, final, overload
+from uuid import uuid4
 
 from haiway import File, Files, Meta, Paginated, Pagination, State, ctx, statemethod
 from haiway.types.frozen import refuse_assignment, refuse_deletion, same_copy, same_deepcopy
@@ -663,9 +665,25 @@ class _ReadOnlyTemplates:
         self.templates: Mapping[str, _StoredTemplate] = templates
 
 
+def _write_atomically(
+    path: Path,
+    contents: bytes,
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary: Path = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+    try:
+        temporary.write_bytes(contents)
+        temporary.replace(path)
+
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
 @final
 class FileStorage:
     __slots__ = (
+        "_lock",
         "_path",
         "_state",
     )
@@ -675,6 +693,7 @@ class FileStorage:
     __copy__ = same_copy
     __deepcopy__ = same_deepcopy
 
+    _lock: asyncio.Lock
     _path: Path
     # single source of truth for everything read from the file - none until loaded
     _state: _WritableTemplates | _ReadOnlyTemplates | None
@@ -689,6 +708,7 @@ class FileStorage:
             Path(path) if isinstance(path, str) else path,
         )
         object.__setattr__(self, "_state", None)
+        object.__setattr__(self, "_lock", asyncio.Lock())
 
     async def listing(
         self,
@@ -696,7 +716,9 @@ class FileStorage:
         **extra: Any,
     ) -> Paginated[TemplateDeclaration]:
         _ = extra
-        loaded: _WritableTemplates | _ReadOnlyTemplates = await self._loaded()
+        async with self._lock:
+            loaded: _WritableTemplates | _ReadOnlyTemplates = await self._loaded()
+
         return _paginate_declarations(
             tuple(stored.declaration for stored in loaded.templates.values()),
             pagination=pagination,
@@ -709,7 +731,9 @@ class FileStorage:
         meta: Meta,
         **extra: Any,
     ) -> str | None:
-        loaded: _WritableTemplates | _ReadOnlyTemplates = await self._loaded()
+        async with self._lock:
+            loaded: _WritableTemplates | _ReadOnlyTemplates = await self._loaded()
+
         stored: _StoredTemplate | None = loaded.templates.get(identifier)
         return stored.content if stored is not None else None
 
@@ -722,29 +746,35 @@ class FileStorage:
         meta: Meta,
         **extra: Any,
     ) -> None:
-        loaded: _WritableTemplates | _ReadOnlyTemplates = await self._loaded()
-        match loaded:
-            case _ReadOnlyTemplates():
-                # saving would destroy whatever could not be read
-                raise TemplateInvalid(
-                    identifier=identifier,
-                    description=(
-                        f"Templates file storage {self._path} is invalid or partially unreadable, "
-                        "refusing to overwrite it"
-                    ),
-                )
-
-            case _WritableTemplates() as writable:
-                writable.templates[identifier] = _StoredTemplate(
-                    declaration=TemplateDeclaration(
+        async with self._lock:
+            loaded: _WritableTemplates | _ReadOnlyTemplates = await self._loaded()
+            match loaded:
+                case _ReadOnlyTemplates():
+                    # saving would destroy whatever could not be read
+                    raise TemplateInvalid(
                         identifier=identifier,
-                        description=description,
-                        variables=variables,
-                        meta=meta,
-                    ),
-                    content=content,
-                )
-                await self._save_file(writable)
+                        description=(
+                            f"Templates file storage {self._path} is invalid or "
+                            "partially unreadable, refusing to overwrite it"
+                        ),
+                    )
+
+                case _WritableTemplates() as writable:
+                    # persist first, memory is updated only when the file was saved
+                    updated: MutableMapping[str, _StoredTemplate] = {
+                        **writable.templates,
+                        identifier: _StoredTemplate(
+                            declaration=TemplateDeclaration(
+                                identifier=identifier,
+                                description=description,
+                                variables=variables,
+                                meta=meta,
+                            ),
+                            content=content,
+                        ),
+                    }
+                    await self._save_file(updated)
+                    object.__setattr__(self, "_state", _WritableTemplates(updated))
 
     async def _loaded(self) -> _WritableTemplates | _ReadOnlyTemplates:
         state: _WritableTemplates | _ReadOnlyTemplates | None = self._state
@@ -815,7 +845,7 @@ class FileStorage:
 
     async def _save_file(
         self,
-        writable: _WritableTemplates,
+        templates: Mapping[str, _StoredTemplate],
         /,
     ) -> None:
         file_contents: bytes = json.dumps(
@@ -827,9 +857,8 @@ class FileStorage:
                     "content": stored.content,
                     "meta": stored.declaration.meta,
                 }
-                for stored in writable.templates.values()
+                for stored in templates.values()
             ]
         ).encode()
 
-        async with ctx.disposables(Files.access(self._path, create=True)):
-            await File.write(file_contents)
+        await asyncio.to_thread(_write_atomically, self._path, file_contents)

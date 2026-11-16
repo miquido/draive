@@ -1,5 +1,6 @@
 from typing import Any
 
+from draive.generation.types import GenerationOutputMissing
 from draive.models import (
     ModelInput,
     ModelInstructions,
@@ -26,4 +27,4 @@ async def generate_audio(
     if audio := completion.audio():
         return audio[-1]
 
-    raise ValueError("Failed to generate a valid audio")
+    raise GenerationOutputMissing("Generation completed without a valid audio output")

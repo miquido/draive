@@ -1,5 +1,6 @@
 from typing import Any
 
+from draive.generation.types import GenerationOutputMissing
 from draive.models import (
     ModelInput,
     ModelInstructions,
@@ -26,4 +27,4 @@ async def generate_image(
     if images := completion.images():
         return images[-1]
 
-    raise ValueError("Failed to generate a valid image")
+    raise GenerationOutputMissing("Generation completed without a valid image output")

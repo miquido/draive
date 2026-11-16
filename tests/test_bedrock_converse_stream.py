@@ -288,3 +288,25 @@ def test_bedrock_request_failure_maps_error_codes(code: str, expected: type[Exce
     assert isinstance(failure, expected)
     if isinstance(failure, ModelInputInvalid):
         assert failure.reason == "bad request"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("member", "expected"),
+    (
+        ("throttlingException", ModelRateLimit),
+        ("serviceUnavailableException", ModelRateLimit),
+        ("validationException", ModelInputInvalid),
+        ("internalServerException", ModelOutputFailed),
+    ),
+)
+async def test_bedrock_stream_failure_members_are_translated(
+    member: str,
+    expected: type[Exception],
+) -> None:
+    from draive.bedrock.converse import _stream_failure  # pyright: ignore[reportPrivateUsage]
+
+    async with ctx.scope("test"):
+        failure = _stream_failure({member: {"message": "boom"}}, model="test-model")
+
+    assert isinstance(failure, expected)

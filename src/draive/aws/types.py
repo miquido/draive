@@ -85,6 +85,23 @@ class AWSResourceNotFound(AWSError):
         )
 
 
+class AWSInvalidArgument(AWSError):
+    """Error raised when a request argument is invalid and no request was sent."""
+
+    def __init__(
+        self,
+        *,
+        uri: str,
+        code: str | None = None,
+        message: str | None = None,
+    ) -> None:
+        super().__init__(
+            uri=uri,
+            code=code or "InvalidArgument",
+            message=message or "Invalid argument",
+        )
+
+
 @runtime_checkable
 class AWSSQSQueueAccessing(Protocol):
     async def __call__[Content](

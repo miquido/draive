@@ -148,6 +148,7 @@ from draive.embedding import (
 from draive.generation import (
     AudioGenerating,
     AudioGeneration,
+    GenerationOutputMissing,
     ImageGenerating,
     ImageGeneration,
     ModelGeneration,
@@ -369,6 +370,7 @@ __all__: tuple[str, ...] = (
     "FlatObject",
     "Function",
     "GenerationModelGenerating",
+    "GenerationOutputMissing",
     "GenerativeModel",
     "GeneratorTool",
     "GuardrailsAnonymization",

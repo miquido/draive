@@ -10,6 +10,7 @@ from draive.conversation.types import (
     ConversationException,
     ConversationOutputStream,
     ConversationUserTurn,
+    merged_model_context,
 )
 from draive.models import (
     GenerativeModel,
@@ -41,9 +42,10 @@ async def conversation_completion(  # noqa: C901, PLR0912, PLR0915
     message: Multimodal,
     **extra: Any,
 ) -> ConversationOutputStream:
-    model_context: MutableSequence[ModelContextElement] = as_list(await memory.recall())
     message = MultimodalContent.of(message)
-    model_context.append(ModelInput.of(message))
+    model_context: MutableSequence[ModelContextElement] = as_list(
+        merged_model_context((*await memory.recall(), ModelInput.of(message)))
+    )
     assistant_turn_accumulator: MutableSequence[
         MultimodalContent | ModelReasoning | ConversationEvent
     ] = []
