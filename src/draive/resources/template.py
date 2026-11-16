@@ -127,13 +127,13 @@ class ResourceTemplate[**Args](
         arguments: Mapping[str, Any],
         /,
     ) -> Mapping[str, Any]:
-        # validated arguments are keyed by name while a template may refer to the alias
-        values: dict[str, Any] = {}
+        # validated arguments are keyed by name while a template may refer to the alias;
+        # variadic keyword arguments already match their template variables by key
+        values: dict[str, Any] = dict(arguments)
         for argument in self._keyword_arguments.values():
             if argument.name not in arguments:
                 continue
 
-            values[argument.name] = arguments[argument.name]
             if argument.alias is not None:
                 values[argument.alias] = arguments[argument.name]
 
@@ -144,13 +144,16 @@ class ResourceTemplate[**Args](
         uri_params: Mapping[str, str],
     ) -> dict[str, Any]:
         coerced: dict[str, Any] = {}
+        consumed: set[str] = set()
         for argument in self._keyword_arguments.values():
             raw_value: Any
             if argument.alias is not None and argument.alias in uri_params:
                 raw_value = uri_params[argument.alias]
+                consumed.update((argument.name, argument.alias))
 
             elif argument.name in uri_params:
                 raw_value = uri_params[argument.name]
+                consumed.add(argument.name)
 
             else:
                 raw_value = argument.default()
@@ -161,6 +164,21 @@ class ResourceTemplate[**Args](
             converted: Any = self._coerce_parameter_value(argument, raw_value)
             # Pass only the canonical parameter name to avoid duplicate alias/name kwargs
             coerced[argument.name] = converted
+
+        if self._variadic_keyword_arguments is not None:
+            # template variables without a declared argument are forwarded through **kwargs
+            for name, raw_value in uri_params.items():
+                if name in consumed:
+                    continue
+
+                if self._variadic_keyword_arguments.specification is not None:
+                    coerced[name] = self._coerce_parameter_value(
+                        self._variadic_keyword_arguments,
+                        raw_value,
+                    )
+
+                else:
+                    coerced[name] = raw_value
 
         return coerced
 

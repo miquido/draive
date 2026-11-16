@@ -91,6 +91,64 @@ def test_resource_without_variables_has_no_args() -> None:
 
 
 @pytest.mark.asyncio
+async def test_resolve_expands_template_variables_from_variadic_keyword_arguments() -> None:
+    @resource(uri_template="https://api.example.com/{bucket}/{item}")
+    async def document(**kwargs: str) -> ResourceContent:
+        return ResourceContent.of(
+            f"{kwargs['bucket']}/{kwargs['item']}".encode(),
+            mime_type="text/plain",
+        )
+
+    resolved = await document.resolve(bucket="docs", item="a b")
+
+    assert resolved.uri == "https://api.example.com/docs/a%20b"
+    assert resolved.resource.to_bytes() == b"docs/a b"
+
+
+@pytest.mark.asyncio
+async def test_resolve_from_uri_forwards_variadic_keyword_arguments() -> None:
+    @resource(uri_template="https://api.example.com/{bucket}/{item}")
+    async def document(**kwargs: str) -> ResourceContent:
+        return ResourceContent.of(
+            repr(sorted(kwargs.items())).encode(),
+            mime_type="text/plain",
+        )
+
+    resolved = await document.resolve_from_uri("https://api.example.com/docs/a%20b")
+
+    assert resolved.uri == "https://api.example.com/docs/a%20b"
+    assert resolved.resource.to_bytes() == b"[('bucket', 'docs'), ('item', 'a b')]"
+
+
+@pytest.mark.asyncio
+async def test_variadic_keyword_arguments_do_not_duplicate_aliased_arguments() -> None:
+    @resource(uri_template="https://api.example.com/{lang}/{page}")
+    async def search(
+        language: Annotated[str, Alias("lang")],
+        **kwargs: str,
+    ) -> ResourceContent:
+        return ResourceContent.of(
+            repr({"language": language, **kwargs}).encode(),
+            mime_type="text/plain",
+        )
+
+    resolved = await search.resolve_from_uri("https://api.example.com/pl/2")
+
+    assert resolved.resource.to_bytes() == b"{'language': 'pl', 'page': '2'}"
+
+
+@pytest.mark.asyncio
+async def test_variadic_keyword_arguments_follow_declared_type_annotations() -> None:
+    @resource(uri_template="https://api.example.com/items/{count}")
+    async def items(**kwargs: int) -> ResourceContent:
+        return ResourceContent.of(str(kwargs["count"] + 1).encode(), mime_type="text/plain")
+
+    resolved = await items.resolve_from_uri("https://api.example.com/items/41")
+
+    assert resolved.resource.to_bytes() == b"42"
+
+
+@pytest.mark.asyncio
 async def test_resolve_expands_aliased_template_variable() -> None:
     @resource(uri_template="https://api.example.com/search{?lang}")
     async def search(language: Annotated[str, Alias("lang")]) -> ResourceContent:
