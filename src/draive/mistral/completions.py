@@ -356,10 +356,10 @@ def _tool_request(
         )
         return None
 
-    arguments: Any = tool_call.function.arguments
-    if isinstance(arguments, str):
+    decoded: Any = tool_call.function.arguments
+    if isinstance(decoded, str):
         try:
-            arguments = json.loads(arguments) if arguments.strip() else None
+            decoded = json.loads(decoded) if decoded.strip() else None
 
         except Exception as exc:
             raise ModelOutputInvalid(
@@ -367,6 +367,20 @@ def _tool_request(
                 model=model,
                 reason=f"Tool arguments decoding error - {type(exc).__name__}: {exc}",
             ) from exc
+
+    arguments: dict[str, Any]
+    if decoded is None:
+        arguments = {}
+
+    elif isinstance(decoded, dict):
+        arguments = cast(dict[str, Any], decoded)
+
+    else:
+        raise ModelOutputInvalid(
+            provider="mistral",
+            model=model,
+            reason=f"Tool arguments are not an object - {type(decoded).__name__}",
+        )
 
     return ModelToolRequest.of(
         identifier,

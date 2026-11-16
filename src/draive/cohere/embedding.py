@@ -8,6 +8,7 @@ from haiway import State, as_list, ctx
 from draive.cohere.api import CohereAPI
 from draive.cohere.config import CohereImageEmbeddingConfig, CohereTextEmbeddingConfig
 from draive.embedding import Embedded, ImageEmbedding, TextEmbedding
+from draive.models import ModelOutputInvalid
 from draive.models.metrics import (
     provider_gather,
     record_embedding_invocation,
@@ -97,6 +98,7 @@ class CohereEmbedding(CohereAPI):
                         values,
                         _response_vectors(
                             responses,
+                            expected=len(attributes),
                             model=embedding_config.model,
                         ),
                         strict=True,
@@ -188,6 +190,7 @@ class CohereEmbedding(CohereAPI):
                         values,
                         _response_vectors(
                             responses,
+                            expected=len(attributes),
                             model=embedding_config.model,
                         ),
                         strict=True,
@@ -200,6 +203,7 @@ def _response_vectors(
     responses: Sequence[EmbedByTypeResponse],
     /,
     *,
+    expected: int,
     model: str,
 ) -> list[Sequence[float]]:
     # the api reports no index, its results are documented to correspond to the
@@ -208,12 +212,21 @@ def _response_vectors(
     vectors: list[Sequence[float]] = []
     for response in responses:
         if not response.embeddings.float_:
-            raise ValueError(
-                f"Cohere embedding using {model} returned no float vectors,"
-                " the model may not support the requested embedding type"
+            raise ModelOutputInvalid(
+                provider="cohere",
+                model=model,
+                reason="No float vectors returned, the model may not support"
+                " the requested embedding type",
             )
 
         vectors.extend(response.embeddings.float_)
+
+    if len(vectors) != expected:
+        raise ModelOutputInvalid(
+            provider="cohere",
+            model=model,
+            reason=f"Returned {len(vectors)} vectors for {expected} inputs",
+        )
 
     return vectors
 

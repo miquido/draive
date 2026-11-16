@@ -76,7 +76,11 @@ class MistralContentModeration(MistralAPI):
                 if moderation_config.category_thresholds is Missing:
                     for category, flagged in result.categories.items():
                         if flagged:
-                            violations[category] = result.category_scores.get(category, 1.0)
+                            _record_violation(
+                                violations,
+                                category,
+                                result.category_scores.get(category, 1.0),
+                            )
 
                         # skip not flagged
 
@@ -88,10 +92,14 @@ class MistralContentModeration(MistralAPI):
                                 category, 1.0 if flagged else 0.0
                             )
                             if score >= category_thresholds[category]:
-                                violations[category] = score
+                                _record_violation(violations, category, score)
 
                         elif flagged:
-                            violations[category] = result.category_scores.get(category, 1.0)
+                            _record_violation(
+                                violations,
+                                category,
+                                result.category_scores.get(category, 1.0),
+                            )
 
                         # skip not flagged
 
@@ -101,3 +109,13 @@ class MistralContentModeration(MistralAPI):
                     violations=violations,
                     content=content,
                 )
+
+
+def _record_violation(
+    violations: dict[str, float],
+    category: str,
+    score: float,
+    /,
+) -> None:
+    # every input is moderated separately, the report keeps the strongest signal
+    violations[category] = max(score, violations.get(category, score))

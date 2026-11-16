@@ -7,6 +7,7 @@ from mistralai.client.models import EmbeddingResponse
 from draive.embedding import Embedded
 from draive.mistral.api import MistralAPI
 from draive.mistral.config import MistralEmbeddingConfig
+from draive.models import ModelOutputInvalid
 from draive.models.metrics import (
     provider_gather,
     record_embedding_invocation,
@@ -87,12 +88,20 @@ class MistralEmbedding(MistralAPI):
                     if not entry.embedding:
                         # dropping it would silently shorten the result and misalign
                         # every value following it
-                        raise ValueError(
-                            f"Mistral embedding using {embedding_config.model} returned"
-                            f" no vector for input {len(vectors)}"
+                        raise ModelOutputInvalid(
+                            provider="mistral",
+                            model=embedding_config.model,
+                            reason=f"No vector returned for input {len(vectors)}",
                         )
 
                     vectors.append(entry.embedding)
+
+            if len(vectors) != len(attributes):
+                raise ModelOutputInvalid(
+                    provider="mistral",
+                    model=embedding_config.model,
+                    reason=f"Returned {len(vectors)} vectors for {len(attributes)} inputs",
+                )
 
             return cast(
                 Sequence[Embedded[Value]] | Sequence[Embedded[str]],

@@ -118,3 +118,23 @@ async def test_mistral_moderation_without_moderable_parts_sends_no_request() -> 
         )
 
     assert sent == []
+
+
+@pytest.mark.asyncio
+async def test_mistral_moderation_reports_the_highest_score_across_inputs() -> None:
+    async def _moderate_async(**_: Any) -> Any:
+        return SimpleNamespace(
+            results=[
+                SimpleNamespace(categories={"violence": True}, category_scores={"violence": 0.9}),
+                SimpleNamespace(categories={"violence": True}, category_scores={"violence": 0.6}),
+            ]
+        )
+
+    model = object.__new__(MistralContentModeration)
+    model._client = SimpleNamespace(classifiers=SimpleNamespace(moderate_async=_moderate_async))
+
+    async with ctx.scope("test"):
+        with pytest.raises(GuardrailsModerationException) as caught:
+            await model.content_verification(TextContent.of("test"))
+
+    assert caught.value.violations == {"violence": 0.9}
