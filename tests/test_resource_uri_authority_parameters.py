@@ -119,6 +119,35 @@ async def test_authority_variable_rejects_encoded_user_info() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "uri",
+    [
+        "https://evil.com%23.example.com/repos/lib",
+        "https://evil.com%3F.example.com/repos/lib",
+    ],
+)
+async def test_authority_variable_rejects_encoded_delimiters(uri: str) -> None:
+    # the raw capture already excludes `#` and `?`, decoding must not reintroduce them
+    assert tenant_path_resource.matches_uri(uri)
+    with pytest.raises(ResourceCorrupted):
+        await tenant_path_resource.resolve_from_uri(uri)
+
+
+@resource(uri_template="https://{host}/repos/{repo}")
+async def host_resource(host: str, repo: str) -> ResourceContent:
+    return ResourceContent.of(f"{host}|{repo}".encode(), mime_type="text/plain")
+
+
+@pytest.mark.asyncio
+async def test_authority_variable_keeps_accepting_a_host_with_port() -> None:
+    uri: str = "https://localhost:8080/repos/lib"
+    assert host_resource.matches_uri(uri)
+    resolved = await host_resource.resolve_from_uri(uri)
+    assert isinstance(resolved.resource, ResourceContent)
+    assert resolved.resource.to_bytes() == b"localhost:8080|lib"
+
+
+@pytest.mark.asyncio
 async def test_authority_variable_within_path_template_rejects_user_info() -> None:
     for uri in (
         "https://evil.com@acme.example.com/repos/lib",
