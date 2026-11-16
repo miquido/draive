@@ -1,4 +1,4 @@
-from asyncio import sleep, timeout
+from asyncio import Timeout, sleep, timeout
 from collections.abc import (
     AsyncGenerator,
     AsyncIterator,
@@ -1365,14 +1365,19 @@ class Step:
             try:
                 while True:
                     started: float = monotonic()
+                    deadline: Timeout = timeout(max(remaining, 0))
                     try:
-                        async with timeout(max(remaining, 0)):
+                        async with deadline:
                             chunk: StepOutputChunk | StepState = await anext(execution_stream)
 
                     except StopAsyncIteration:
                         return
 
                     except TimeoutError as exc:
+                        if not deadline.expired():
+                            # a timeout of the step itself, not of this limit
+                            raise
+
                         raise StepTimeout(
                             f"Step timed out after {seconds} seconds",
                             state=state,

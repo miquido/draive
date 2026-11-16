@@ -1051,6 +1051,76 @@ async def test_with_timeout_passes_through_fast_step_and_validates() -> None:
 
 
 @pytest.mark.asyncio
+async def test_with_timeout_keeps_a_timeout_error_of_the_step() -> None:
+    # `asyncio.timeout` and the wrapped step both raise `TimeoutError` - only the
+    # limit being exceeded may be reported as `StepTimeout`, the step's own
+    # failure has to reach the caller unchanged
+    async def upstream_timeout(state: Any) -> Any:
+        raise TimeoutError("upstream request timed out after 10ms")
+        yield state  # pragma: no cover - unreachable, keeps the function a generator
+
+    with pytest.raises(TimeoutError) as exc_info:
+        await Step(upstream_timeout).with_timeout(30).process()
+
+    assert not isinstance(exc_info.value, StepTimeout)
+    assert str(exc_info.value) == "upstream request timed out after 10ms"
+
+
+@pytest.mark.asyncio
+async def test_with_timeout_keeps_a_timeout_error_of_the_step_after_output() -> None:
+    # the same distinction has to hold once the step already emitted output - the
+    # remaining time is then shared between the emitted chunk and the failure
+    async def failing_after_output(state: Any) -> Any:
+        yield TextContent.of("started")
+        raise TimeoutError("downstream call timed out")
+
+    received: list[str] = []
+    with pytest.raises(TimeoutError) as exc_info:
+        async for chunk in Step(failing_after_output).with_timeout(30).stream():
+            if isinstance(chunk, TextContent):
+                received.append(chunk.text)
+
+    assert received == ["started"]
+    assert not isinstance(exc_info.value, StepTimeout)
+    assert str(exc_info.value) == "downstream call timed out"
+
+
+@pytest.mark.asyncio
+async def test_with_timeout_still_raises_step_timeout_for_the_limit() -> None:
+    async def slow(state: Any) -> Any:
+        await asyncio.sleep(1)
+        yield state
+
+    with pytest.raises(StepTimeout) as exc_info:
+        await Step(slow).with_timeout(0.05).process()
+
+    assert exc_info.value.timeout == 0.05
+
+
+@pytest.mark.asyncio
+async def test_timeout_error_of_the_step_is_retryable() -> None:
+    attempts = 0
+
+    async def upstream_timeout(state: Any) -> Any:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise TimeoutError("upstream request timed out")
+
+        yield TextContent.of("done")
+
+    result = (
+        await Step(upstream_timeout)
+        .with_timeout(30)
+        .with_retry(catching=TimeoutError, limit=1)
+        .run()
+    )
+
+    assert attempts == 2
+    assert _text_of(result) == "done"
+
+
+@pytest.mark.asyncio
 async def test_timeout_is_retryable() -> None:
     attempts = 0
 
