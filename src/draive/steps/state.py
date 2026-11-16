@@ -143,9 +143,11 @@ class StepState(State, serializable=True):
         key : str | None, optional
             Custom artifact key. Defaults to ``content.__name__``.
         default : Content | None, optional
-            Value returned when the artifact is missing and not required.
+            Value returned when the artifact is missing and not required. Ignored
+            when ``required`` is ``True``.
         required : bool, optional
-            Whether missing artifacts should raise ``KeyError``.
+            Whether missing artifacts should raise ``KeyError``. Takes precedence
+            over ``default``.
 
         Returns
         -------
@@ -163,11 +165,11 @@ class StepState(State, serializable=True):
         if current is not None:
             return current.to_state(content)
 
-        elif default is not None:
-            return default
-
         elif required:
             raise KeyError(f"Artifact {lookup_key} is not available")
+
+        elif default is not None:
+            return default
 
         else:
             return None
