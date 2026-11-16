@@ -411,3 +411,142 @@ async def test_realtime_interrupted_turn_drops_unanswered_tool_requests() -> Non
     assert isinstance(first, ModelOutput)
     assert [request.identifier for request in first.tool_requests] == ["t1"]
     assert _kinds(context) == ["output", "input", "input"]
+
+
+@tool
+async def lookup() -> str:
+    return "tool text"
+
+
+@tool
+async def slow_lookup() -> str:
+    await asyncio.sleep(0.1)
+    return "tool text"
+
+
+def _merged_blocks(harness: _Harness) -> list[Any]:
+    from draive.conversation.types import merged_model_context
+
+    return list(merged_model_context(_replayed_context(harness.remembered)))
+
+
+def _assert_tool_exchange(
+    context: Sequence[Any],
+    *,
+    identifiers: Sequence[str],
+    before: str | None,
+    after: str,
+) -> None:
+    # strictly alternating: output(before + requests), input(responses), output(after)
+    assert _kinds(context) == ["output", "input", "output"]
+    first, second, last = context
+    assert [request.identifier for request in first.tool_requests] == list(identifiers)
+    assert first.content.to_str() == (before or "")
+    assert [response.identifier for response in second.tool_responses] == list(identifiers)
+    assert last.content.to_str() == after
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("parallel", [False, True])
+async def test_realtime_tool_exchange_is_remembered_from_chunks_only(parallel: bool) -> None:
+    # OpenAI-like: tool requests are only chunks, never part of a turn_completed output
+    identifiers = ("t1", "t2") if parallel else ("t1",)
+    harness = _Harness(
+        [
+            _text_turn("assistant", "let me check"),
+            *(ModelToolRequest.of(identifier, tool="lookup") for identifier in identifiers),
+            TextContent.of("mid"),
+        ]
+    )
+    async with ctx.scope("test", harness.model()):
+        async with realtime_conversation_preparing(
+            instructions="",
+            toolbox=Toolbox.of(lookup),
+            memory=harness.memory(),
+            output="text",
+        ) as session:
+            await _drain(session, 2 * len(identifiers) + 1)
+            await asyncio.sleep(0.05)
+            harness.chunks.extend([_text_turn("assistant", "done"), TextContent.of("end")])
+            await _drain(session, 1)
+
+    _assert_tool_exchange(
+        _merged_blocks(harness),
+        identifiers=identifiers,
+        before="let me check",
+        after="done",
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("parallel", [False, True])
+async def test_realtime_tool_exchange_is_remembered_once_when_provider_reports_requests(
+    parallel: bool,
+) -> None:
+    # Gemini-like: requests are chunks and also part of the output carrying the final answer
+    identifiers = ("t1", "t2") if parallel else ("t1",)
+    harness = _Harness(
+        [
+            *(ModelToolRequest.of(i, tool="lookup") for i in identifiers),
+            TextContent.of("mid"),
+        ]
+    )
+    async with ctx.scope("test", harness.model()):
+        async with realtime_conversation_preparing(
+            instructions="",
+            toolbox=Toolbox.of(lookup),
+            memory=harness.memory(),
+            output="text",
+        ) as session:
+            await _drain(session, 2 * len(identifiers) + 1)
+            await asyncio.sleep(0.05)
+            harness.chunks.extend(
+                [
+                    ModelSessionEvent.turn_completed(
+                        ModelOutput.of(
+                            *(ModelToolRequest.of(i, tool="lookup") for i in identifiers),
+                            MultimodalContent.of("the answer"),
+                        )
+                    ),
+                    TextContent.of("end"),
+                ]
+            )
+            await _drain(session, 1)
+            # the exchange is complete, it is remembered before the session closes
+            assert [turn.turn for turn in harness.remembered] == ["assistant"]
+
+    _assert_tool_exchange(
+        _merged_blocks(harness),
+        identifiers=identifiers,
+        before=None,
+        after="the answer",
+    )
+
+
+@pytest.mark.asyncio
+async def test_realtime_pending_tool_exchange_is_flushed_on_close() -> None:
+    harness = _Harness([ModelToolRequest.of("t1", tool="slow_lookup")])
+    async with ctx.scope("test", harness.model()):
+        async with realtime_conversation_preparing(
+            instructions="",
+            toolbox=Toolbox.of(slow_lookup),
+            memory=harness.memory(),
+            output="text",
+        ) as session:
+            await _drain(session, 1)
+            harness.chunks.append(
+                ModelSessionEvent.turn_completed(
+                    ModelOutput.of(
+                        ModelToolRequest.of("t1", tool="slow_lookup"),
+                        MultimodalContent.of("the answer"),
+                    )
+                )
+            )
+            harness.chunks.append(TextContent.of("end"))
+            await _drain(session, 1)  # turn completed before the tool answered, stays pending
+            assert harness.remembered == []
+            await _drain(session, 1)  # tool response event
+
+    context = _merged_blocks(harness)
+    assert [turn.turn for turn in harness.remembered] == ["assistant"]
+    _assert_tool_exchange(context, identifiers=("t1",), before=None, after="the answer")

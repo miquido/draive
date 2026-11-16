@@ -1,7 +1,15 @@
 import asyncio
 from asyncio import CancelledError
 from collections import deque
-from collections.abc import AsyncGenerator, Generator, Mapping, MutableSequence, Sequence
+from collections.abc import (
+    AsyncGenerator,
+    Awaitable,
+    Callable,
+    Generator,
+    Mapping,
+    MutableSequence,
+    Sequence,
+)
 from types import TracebackType
 from typing import Any
 
@@ -50,9 +58,11 @@ def realtime_conversation_preparing(  # noqa: C901, PLR0915
 ) -> RealtimeConversationSessionScope:
     session_scope: ModelSessionScope
     pending_reading: asyncio.Task[ModelSessionOutputChunk] | None = None
+    flushing_pending: Callable[[], Awaitable[None]] | None = None
 
     async def open_session() -> RealtimeConversationSession:  # noqa: C901, PLR0915
         nonlocal session_scope
+        nonlocal flushing_pending
         session_scope = RealtimeGenerativeModel.session(
             instructions=instructions,
             tools=toolbox.model_tools(iteration=0),
@@ -156,16 +166,42 @@ def realtime_conversation_preparing(  # noqa: C901, PLR0915
         pending_elements: MutableSequence[ModelInput | ModelOutput] = []
         handled_responses: dict[str, ModelToolResponse] = {}
 
+        # tool requests observed as stream chunks, a provider may not report them within
+        # its completed turns (or report them only after they were handled), each one is
+        # kept as a pending element until a completed turn reports it
+        observed_requests: dict[str, ModelOutput] = {}
+
         def assistant_turn() -> ConversationAssistantTurn | None:
             turn: ConversationAssistantTurn | None = _assistant_turn(
                 tuple(pending_elements),
                 handled_responses,
             )
+            for element in pending_elements:
+                if isinstance(element, ModelOutput):
+                    for request in element.tool_requests:
+                        handled_responses.pop(request.identifier, None)
+
             pending_elements.clear()
-            handled_responses.clear()
+            observed_requests.clear()
             return turn
 
-        async def read() -> MultimodalContentPart | ModelReasoningChunk | ConversationEvent:  # noqa: C901, PLR0912
+        async def flush_pending() -> None:
+            if pending_elements:
+                await remember_turn(assistant_turn())
+
+        flushing_pending = flush_pending
+
+        def pending_exchange_answered() -> bool:
+            # a completed exchange has a response delivered for every pending tool request
+            requests: set[str] = {
+                request.identifier
+                for element in pending_elements
+                if isinstance(element, ModelOutput)
+                for request in element.tool_requests
+            }
+            return bool(requests) and requests.issubset(handled_responses.keys())
+
+        async def read() -> MultimodalContentPart | ModelReasoningChunk | ConversationEvent:  # noqa: C901, PLR0912, PLR0915
             nonlocal pending_reading
             while True:
                 if tools_output:
@@ -204,6 +240,11 @@ def realtime_conversation_preparing(  # noqa: C901, PLR0915
                     handling: asyncio.Task[None] = ctx.spawn(handle_tool_request, chunk)
                     tools_running.add(handling)
                     handling.add_done_callback(tools_running.discard)
+                    if chunk.identifier not in observed_requests:
+                        observed: ModelOutput = ModelOutput.of(chunk)
+                        observed_requests[chunk.identifier] = observed
+                        pending_elements.append(observed)
+
                     return ConversationEvent.tool_request(chunk)
 
                 elif isinstance(chunk, ModelSessionEvent):
@@ -222,7 +263,24 @@ def realtime_conversation_preparing(  # noqa: C901, PLR0915
 
                         elif isinstance(chunk.content, ModelOutput):
                             if chunk.content.contains_tools:
+                                # the completed output supersedes requests observed as chunks
+                                for request in chunk.content.tool_requests:
+                                    superseded: ModelOutput | None = observed_requests.pop(
+                                        request.identifier,
+                                        None,
+                                    )
+                                    if superseded is not None:
+                                        pending_elements[:] = [
+                                            element
+                                            for element in pending_elements
+                                            if element is not superseded
+                                        ]
+
                                 pending_elements.append(chunk.content)
+                                if pending_exchange_answered():
+                                    # the provider closed the turn after the tools were answered,
+                                    # the output carries the final answer of the exchange
+                                    await remember_turn(assistant_turn())
 
                             else:
                                 pending_elements.append(chunk.content)
@@ -289,6 +347,10 @@ def realtime_conversation_preparing(  # noqa: C901, PLR0915
         if pending_reading is not None:
             pending_reading.cancel()
 
+        if flushing_pending is not None:
+            # whatever the assistant produced until now belongs to the memory
+            await flushing_pending()
+
         await session_scope.__aexit__(
             exc_type,
             exc_val,
@@ -332,33 +394,55 @@ def _assistant_turn_content(  # noqa: C901
         if isinstance(element, ModelOutput)
         for request in element.tool_requests
     }
+    emitted_requests: set[str] = set()
+    emitted_responses: set[str] = set()
+    fallbacks: list[ModelToolResponse] = []
+
+    def flush_fallbacks() -> Generator[ConversationEvent]:
+        # delivered responses follow the requests they answer, before any following content
+        for response in fallbacks:
+            if response.identifier not in emitted_responses:
+                emitted_responses.add(response.identifier)
+                yield ConversationEvent.tool_response(response)
+
+        fallbacks.clear()
+
     for element in elements:
         if isinstance(element, ModelInput):
+            yield from flush_fallbacks()
             for input_block in element.input:
                 if isinstance(input_block, MultimodalContent):
                     yield input_block
 
-                elif input_block.identifier in requested:
+                elif (
+                    input_block.identifier in requested
+                    and input_block.identifier not in emitted_responses
+                ):
+                    emitted_responses.add(input_block.identifier)
                     yield ConversationEvent.tool_response(input_block)
 
         else:
             assert isinstance(element, ModelOutput)  # nosec: B101
-            fallbacks: list[ModelToolResponse] = []
             for output_block in element.output:
                 if isinstance(output_block, ModelToolRequest):
+                    if output_block.identifier in emitted_requests:
+                        continue  # reported both as a chunk and within a completed turn
+
                     if output_block.identifier in responded:
+                        emitted_requests.add(output_block.identifier)
                         yield ConversationEvent.tool_request(output_block)
 
                     elif output_block.identifier in handled_responses:
                         # the provider did not report the response, use the delivered one
+                        emitted_requests.add(output_block.identifier)
                         yield ConversationEvent.tool_request(output_block)
                         fallbacks.append(handled_responses[output_block.identifier])
 
                 else:
+                    yield from flush_fallbacks()
                     yield output_block
 
-            for response in fallbacks:
-                yield ConversationEvent.tool_response(response)
+    yield from flush_fallbacks()
 
 
 def _assistant_turn(

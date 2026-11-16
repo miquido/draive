@@ -101,6 +101,22 @@
   only. `Evaluator.average` ignores non-text `error` meta. `EvaluatorSuite.add_case`
   bootstraps only the built-in file storage, a custom storage raising `FileNotFoundError`
   propagates. The MCP server serves undecodable text resources as blobs.
+- Gemini Live coalesces adjacent audio chunks of a completed turn into a single resource block
+  (the live stream still emits every chunk). Bedrock raises `ValueError` when the closing model
+  input has no deliverable content instead of sending a request ending on an assistant message.
+- vLLM materializes message content so SDK request retries no longer send empty tool or user
+  content, sends empty tool results as an empty string and raises `ModelOutputInvalid` for
+  non-object tool arguments. Ollama sends tool messages before user content and skips empty
+  assistant messages. vLLM and Ollama failure reasons are never empty. Anthropic tool-result
+  content is materialized as well (retry-serialization pin tests for Anthropic and OpenAI).
+- Mistral: non-object tool arguments raise `ModelOutputInvalid`, moderation keeps the highest
+  score per category across inputs. Cohere on Bedrock: throttling and capacity errors raise
+  `ModelRateLimit`, validation errors `ModelInputInvalid`. Mistral and Cohere embeddings raise
+  `ModelOutputInvalid` for inconsistent responses instead of `ValueError`.
+- Realtime conversation memory remembers tool exchanges observed from the session (OpenAI
+  Realtime) and flushes pending assistant output on session close and once a tool-using turn
+  completes (Gemini Live), deduplicating requests and responses by identifier. User text
+  written through `write()` is still not remembered.
 
 ### Breaking behavior notes
 
