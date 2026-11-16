@@ -200,12 +200,24 @@ def _is_encoded_text_base64(
         return False
 
 
+_HEX_BYTE: Final[str] = r"(?:0x[0-9a-f]{2}\b|[0-9a-f]{2}\b)"
+_HEX_RUN: Final[re.Pattern[str]] = re.compile(
+    rf"(?i)\b{_HEX_BYTE}(?:[\s,;:|/\\-]+{_HEX_BYTE}){{5,}}"
+)
+
+
 def _is_encoded_text_hex(
     match: re.Match[str],
     text: str,
 ) -> bool:
     # mac addresses and other hex dumps are not text
-    tokens: list[str] = re.findall(r"(?i)\b(?:0x)?([0-9a-f]{2})\b", match.group(0))
+    # only the run of bytes counts, words of the optional keyword prefix (`be`, `ad`...)
+    # are valid hex pairs as well and would corrupt the decoded payload
+    run: re.Match[str] | None = _HEX_RUN.search(match.group(0))
+    if run is None:
+        return False
+
+    tokens: list[str] = re.findall(r"(?i)\b(?:0x)?([0-9a-f]{2})\b", run.group(0))
     try:
         return _is_mostly_printable(bytes.fromhex("".join(tokens)))
 

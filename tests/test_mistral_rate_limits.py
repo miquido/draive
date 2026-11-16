@@ -66,3 +66,19 @@ async def _complete(headers: Mapping[str, str], *, during_stream: bool = False) 
             config=MistralChatConfig(model="test-model"),
         ):
             pass
+
+
+@pytest.mark.asyncio
+async def test_unsupported_output_is_not_reported_as_invalid_input() -> None:
+    model = object.__new__(MistralCompletions)
+    model._client = SimpleNamespace(chat=SimpleNamespace())
+    async with ctx.scope("test"):
+        with pytest.raises(NotImplementedError):
+            async for _ in model.completion(
+                instructions="test",
+                tools=ModelTools.none,
+                context=(),
+                output="image",
+                config=MistralChatConfig(model="test-model"),
+            ):
+                pass

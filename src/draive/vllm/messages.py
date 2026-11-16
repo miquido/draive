@@ -111,6 +111,9 @@ class VLLMMessages(VLLMAPI):
                 )
                 request_response_format = _response_format(output)
 
+            except NotImplementedError:
+                raise  # an unsupported capability is not an invalid input
+
             except Exception as exc:
                 raise ModelInputInvalid(
                     provider=self._provider,

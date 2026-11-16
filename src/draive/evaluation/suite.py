@@ -531,7 +531,8 @@ class EvaluatorSuite[**Args, Parameters: State]:
         Raises
         ------
         ValueError
-            When a selection resolves to no cases or refers to an unknown case identifier.
+            When a count or fraction selection is out of range or a selected case
+            identifier is unknown.
         """
         async with ctx.scope(f"evaluator.suite.{self.name}", *self._state):
             available_cases: Sequence[EvaluatorSuiteCase[Parameters]]

@@ -96,3 +96,25 @@ async def test_mistral_moderation_does_not_send_resource_reference_uri() -> None
         )
 
     assert sent == [["test"]]
+
+
+@pytest.mark.asyncio
+async def test_mistral_moderation_without_moderable_parts_sends_no_request() -> None:
+    sent: list[Any] = []
+
+    async def _moderate_async(**kwargs: Any) -> Any:
+        sent.append(kwargs["inputs"])
+        return SimpleNamespace(results=[])
+
+    model = object.__new__(MistralContentModeration)
+    model._client = SimpleNamespace(classifiers=SimpleNamespace(moderate_async=_moderate_async))
+
+    async with ctx.scope("test"):
+        await model.content_verification(
+            MultimodalContent.of(
+                ResourceReference.of("https://example.com/image.png", mime_type="image/png"),
+            ),
+            config=MistralModerationConfig(),
+        )
+
+    assert sent == []

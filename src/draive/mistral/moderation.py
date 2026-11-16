@@ -54,6 +54,9 @@ class MistralContentModeration(MistralAPI):
 
                     moderated_content.append(part.to_str())
 
+            if not moderated_content:
+                return  # nothing the provider can moderate, already reported above
+
             response: ModerationResponse
             with provider_failure(
                 provider="mistral",

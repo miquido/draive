@@ -393,7 +393,6 @@ def _resolve_requirement(  # noqa: C901, PLR0911
 
         case "equal":
             accessor, resolved_arguments = _json_accessor(requirement.lhs, arguments)
-            elements: str = _array_or_empty(accessor)
             resolved_arguments = [*resolved_arguments, _json_value(requirement.rhs)]
             return (
                 f"{accessor} = ${len(resolved_arguments)}::JSONB",
