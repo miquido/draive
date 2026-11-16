@@ -62,6 +62,16 @@ class Toolbox(State):
     @classmethod
     def of(
         cls,
+        tool_or_tools: Self,
+        /,
+        *,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self: ...
+
+    @overload
+    @classmethod
+    def of(
+        cls,
         tool_or_tools: Iterable[Tool] | Tool | None,
         /,
         *tools: Tool,
@@ -95,18 +105,22 @@ class Toolbox(State):
             of iterations, and a ``Tool`` suggests that specific
             tool for the first iteration when available.
         meta : Meta | MetaValues | None
-            Optional metadata attached to the toolbox state.
+            Optional metadata attached to the toolbox state. When ``tool_or_tools``
+            is already a toolbox, provided values are merged into its metadata.
 
         Returns
         -------
         Self
-            New toolbox instance or the same instance when ``tool_or_tools`` is
-            already a toolbox.
+            New toolbox instance, an updated copy when ``tool_or_tools`` is already
+            a toolbox and metadata was provided, or the same instance otherwise.
         """
         if isinstance(tool_or_tools, Toolbox):
             assert not tools  # nosec: B101
             assert suggesting is None  # nosec: B101
-            return tool_or_tools
+            if meta is None:
+                return tool_or_tools
+
+            return tool_or_tools.updating(meta=tool_or_tools.meta.merged_with(meta))
 
         first: Iterable[Tool]
         if tool_or_tools is None:

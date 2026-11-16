@@ -237,6 +237,37 @@ async def test_tools_provider_toolbox_uses_provider_meta_by_default() -> None:
 
 
 @pytest.mark.asyncio
+async def test_of_existing_toolbox_returns_the_same_instance_without_meta() -> None:
+    async with ctx.scope("test"):
+
+        @tool
+        async def ping() -> str:
+            return "pong"
+
+        toolbox = Toolbox.of(ping, meta={"tag": "value"})
+
+    assert Toolbox.of(toolbox) is toolbox
+
+
+@pytest.mark.asyncio
+async def test_of_existing_toolbox_merges_provided_meta() -> None:
+    async with ctx.scope("test"):
+
+        @tool
+        async def ping() -> str:
+            return "pong"
+
+        toolbox = Toolbox.of(ping, meta={"tag": "base", "kept": "value"})
+
+    updated = Toolbox.of(toolbox, meta={"tag": "override", "added": "value"})
+
+    assert updated is not toolbox
+    assert toolbox.meta == Meta.of({"tag": "base", "kept": "value"})
+    assert updated.meta == Meta.of({"tag": "override", "kept": "value", "added": "value"})
+    assert updated.tools == toolbox.tools
+
+
+@pytest.mark.asyncio
 async def test_tools_provider_toolbox_allows_overriding_provider_meta() -> None:
     async with ctx.scope("test"):
 
