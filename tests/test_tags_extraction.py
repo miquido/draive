@@ -1,3 +1,5 @@
+from pytest import mark
+
 from draive import MultimodalContent, MultimodalTag, TextContent
 from draive.resources import ResourceReference
 
@@ -103,6 +105,67 @@ def test_tag_to_str_escapes_attributes():
 
     expected = '<sample attr="&lt;&gt;&amp;{}">inner</sample>'.format('\\"')
     assert tag.to_str() == expected
+
+
+@mark.parametrize(
+    "value",
+    [
+        "<x> & y",
+        "&",
+        "<",
+        ">",
+        "&lt;",
+        "&amp;",
+        "a &amp;lt; b",
+        "<&>",
+        'quoted "value"',
+        "back\\slash",
+        "tab\tnew\nline\rcarriage",
+        '<tag attr="v">&amp;</tag>',
+        "plain value",
+    ],
+)
+def test_parses_back_what_rendering_escaped(value: str) -> None:
+    # rendering escapes markup characters as entities, parsing has to decode them -
+    # otherwise the metadata is corrupted on every string projection round trip
+    rendered = MultimodalTag.of("inner", name="sample", meta={"attr": value}).to_str()
+
+    tag = MultimodalContent.of(rendered).tag("sample")
+
+    assert tag is not None
+    assert tag.meta.get("attr") == value
+    assert tag.content == MultimodalContent.of("inner")
+
+
+def test_rendering_parsed_attributes_repeats_the_same_string() -> None:
+    # escaping the already escaped value doubled it, so every round trip grew the markup
+    tag = MultimodalTag.of("inner", name="sample", meta={"attr": "<x> & y"})
+    rendered = tag.to_str()
+
+    parsed = MultimodalContent.of(rendered).tag("sample")
+
+    assert parsed is not None
+    assert parsed.to_str() == rendered
+
+
+def test_parses_self_closing_tag_attributes_back() -> None:
+    tag = MultimodalTag.of(name="empty", meta={"attr": "<&>"})
+    rendered = tag.to_str()
+
+    parsed = MultimodalContent.of(rendered).tag("empty")
+
+    assert parsed is not None
+    assert parsed.content == MultimodalContent.empty
+    assert parsed.meta.get("attr") == "<&>"
+
+
+def test_decodes_a_single_escape_level_only() -> None:
+    # an attribute holding the literal text `&lt;` is escaped to `&amp;lt;` and has to
+    # come back as `&lt;`, not as `<`
+    tag = MultimodalContent.of('<sample attr="&amp;lt;">inner</sample>').tag("sample")
+
+    assert tag is not None
+    assert tag.meta.get("attr") == "&lt;"
 
 
 def test_parses_tag_spanning_multiple_text_parts():

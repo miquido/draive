@@ -1171,7 +1171,7 @@ def _parse_attr_value(  # noqa: C901, PLR0912
         if ch == quote:
             if last < i:
                 parts.append(text[last:i])
-            return "".join(parts), i + 1
+            return _unescaped_attribute_string("".join(parts)), i + 1
 
         if ch in {"\n", "\r"}:
             return None, i
@@ -1257,6 +1257,22 @@ _ATTRIBUTE_ESCAPE_MAP: Mapping[str, str] = {
 
 def _escape_attribute_string(value: str) -> str:
     return "".join(_ATTRIBUTE_ESCAPE_MAP.get(char, char) for char in value)
+
+
+# markup characters are escaped as entities instead of backslash sequences, reading an
+# attribute has to decode them back - `&amp;` goes last so a single escape is undone
+_ATTRIBUTE_UNESCAPE_PAIRS: tuple[tuple[str, str], ...] = (
+    ("&lt;", "<"),
+    ("&gt;", ">"),
+    ("&amp;", "&"),
+)
+
+
+def _unescaped_attribute_string(value: str) -> str:
+    for escaped, character in _ATTRIBUTE_UNESCAPE_PAIRS:
+        value = value.replace(escaped, character)
+
+    return value
 
 
 def _formatted_tag_attribute_value(
