@@ -11,6 +11,9 @@
   URIs carrying undeclared query parameters (for templates without a query) or encoded
   separators within host variables are refused, a missing required variable fails the
   expansion, aliased variables expand correctly.
+- Resource template variables always have to match declared function arguments, a variadic
+  `**kwargs` no longer makes the declaration accept an undeclared variable. It remains available
+  for extra arguments of `resolve(...)`.
 - Public re-exports from haiway now include `URITemplate`, `DefaultEnv`, `DefaultFactory`,
   `Directory`, `PaginationToken`, `Paths`, `ScopeKind` and `parse_bool`.
 - Mistral reads `MISTRAL_ENDPOINT` as an alias for `MISTRAL_SERVER_URL`.

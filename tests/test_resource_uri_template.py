@@ -80,6 +80,31 @@ def test_resource_rejects_a_malformed_uri_template() -> None:
             return ResourceContent.of(b"", mime_type="text/plain")
 
 
+def test_resource_rejects_template_variable_covered_only_by_variadic_arguments() -> None:
+    with pytest.raises(ValueError, match="not found in function arguments"):
+
+        @resource(uri_template="https://api.example.com/{bucket}/{item}")
+        async def document(bucket: str, **extra: str) -> ResourceContent:
+            return ResourceContent.of(b"", mime_type="text/plain")
+
+
+@pytest.mark.asyncio
+async def test_variadic_arguments_carry_extras_outside_of_the_uri() -> None:
+    @resource(uri_template="https://api.example.com/{bucket}")
+    async def document(bucket: str, **extra: str) -> ResourceContent:
+        return ResourceContent.of(
+            repr((bucket, sorted(extra.items()))).encode(),
+            mime_type="text/plain",
+        )
+
+    resolved = await document.resolve(bucket="docs", region="eu")
+    assert resolved.uri == "https://api.example.com/docs"
+    assert resolved.resource.to_bytes() == b"('docs', [('region', 'eu')])"
+
+    from_uri = await document.resolve_from_uri("https://api.example.com/docs")
+    assert from_uri.resource.to_bytes() == b"('docs', [])"
+
+
 def test_resource_without_variables_has_no_args() -> None:
     @resource(uri_template="https://api.example.com/status")
     async def status() -> ResourceContent:

@@ -62,10 +62,12 @@ class ResourceTemplate[**Args](
             if attribute.alias is not None
         }
         for template_parameter in uri_template.variables:
+            # variadic keyword arguments are left for extras, template variables identify
+            # the resource and always have to be declared
             parameter: Attribute | None = self._keyword_arguments.get(
                 template_parameter
             ) or parameters_by_alias.get(template_parameter)
-            if parameter is None and self._variadic_keyword_arguments is None:
+            if parameter is None:
                 raise ValueError(
                     f"URI template parameter {template_parameter} not found in function arguments"
                 )
@@ -403,7 +405,8 @@ def resource[**Args](
     ----------
     uri_template : URITemplate | str
         RFC 6570 template of the resource URI, its variables have to match the function
-        arguments by name or alias. A text is verified when the resource is declared.
+        arguments by name or alias, variadic keyword arguments do not match them. A text is
+        verified when the resource is declared.
     mime_type : str | None
         Mime type of the resource content.
     name : str | None

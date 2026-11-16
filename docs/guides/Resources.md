@@ -27,8 +27,10 @@ async def main() -> None:
 ```
 
 Every template variable has to match a function argument by name or by `Alias`, otherwise the
-declaration raises `ValueError`. Values taken from a URI are coerced to the annotated argument types
-(`int`, `bool`, enums, JSON lists and objects, ...).
+declaration raises `ValueError`, variadic `**kwargs` never match template variables. They may still
+collect implementation specific extras passed to `resolve(...)` - those reach the function but are
+not part of the URI, so they are not available when resolving from a URI. Values taken from a URI
+are coerced to the annotated argument types (`int`, `bool`, enums, JSON lists and objects, ...).
 
 ## URITemplate
 
