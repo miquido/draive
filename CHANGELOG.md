@@ -38,6 +38,9 @@
 
 ### Fixed
 
+- MCP resource URIs survive the client identifier round trip: custom schemes without an
+  authority (`notes:///docs/a`) keep their `//`, and client identifiers containing dots are
+  matched whole (longest first) when stripping the prefix and routing a URI to a client.
 - Ollama tool calls no longer emit a Pydantic serializer warning for open tool parameters.
 - Provider adapters translate SDK failures into typed model exceptions consistently
   (OpenAI, Anthropic, Mistral, Gemini, Ollama, Cohere, vLLM, Bedrock).
