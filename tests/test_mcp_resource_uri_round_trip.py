@@ -14,9 +14,9 @@ from draive.mcp.client import MCPClient, MCPClients  # pyright: ignore[reportPri
         ("source", "notes://host/docs/a", "notes://source.host/docs/a"),
         ("source", "mcp://host/details", "mcp://source.host/details"),
         ("source", "/details", "mcp://source/details"),
-        ("my.server", "notes:///docs/a", "notes://my.server/docs/a"),
-        ("my.server", "notes://host/docs/a", "notes://my.server.host/docs/a"),
-        ("my.server", "/details", "mcp://my.server/details"),
+        ("my.server", "notes:///docs/a", "notes://my%2Eserver/docs/a"),
+        ("my.server", "notes://host/docs/a", "notes://my%2Eserver.host/docs/a"),
+        ("my.server", "/details", "mcp://my%2Eserver/details"),
     ],
 )
 def test_listed_resource_uri_is_restored_for_the_server(
@@ -35,15 +35,15 @@ def test_listed_resource_uri_is_restored_for_the_server(
     [
         (("source",), "notes://source/docs/a", "source"),
         (("source",), "mcp://source.item/details", "source"),
-        (("my.server",), "notes://my.server/docs/a", "my.server"),
-        (("my.server",), "mcp://my.server.host/details", "my.server"),
-        (("my", "my.server"), "mcp://my.server.host/details", "my.server"),
+        (("my.server",), "notes://my%2Eserver/docs/a", "my.server"),
+        (("my.server",), "mcp://my%2Eserver.host/details", "my.server"),
+        (("my", "my.server"), "mcp://my%2Eserver.host/details", "my.server"),
         (("my", "my.server"), "mcp://my.other/details", "my"),
         (("source",), "mcp://other.source/details", None),
         (("source",), "relative/details", None),
     ],
 )
-def test_resource_uri_is_routed_to_the_longest_matching_client(
+def test_resource_uri_is_routed_to_the_matching_client(
     identifiers: tuple[str, ...],
     uri: str,
     expected: str | None,
@@ -51,3 +51,23 @@ def test_resource_uri_is_routed_to_the_longest_matching_client(
     clients = MCPClients(*(MCPClient.stdio(i, command="true") for i in identifiers))  # pyright: ignore[reportArgumentType]
 
     assert clients._client_identifier_for_uri(uri) == expected  # pyright: ignore[reportPrivateUsage]
+
+
+@pytest.mark.parametrize(
+    ("server_uri", "origin"),
+    [
+        ("mcp://server.host/details", "my"),
+        ("mcp://host/details", "my.server"),
+    ],
+)
+def test_listed_resource_uri_routes_back_to_the_client_which_listed_it(
+    server_uri: str,
+    origin: str,
+) -> None:
+    producers = {i: MCPClient.stdio(i, command="true") for i in ("my", "my.server")}
+    clients = MCPClients(*producers.values())  # pyright: ignore[reportArgumentType]
+
+    listed: str = producers[origin]._with_uri_identifier(server_uri)  # pyright: ignore[reportPrivateUsage]
+
+    assert clients._client_identifier_for_uri(listed) == origin  # pyright: ignore[reportPrivateUsage]
+    assert producers[origin]._without_uri_identifier(listed) == server_uri  # pyright: ignore[reportPrivateUsage]

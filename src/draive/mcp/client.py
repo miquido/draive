@@ -513,7 +513,7 @@ class MCPClient:
             return _assemble_uri(
                 parsed,
                 scheme=parsed.scheme,
-                netloc=f"{self.identifier}.{parsed.netloc}",
+                netloc=f"{_encode_identifier(self.identifier)}.{parsed.netloc}",
                 path=parsed.path,
             )
 
@@ -527,7 +527,7 @@ class MCPClient:
             # default to mcp scheme if empty
             scheme=parsed.scheme or "mcp",
             # use identifier as domain/netloc
-            netloc=self.identifier,
+            netloc=_encode_identifier(self.identifier),
             path=path,
         )
 
@@ -543,7 +543,8 @@ class MCPClient:
         if not parsed.netloc:
             return uri
 
-        if parsed.netloc == self.identifier:
+        identifier: str = _encode_identifier(self.identifier)
+        if parsed.netloc == identifier:
             # an empty authority is kept as `scheme:///path`, the local `mcp` scheme is dropped
             return _assemble_uri(
                 parsed,
@@ -552,12 +553,11 @@ class MCPClient:
                 path=parsed.path,
             )
 
-        # identifiers may contain dots, the whole identifier has to match the prefix
-        if parsed.netloc.startswith(f"{self.identifier}."):
+        if parsed.netloc.startswith(f"{identifier}."):
             return _assemble_uri(
                 parsed,
                 scheme=parsed.scheme,
-                netloc=parsed.netloc[len(self.identifier) + 1 :],
+                netloc=parsed.netloc[len(identifier) + 1 :],
                 path=parsed.path,
             )
 
@@ -654,6 +654,15 @@ class MCPClient:
         # the transport is closed regularly instead of being thrown into - it only
         # has to release the connection, while the cause propagates through the scope
         await self._close_session()
+
+
+def _encode_identifier(
+    identifier: str,
+    /,
+) -> str:
+    # dots separate the identifier from the original authority, escaping them within
+    # the identifier keeps the encoded uri unambiguous (`my.server` != `my` + `server`)
+    return identifier.replace("%", "%25").replace(".", "%2E")
 
 
 def _assemble_uri(
@@ -991,15 +1000,17 @@ class MCPClients:
         if not parsed.netloc:
             return None
 
-        if parsed.netloc in self._clients.keys():
-            return parsed.netloc
+        for identifier in self._clients:
+            if _encode_identifier(identifier) == parsed.netloc:
+                return identifier
 
-        # a server may scope its resources under a dotted prefix, i.e. `mcp://server.item`,
-        # while identifiers may contain dots themselves - the longest matching one wins
-        matching: list[str] = [
-            identifier for identifier in self._clients if parsed.netloc.startswith(f"{identifier}.")
-        ]
-        return max(matching, key=len) if matching else None
+        # a server may scope its resources under a dotted prefix, i.e. `mcp://server.item`
+        encoded_identifier: str = parsed.netloc.split(".", 1)[0]
+        for identifier in self._clients:
+            if _encode_identifier(identifier) == encoded_identifier:
+                return identifier
+
+        return None
 
     async def tools_fetch(
         self,
