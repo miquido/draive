@@ -185,3 +185,28 @@ async def test_multi_content_read_references_are_resolvable_back() -> None:
         clients._client_identifier_for_uri(reference.uri)  # pyright: ignore[reportPrivateUsage]
         for reference in references
     ] == ["source", "source"]
+
+
+@pytest.mark.asyncio
+async def test_resource_link_keeps_its_metadata_and_is_scoped() -> None:
+    from mcp.types import ResourceLink
+
+    from draive.mcp.client import _convert_content  # pyright: ignore[reportPrivateUsage]
+    from draive.resources import ResourceReference
+
+    content = await _convert_content(
+        ResourceLink(
+            type="resource_link",
+            uri="https://host/report",
+            name="Report",
+            description="Quarterly",
+            mime_type="application/pdf",
+        ),
+        scope_uri=lambda uri: f"scoped:{uri}",
+    )
+
+    reference = content.parts[0]
+    assert isinstance(reference, ResourceReference)
+    assert reference.uri == "scoped:https://host/report"
+    assert reference.meta.name == "Report"
+    assert reference.meta.description == "Quarterly"

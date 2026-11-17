@@ -37,6 +37,7 @@ from mcp.types import (
 )
 from mcp.types import ImageContent as MCPImageContent
 from mcp.types import Resource as MCPResource
+from mcp.types import ResourceLink as MCPResourceLink
 from mcp.types import ResourceTemplate as MCPResourceTemplate
 from mcp.types import TextContent as MCPTextContent
 from mcp.types import Tool as MCPTool
@@ -168,7 +169,7 @@ class MCPServer:
                 yield
 
         return Starlette(
-            debug=__debug__,
+            debug=False,
             routes=[Mount(path, app=session_manager.handle_request)],
             lifespan=lifespan,
         )
@@ -185,11 +186,12 @@ class MCPServer:
 
         from mcp.server.sse import SseServerTransport
         from starlette.applications import Starlette
+        from starlette.responses import Response
         from starlette.routing import Mount, Route
 
         sse = SseServerTransport("/messages/")
 
-        async def handle_sse(request: Any):
+        async def handle_sse(request: Any) -> Response:
             async with sse.connect_sse(request.scope, request.receive, request._send) as streams:
                 await self.run(
                     read_stream=streams[0],
@@ -198,8 +200,11 @@ class MCPServer:
                     experimental_capabilities=as_dict(experimental_capabilities),
                 )
 
+            # the connection is already closed, an empty response satisfies the route contract
+            return Response()
+
         return Starlette(
-            debug=__debug__,
+            debug=False,
             routes=[
                 Route("/sse", endpoint=handle_sse),
                 Mount("/messages/", app=sse.handle_post_message),
@@ -514,8 +519,12 @@ def _decode_text(data: str, /, *, mime_type: str) -> str | None:
 
 def _convert_multimodal_content(
     content: MultimodalContent,
-) -> Sequence[MCPTextContent | MCPImageContent | MCPAudioContent | EmbeddedResource]:
-    converted: list[MCPTextContent | MCPImageContent | MCPAudioContent | EmbeddedResource] = []
+) -> Sequence[
+    MCPTextContent | MCPImageContent | MCPAudioContent | MCPResourceLink | EmbeddedResource
+]:
+    converted: list[
+        MCPTextContent | MCPImageContent | MCPAudioContent | MCPResourceLink | EmbeddedResource
+    ] = []
     for part in content.parts:
         if isinstance(part, TextContent):
             converted.append(
@@ -587,10 +596,15 @@ def _convert_multimodal_content(
                 )
 
         elif isinstance(part, ResourceReference):
-            # We don't return links yet; ask callers to provide content
-            # we could try to resolve those contextually using ResourceRepository
-            raise NotImplementedError(
-                "MCP resource links are not supported yet; provide content blobs instead"
+            # references are passed to the client as links, it decides whether to read them
+            converted.append(
+                MCPResourceLink(
+                    type="resource_link",
+                    uri=part.uri,
+                    name=part.meta.name or part.uri,
+                    description=part.meta.description,
+                    mime_type=part.mime_type,
+                )
             )
 
         else:
