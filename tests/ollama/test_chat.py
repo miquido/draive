@@ -1,4 +1,6 @@
 import json
+import subprocess
+import sys
 import warnings
 from types import SimpleNamespace
 from typing import Any
@@ -260,3 +262,36 @@ def test_nested_tool_parameters_survive_serialization() -> None:
 
     # sequences are normalized into tuples by the specification validation
     assert json.loads(json.dumps(serialized["tools"][0]["function"]["parameters"])) == parameters
+
+
+def test_open_tool_parameters_do_not_emit_pydantic_warnings() -> None:
+    # pytest discards warning filters registered while collecting, so check in a clean interpreter
+    script = """
+import warnings
+from ollama import Message
+from ollama._client import _copy_tools
+from ollama._types import ChatRequest
+from draive.models import ModelToolSpecification
+from draive.ollama.chat import _tool_specification_as_tool
+
+tool = _tool_specification_as_tool(
+    ModelToolSpecification(
+        name="probe",
+        description="probe",
+        parameters={"type": "object", "properties": {}, "additionalProperties": False},
+    )
+)
+request = ChatRequest(
+    model="m", messages=[Message(role="user", content="x")], tools=list(_copy_tools([tool]))
+)
+with warnings.catch_warnings(record=True) as caught:
+    request.model_dump(exclude_none=True)
+print(len(caught))
+"""
+    result = subprocess.run(
+        [sys.executable, "-I", "-c", script],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert result.stdout.strip() == "0"

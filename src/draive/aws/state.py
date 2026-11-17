@@ -76,7 +76,7 @@ class AWSSQS(State):
         -----
         Typical usage::
 
-            async with AWSSQS.queue(
+            async with await AWSSQS.queue(
                 "events",
                 content_encoder=encode_event,
                 content_decoder=decode_event,

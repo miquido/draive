@@ -45,6 +45,7 @@ import draive
         "timeout",
         "throttle",
         "concurrently",
+        "gather",
         "stream_concurrently",
     ),
 )

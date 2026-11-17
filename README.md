@@ -240,6 +240,13 @@ Variant extras are available for provider-specific setups: `openai_realtime` (Op
 `anthropic_bedrock` and `cohere_bedrock` (those providers accessed through AWS Bedrock), and `httpx`
 (shared HTTP client).
 
+## 🤖 Coding agents
+
+The repository ships an [Agent Skill](https://agentskills.io) teaching coding agents how to write
+Draive code - its patterns, APIs and gotchas, verified against the framework. Copy
+[`skills/draive`](skills/draive) into the skills directory of your agent (for example
+`.claude/skills/draive` in your project) to make it available.
+
 ## 👷 Contributing
 
 Draive is open-source and always growing — and we’d love your help.

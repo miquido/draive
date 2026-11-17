@@ -1,5 +1,6 @@
 """Ollama chat adapter for GenerativeModel with tools and streaming."""
 
+import warnings
 from collections.abc import AsyncGenerator, Iterable, Mapping, Sequence
 from typing import Any, Final, Literal, cast
 from uuid import uuid4
@@ -299,6 +300,17 @@ def _context_messages(
                     for request in element.tool_requests
                 ],
             )
+
+
+# the sdk serializes tools through `model_dump`, where our deliberately open parameters mapping
+# (see `_tool_specification_as_tool`) is not an instance of its closed `Parameters` model;
+# the serialized payload is complete, only pydantic's type check complains
+warnings.filterwarnings(
+    "ignore",
+    message=r"Pydantic serializer warnings:\s+PydanticSerializationUnexpectedValue\(Expected "
+    r"`Parameters`",
+    category=UserWarning,
+)
 
 
 def _tool_specification_as_tool(

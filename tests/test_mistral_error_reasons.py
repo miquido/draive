@@ -50,7 +50,7 @@ def _assert_safe(exc: ModelOutputFailed, error: SDKError, *, runner: Any) -> Non
     assert MARKER not in exc.reason
     assert "Body" not in exc.reason
     assert MARKER not in str(exc)
-    # gather_all re-raises the first failure `from None`, dropping the cause of embeddings
+    # the embeddings failure is translated within a task group, which drops its cause
     if runner is not _embedding_failure:
         assert exc.__cause__ is error
 
