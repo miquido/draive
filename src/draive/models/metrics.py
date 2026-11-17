@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from typing import cast
 
-from haiway import Missing, ObservabilityAttribute, ctx
+from haiway import Missing, ObservabilityAttribute, ctx, gather
 
 from draive.models.types import (
     ModelException,
@@ -17,7 +17,6 @@ from draive.models.types import (
     ModelTools,
     ModelToolSpecification,
 )
-from draive.utils.concurrent import gather_all
 
 __all__ = (
     "model_rate_limit",
@@ -463,7 +462,7 @@ async def provider_gather[Result](
         When any of the calls fails with an unexpected exception.
     """
     with provider_failure(provider=provider, model=model, operation=operation):
-        return await gather_all(*awaitables)
+        return await gather(*awaitables)
 
 
 _RATE_LIMIT_STATUS: int = 429

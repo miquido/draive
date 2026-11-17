@@ -4,7 +4,11 @@
 
 ### Changed
 
-- Requires Python 3.15 and haiway 0.62.
+- Requires Python 3.15 and haiway 0.62.1.
+- `draive.utils.gather_all` is removed in favor of haiway `gather` (exported from `draive`).
+  Several coroutines failing together now raise an `ExceptionGroup` instead of the first failure.
+- `draive.fastapi` no longer exports `ExceptionHandling` (removed in haiway 0.62.1), pass the
+  unhandled error handler to `application(..., exception_handler=...)` as a plain callable.
 - Resource templates use haiway `URITemplate` for expansion, matching and verification.
   `ResourceReferenceTemplate.template_uri` is a `URITemplate` (serialized as
   `{"template": "..."}`), `@resource(uri_template=...)` accepts a string or a `URITemplate`.
@@ -15,23 +19,26 @@
   `**kwargs` no longer makes the declaration accept an undeclared variable. It remains available
   for extra arguments of `resolve(...)`.
 - Public re-exports from haiway now include `URITemplate`, `DefaultEnv`, `DefaultFactory`,
-  `Directory`, `PaginationToken`, `Paths`, `ScopeKind` and `parse_bool`.
+  `Directory`, `PaginationToken`, `Paths`, `ScopeKind`, `gather` and `parse_bool`.
 - Mistral reads `MISTRAL_ENDPOINT` as an alias for `MISTRAL_SERVER_URL`.
 - SurrealDB 3.x or newer is required (verified with 3.2 and 4.0).
 
 ### Added
 
+- `ToolArgumentsException` is exported from `draive` and `draive.tools`.
+- `skills/draive` - an Agent Skill for coding agents writing Draive code.
 - Telemetry: provider failure/rate-limit metrics, embedding token usage, tool invocations,
   guardrail verdicts, evaluator suite case errors and durations, Qdrant and SurrealDB
   operation metrics, per-root AWS CloudWatch traces.
-- `ConversationException`; iteration limits for agents, steps and conversation completion
-  (`max_iterations`) raising typed exceptions.
+- `ConversationException`; iteration limits raising typed exceptions: `max_iterations` for
+  agents and steps, a fixed limit of 32 for conversation completion.
 - `docs/guides/Resources.md`.
 - `GenerationOutputMissing` raised by image and audio generation instead of a bare
   `ValueError`; `AWSInvalidArgument`.
 
 ### Fixed
 
+- Ollama tool calls no longer emit a Pydantic serializer warning for open tool parameters.
 - Provider adapters translate SDK failures into typed model exceptions consistently
   (OpenAI, Anthropic, Mistral, Gemini, Ollama, Cohere, vLLM, Bedrock).
 - Evaluation: invalid score bounds and empty suites are rejected, suite case errors become

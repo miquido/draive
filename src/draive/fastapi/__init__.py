@@ -1,6 +1,5 @@
 from haiway.fastapi import (
     ContextMiddleware,
-    ExceptionHandling,
     ObservabilityPreparing,
     ServerContext,
     StreamResponse,
@@ -10,7 +9,6 @@ from haiway.fastapi import (
 
 __all__ = (
     "ContextMiddleware",
-    "ExceptionHandling",
     "ObservabilityPreparing",
     "ServerContext",
     "StreamResponse",
