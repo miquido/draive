@@ -79,7 +79,7 @@ async def store(content: str, **extra: Any) -> None:
 Decorate the adapter function, not the callers. The outer decorator wraps the inner ones.
 
 ```python
-@cache(limit=256, expiration=60)      # skip repeats
+@cache(limit=256, expiration=60)      # skip repeats - keyed on arguments only, never on `ctx`
 @timeout(5)                           # bounds the whole call, retries included
 @retry(limit=3, delay=0.2, catching=TransientError)   # up to 3 retries: 4 attempts
 @throttle(limit=10, period=1)         # stay within provider rate limits

@@ -208,7 +208,7 @@ from typing import Any
 
 import pytest
 from draive import (GenerativeModel, ModelContextElement, ModelOutputChunk, ModelOutputStream,
-                    ModelTools, ModelToolRequest, TextContent, TextGeneration, ctx)
+                    ModelTools, ModelToolRequest, TextContent, TextGeneration, ctx, tool)
 
 def fake_model(*turns: Sequence[ModelOutputChunk]) -> GenerativeModel:
     calls: list[Sequence[ModelContextElement]] = []       # inspect what the model was sent
@@ -222,6 +222,10 @@ def fake_model(*turns: Sequence[ModelOutputChunk]) -> GenerativeModel:
                 yield chunk
         return stream()
     return GenerativeModel(generating=generating)
+
+@tool
+async def weather(city: str) -> str:
+    return f"Sunny in {city}"
 
 @pytest.mark.asyncio
 async def test_weather() -> None:

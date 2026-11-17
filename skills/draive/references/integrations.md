@@ -88,11 +88,16 @@ async with ctx.scope("worker", disposables=(RabbitMQClient(),)):
                 if message.meta.get("attempt", 1) > 3:
                     await message.reject(requeue=False)    # stop a poison message
                     continue
-                async with message as content:             # ack on success, reject on exception
-                    await handle(content)
+                try:
+                    async with message as content:         # ack on success, reject on exception
+                        await handle(content)
+                except Exception:                          # the block re-raises after rejecting
+                    ctx.log_error("order handling failed") # without this the consumer loop ends
 ```
 
 - Both `RabbitMQ.queue(...)` and `queue.consume()` are awaited **and** entered: `async with await`.
+- `async with message` settles the message and then re-raises the handler's exception, which
+  ends the `async for` - catch it per message to keep the worker running.
 - A rejected message is requeued by default, so a handler that always fails loops - guard with
   `attempt` as above (declare the queue `x-queue-type: quorum` for a real count).
 - Handlers must be idempotent: consumers are re-established after a connection loss and in-flight

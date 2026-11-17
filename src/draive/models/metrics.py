@@ -438,7 +438,8 @@ async def provider_gather[Result](
 ) -> Sequence[Result]:
     """Run provider calls concurrently translating failures into typed exceptions.
 
-    The remaining calls are cancelled when one of them fails.
+    The remaining calls are cancelled when one of them fails. When several fail together
+    the first model exception is raised, or the first failure of any other kind.
 
     Parameters
     ----------
@@ -462,7 +463,34 @@ async def provider_gather[Result](
         When any of the calls fails with an unexpected exception.
     """
     with provider_failure(provider=provider, model=model, operation=operation):
-        return await gather(*awaitables)
+        try:
+            return await gather(*awaitables)
+
+        except ExceptionGroup as group:
+            # calls failing together are reported as a group, surface the primary failure
+            # to keep typed exceptions, i.e. rate limits, recognizable
+            raise _primary_failure(group) from None
+
+
+def _primary_failure(
+    group: BaseExceptionGroup[BaseException],
+    /,
+) -> BaseException:
+    failures: list[BaseException] = []
+    pending: list[BaseException] = list(group.exceptions)
+    while pending:
+        failure: BaseException = pending.pop(0)
+        if isinstance(failure, BaseExceptionGroup):
+            # nested groups keep their order
+            pending[:0] = cast(BaseExceptionGroup[BaseException], failure).exceptions
+
+        else:
+            failures.append(failure)
+
+    return next(
+        (failure for failure in failures if isinstance(failure, ModelException)),
+        failures[0],
+    )
 
 
 _RATE_LIMIT_STATUS: int = 429

@@ -72,8 +72,9 @@ class StorageConfig(State):
 ```
 
 Small, immutable, defaulted. A configuration constructible without arguments does not have to be
-installed: `ctx.state(StorageConfig)` builds it from its defaults. Override for one call with
-`ctx.state(StorageConfig).updating(...)`, for a block with `with ctx.updating(StorageConfig(...)):`.
+installed: `ctx.state(StorageConfig)` builds it from its defaults. Override for a block with
+`with ctx.updating(StorageConfig(...)):`. `ctx.state(StorageConfig).updating(...)` only returns an
+updated copy - pass it explicitly, it does not change what a service call resolves.
 
 ## Service (the functionality triple)
 

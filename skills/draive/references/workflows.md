@@ -120,6 +120,9 @@ AgentMemory(recalling=..., remembering=..., preparing=None)   # custom backend
 memory.with_ctx(SomeState(), disposables=(client(),))         # bind state around memory calls
 AgentMemory.disabled                                          # default: context lives for one turn
 ```
+Persistent memory is keyed by `agent_uri`: a string `agent="name"` gets a random
+`agent://<uuid>` per process, so pass a stable `AgentIdentity.of(uri="agent://support", name=...)`
+or history is not found after a restart.
 Protocols `AgentMemoryPreparing/Recalling/Remembering` import from `draive.agents`. Postgres:
 `PostgresAgentMemory.instance()` from `draive.postgres`.
 

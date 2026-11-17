@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 from haiway import ctx
 
@@ -28,6 +30,48 @@ async def test_provider_gather_translates_failures() -> None:
     async with ctx.scope("test"):
         with pytest.raises(ModelOutputFailed):
             await provider_gather(failing(), provider="test", model="m", operation="embedding")
+
+
+@pytest.mark.asyncio
+async def test_provider_gather_keeps_rate_limit_of_concurrent_failures() -> None:
+    barrier = asyncio.Barrier(2)  # both calls fail together, gather reports an exception group
+
+    async def failing() -> int:
+        await barrier.wait()
+        raise RuntimeError("boom")
+
+    async def limited() -> int:
+        await barrier.wait()
+        raise ModelRateLimit(provider="test", model="m", retry_after=1.0)
+
+    async with ctx.scope("test"):
+        with pytest.raises(ModelRateLimit):
+            await provider_gather(
+                failing(),
+                limited(),
+                provider="test",
+                model="m",
+                operation="embedding",
+            )
+
+
+@pytest.mark.asyncio
+async def test_provider_gather_translates_concurrent_failures() -> None:
+    barrier = asyncio.Barrier(2)
+
+    async def failing() -> int:
+        await barrier.wait()
+        raise RuntimeError("boom")
+
+    async with ctx.scope("test"):
+        with pytest.raises(ModelOutputFailed, match="embedding request failed - RuntimeError"):
+            await provider_gather(
+                failing(),
+                failing(),
+                provider="test",
+                model="m",
+                operation="embedding",
+            )
 
 
 class _StatusCodeError(Exception):

@@ -9,7 +9,7 @@ the docs before use.
 
 | About to write | Use |
 | --- | --- |
-| `os.getenv`, `os.environ[...]`, manual casting | `getenv_str/int/float/bool/base64`, `getenv`, `parse_bool`; `load_env()` reads `.env`; in a `State`, `DefaultEnv("NAME", mapping=int, fallback=..., required=True)` |
+| `os.getenv`, `os.environ[...]`, manual casting | `getenv_str/int/float/bool/base64`, `getenv`, `parse_bool`; `load_env()` reads `.env`; in a `State`, `DefaultEnv("NAME", mapping=int, fallback=...)` or `DefaultEnv("NAME", required=True)` (`fallback` together with `required=True` raises `AssertionError`) |
 | `field(default_factory=...)`, `__post_init__` defaults | `Default(value)`, `Default(factory=fn)`, `DefaultFactory(fn, *args)`, `DefaultEnv(...)` |
 | hand-written validation in `__init__` | `Annotated[T, Validator(fn)]` (before the built-in validation, coerces raw input) and `Verifier(fn)` (after it, on the typed value); both return the value and raise to reject |
 | nested `dataclasses.replace(...)` | `state.updating(...)`; for deep paths `AttributePath`: `User._.profile.name(user)` reads, `User._.profile.name(user, updated="new")` returns an updated copy, `User._.roles[0]` for items |
@@ -22,7 +22,7 @@ the docs before use.
 | `asyncio.create_task`, `asyncio.TaskGroup` | `ctx.spawn(...)` (scoped), `ctx.spawn_background(...)` only to outlive the scope |
 | `asyncio.gather` | `gather(*coros)` (cancels the rest on failure) |
 | semaphore + gather for N at a time | `concurrently(coros, concurrent_tasks=...)`, `execute_concurrently(handler, items, concurrent_tasks=...)`, `process_concurrently(source, handler, ...)` |
-| merging async generators | `stream_concurrently(*sources)`, `stream2/3/4_concurrently` (keeps types); close early-left generators with `ctx.closing(gen)` |
+| merging async generators | `stream_concurrently(*sources)`, `stream2/3/4_concurrently` (keeps types; by default the merge ends and cancels the rest as soon as any source is exhausted - pass `exhaustive=True` to drain all); close early-left generators with `ctx.closing(gen)` |
 | `run_in_executor`, `asyncio.to_thread` | `@asynchronous` (context is propagated; accepts `executor=`) |
 | `asyncio.wait_for` | `@timeout(seconds)` |
 | retry loops with sleep | `@retry(limit=..., delay=..., catching=...)` - `limit` is the number of retries |
