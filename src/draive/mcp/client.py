@@ -156,6 +156,7 @@ class MCPClient:
         command: str,
         args: Sequence[str] | None = None,
         env: Mapping[str, str] | None = None,
+        request_timeout: float | None = None,
         features: Collection[type[ResourcesRepository] | type[ToolsProvider]] | None = None,
         tags: MetaTags | None = None,
     ) -> Self:
@@ -168,7 +169,11 @@ class MCPClient:
                     env=as_dict(env),
                 )
             ) as (read, write):
-                async with ClientSession(read, write) as session:
+                async with ClientSession(
+                    read,
+                    write,
+                    read_timeout_seconds=request_timeout,
+                ) as session:
                     yield session
 
         return cls(
@@ -187,6 +192,7 @@ class MCPClient:
         headers: Mapping[str, Any] | None = None,
         timeout: float = 5,
         sse_read_timeout: float = 60 * 5,
+        request_timeout: float | None = None,
         features: Collection[type[ResourcesRepository] | type[ToolsProvider]] | None = None,
         tags: MetaTags | None = None,
     ) -> Self:
@@ -198,7 +204,11 @@ class MCPClient:
                 timeout=timeout,
                 sse_read_timeout=sse_read_timeout,
             ) as (read, write):
-                async with ClientSession(read, write) as session:
+                async with ClientSession(
+                    read,
+                    write,
+                    read_timeout_seconds=request_timeout,
+                ) as session:
                     yield session
 
         return cls(
@@ -218,6 +228,7 @@ class MCPClient:
         timeout: float = 30,
         sse_read_timeout: float = 60 * 5,
         terminate_on_close: bool = True,
+        request_timeout: float | None = None,
         features: Collection[type[ResourcesRepository] | type[ToolsProvider]] | None = None,
         tags: MetaTags | None = None,
     ) -> Self:
@@ -239,7 +250,11 @@ class MCPClient:
                     http_client=http_client,
                     terminate_on_close=terminate_on_close,
                 ) as (read, write):
-                    async with ClientSession(read, write) as session:
+                    async with ClientSession(
+                        read,
+                        write,
+                        read_timeout_seconds=request_timeout,
+                    ) as session:
                         yield session
 
         return cls(
@@ -322,6 +337,7 @@ class MCPClient:
         cursor: str | None = starting_cursor
         offset: int = page_offset
         next_token: str | None = None
+        visited_cursors: set[str | None] = {cursor}
         while remaining > 0:
             request_params: PaginatedRequestParams | None
             if cursor is not None:
@@ -338,11 +354,12 @@ class MCPClient:
             if offset >= len(current_resources):
                 # Keep walking pages when stale/local offset points past current data.
                 offset -= len(current_resources)
-                if result.next_cursor is None or result.next_cursor == cursor:
+                if result.next_cursor is None or result.next_cursor in visited_cursors:
                     next_token = None
                     break
 
                 cursor = result.next_cursor
+                visited_cursors.add(cursor)
                 continue
 
             available = current_resources[offset:]
@@ -361,11 +378,12 @@ class MCPClient:
                 )
                 break
 
-            if result.next_cursor is None or result.next_cursor == cursor:
+            if result.next_cursor is None or result.next_cursor in visited_cursors:
                 next_token = None
                 break
 
             cursor = result.next_cursor
+            visited_cursors.add(cursor)
             offset = 0
             next_token = cursor
 
@@ -449,6 +467,7 @@ class MCPClient:
 
         mcp_tools: list[MCPTool] = []
         cursor: str | None = None
+        visited_cursors: set[str | None] = {cursor}
         while True:
             request_params: PaginatedRequestParams | None
             if cursor is not None:
@@ -459,10 +478,12 @@ class MCPClient:
 
             result: ListToolsResult = await self._session.list_tools(params=request_params)
             mcp_tools.extend(result.tools)
-            if result.next_cursor is None or result.next_cursor == cursor:
+            # a cursor seen before means the server cycles, listing can't advance any further
+            if result.next_cursor is None or result.next_cursor in visited_cursors:
                 break
 
             cursor = result.next_cursor
+            visited_cursors.add(cursor)
 
         return tuple(
             _convert_tool(
@@ -497,7 +518,12 @@ class MCPClient:
             )
 
         return MultimodalContent.of(
-            *await gather(*(_convert_content(part) for part in result.content))
+            *await gather(
+                *(
+                    _convert_content(part, scope_uri=self._with_uri_identifier)
+                    for part in result.content
+                )
+            )
         )
 
     def _with_uri_identifier(
@@ -606,7 +632,17 @@ class MCPClient:
                 prepared.set_exception(exc)
 
         self._session_owner = loop.create_task(session_owner())
-        self._session = await prepared
+        try:
+            self._session = await prepared
+
+        except BaseException:
+            # interrupted or failed before the session was ready, do not leave the owner behind
+            self._session_closing.set()
+            if not self._session_owner.done():
+                self._session_owner.cancel()
+
+            raise
+
         try:
             await self._session.initialize()
 
@@ -696,6 +732,8 @@ async def _convert_content(  # noqa: C901, PLR0911
     | MCPResourceLink
     | MCPEmbeddedResource,
     /,
+    *,
+    scope_uri: Callable[[str], str] | None = None,
 ) -> MultimodalContent:
     match content:
         case MCPTextContent() as text:
@@ -751,8 +789,17 @@ async def _convert_content(  # noqa: C901, PLR0911
                                 )
                             )
 
-        case MCPResourceLink():
-            raise NotImplementedError("MCP resource links are not supported yet")
+        case MCPResourceLink() as link:
+            return MultimodalContent.of(
+                ResourceReference.of(
+                    scope_uri(link.uri) if scope_uri is not None else link.uri,
+                    mime_type=link.mime_type,
+                    meta={
+                        "name": link.name,
+                        "description": link.description,
+                    },
+                )
+            )
 
 
 async def _convert_error_content(
@@ -830,7 +877,15 @@ class MCPClients:
         client: MCPClient,
         *clients: MCPClient,
     ) -> None:
-        self._clients: Mapping[str, MCPClient] = {c.identifier: c for c in [client, *clients]}
+        all_clients: Sequence[MCPClient] = [client, *clients]
+        identifiers: set[str] = set()
+        for candidate in all_clients:
+            if candidate.identifier in identifiers:
+                raise ValueError(f"Duplicate MCP client identifier: {candidate.identifier}")
+
+            identifiers.add(candidate.identifier)
+
+        self._clients: Mapping[str, MCPClient] = {c.identifier: c for c in all_clients}
         self._resources: Mapping[str, ResourcesRepository]
         self._tools: Mapping[str, ToolsProvider]
 
@@ -1019,11 +1074,23 @@ class MCPClients:
         **extra: Any,
     ) -> Sequence[Tool]:
         if mcp_server is None:
-            return tuple(
+            aggregated: tuple[Tool, ...] = tuple(
                 chain.from_iterable(
                     await gather(*[client.load(**extra) for client in self._tools.values()])
                 )
             )
+            seen_names: set[str] = set()
+            for tool in aggregated:
+                if tool.name in seen_names:
+                    # toolboxes keep the last duplicate, select a server to avoid ambiguity
+                    ctx.log_warning(
+                        f"MCP tool '{tool.name}' is provided by multiple servers,"
+                        " only the last one will be available"
+                    )
+
+                seen_names.add(tool.name)
+
+            return aggregated
 
         elif tools := self._tools.get(mcp_server):
             return await tools.load(**extra)
@@ -1032,8 +1099,27 @@ class MCPClients:
             return ()
 
     async def __aenter__(self) -> Sequence[ResourcesRepository | ToolsProvider]:
-        features: Sequence[Sequence[ResourcesRepository | ToolsProvider]] = await gather(
-            *[client.__aenter__() for client in self._clients.values()]
+        clients: Sequence[MCPClient] = tuple(self._clients.values())
+        outcomes: Sequence[
+            Sequence[ResourcesRepository | ToolsProvider] | BaseException
+        ] = await gather(
+            *[client.__aenter__() for client in clients],
+            return_exceptions=True,
+        )
+        if failure := next((o for o in outcomes if isinstance(o, BaseException)), None):
+            # clients which did enter have to be released, `__aexit__` is not called after a failure
+            await gather(
+                *[
+                    client.__aexit__(None, None, None)
+                    for client, outcome in zip(clients, outcomes, strict=True)
+                    if not isinstance(outcome, BaseException)
+                ],
+                return_exceptions=True,
+            )
+            raise failure
+
+        features: Sequence[Sequence[ResourcesRepository | ToolsProvider]] = cast(
+            Sequence[Sequence[ResourcesRepository | ToolsProvider]], outcomes
         )
 
         self._resources = {}
@@ -1076,7 +1162,8 @@ class MCPClients:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        await gather(
+        # every client has to be released, even if some of them fail to close
+        results: Sequence[BaseException | None] = await gather(
             *[
                 client.__aexit__(
                     exc_type,
@@ -1084,5 +1171,11 @@ class MCPClients:
                     exc_tb,
                 )
                 for client in self._clients.values()
-            ]
+            ],
+            return_exceptions=True,
         )
+        if failures := [result for result in results if isinstance(result, BaseException)]:
+            if len(failures) == 1:
+                raise failures[0]
+
+            raise BaseExceptionGroup("Failed to close MCP clients", failures)

@@ -151,3 +151,21 @@ async def test_mcp_tool_call_returns_converted_content() -> None:
     content = await client._tool_call("working", {})  # pyright: ignore[reportPrivateUsage]
 
     assert content.to_str() == "result"
+
+
+@pytest.mark.asyncio
+async def test_mcp_tools_fetch_stops_on_cyclic_cursors() -> None:
+    session = _DummySession(
+        {
+            None: (("a",), "cursor-2"),
+            "cursor-2": (("b",), "cursor-3"),
+            # cycling back to an already visited cursor can't advance any further
+            "cursor-3": (("c",), "cursor-2"),
+        }
+    )
+    client = _mcp_client_with_session(session)
+
+    tools = await client.tools_fetch()
+
+    assert [tool.name for tool in tools] == ["a", "b", "c"]
+    assert session.cursors == [None, "cursor-2", "cursor-3"]

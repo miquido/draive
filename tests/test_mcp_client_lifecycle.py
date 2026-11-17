@@ -3,7 +3,7 @@ from typing import Any, cast
 
 import pytest
 
-from draive.mcp.client import MCPClient
+from draive.mcp.client import MCPClient, MCPClients
 from draive.resources import ResourcesRepository
 from draive.tools import ToolsProvider
 
@@ -112,3 +112,57 @@ async def test_transport_failure_surfaces_from_enter() -> None:
 
     with pytest.raises(RuntimeError, match="transport unavailable"):
         _ = await client.__aenter__()
+
+
+class _TrackingSessionManager:
+    def __init__(self) -> None:
+        self.exited: bool = False
+
+    async def __aenter__(self) -> Any:
+        return _StubSession()
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any,
+    ) -> None:
+        _ = (exc_type, exc_val, exc_tb)
+        self.exited = True
+
+
+@pytest.mark.asyncio
+async def test_failed_enter_releases_already_entered_clients() -> None:
+    healthy = _TrackingSessionManager()
+    clients = MCPClients(
+        MCPClient(
+            "healthy",
+            session_manager=cast(Any, healthy),
+            features=(ToolsProvider,),
+            tags=(),
+        ),
+        MCPClient(
+            "failing",
+            session_manager=cast(Any, _FailingSessionManager()),
+            features=(ToolsProvider,),
+            tags=(),
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="transport unavailable"):
+        _ = await clients.__aenter__()
+
+    assert healthy.exited
+
+
+def test_duplicate_client_identifiers_are_rejected() -> None:
+    def client() -> MCPClient:
+        return MCPClient(
+            "same",
+            session_manager=cast(Any, _TrackingSessionManager()),
+            features=(),
+            tags=(),
+        )
+
+    with pytest.raises(ValueError, match="Duplicate MCP client identifier"):
+        MCPClients(client(), client())

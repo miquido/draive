@@ -17,6 +17,7 @@ from mcp.types import (
     ListToolsResult,
     ReadResourceRequestParams,
     ReadResourceResult,
+    ResourceLink,
     TextContent,
     TextResourceContents,
 )
@@ -253,11 +254,20 @@ def test_convert_multimodal_content_maps_every_kind() -> None:
     assert isinstance(converted[4], EmbeddedResource)
 
 
-def test_convert_multimodal_content_rejects_references() -> None:
-    with pytest.raises(NotImplementedError):
+def test_convert_multimodal_content_converts_references_to_links() -> None:
+    converted = list(
         _convert_multimodal_content(
-            MultimodalContent.of(ResourceReference.of("https://example.com/a.png"))
+            MultimodalContent.of(
+                ResourceReference.of("https://example.com/a.png", mime_type="image/png")
+            )
         )
+    )
+
+    assert len(converted) == 1
+    link = converted[0]
+    assert isinstance(link, ResourceLink)
+    assert link.uri == "https://example.com/a.png"
+    assert link.mime_type == "image/png"
 
 
 @pytest.mark.asyncio
@@ -393,3 +403,13 @@ def test_server_accepts_mixed_resource_template_arities() -> None:
     )
 
     assert server is not None
+
+
+@pytest.mark.parametrize("prepare", ["streamable", "sse"])
+def test_asgi_apps_do_not_expose_tracebacks(prepare: str) -> None:
+    server = MCPServer(name="tools", tools=[add])
+    app = (
+        server.prepare_streamable_http_asgi() if prepare == "streamable" else server.prepare_asgi()
+    )
+
+    assert app.debug is False
