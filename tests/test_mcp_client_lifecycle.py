@@ -1,4 +1,5 @@
-from asyncio import Task, current_task, sleep
+import asyncio
+from asyncio import Event, Task, current_task, sleep
 from typing import Any, cast
 
 import pytest
@@ -166,3 +167,57 @@ def test_duplicate_client_identifiers_are_rejected() -> None:
 
     with pytest.raises(ValueError, match="Duplicate MCP client identifier"):
         MCPClients(client(), client())
+
+
+def _client(
+    identifier: str,
+    manager: Any,
+) -> MCPClient:
+    return MCPClient(identifier, session_manager=manager, features=(), tags=())
+
+
+class _HangingSessionManager:
+    async def __aenter__(self) -> Any:
+        await Event().wait()
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any,
+    ) -> None:
+        _ = (exc_type, exc_val, exc_tb)
+
+
+@pytest.mark.asyncio
+async def test_failed_enter_does_not_wait_for_pending_clients() -> None:
+    healthy = _TrackingSessionManager()
+    clients = MCPClients(
+        _client("healthy", healthy),
+        _client("hanging", _HangingSessionManager()),
+        _client("failing", _FailingSessionManager()),
+    )
+
+    with pytest.raises(RuntimeError, match="transport unavailable"):
+        async with asyncio.timeout(2):
+            _ = await clients.__aenter__()
+
+    assert healthy.exited
+
+
+@pytest.mark.asyncio
+async def test_cancelled_enter_releases_already_entered_clients() -> None:
+    healthy = _TrackingSessionManager()
+    clients = MCPClients(
+        _client("healthy", healthy),
+        _client("hanging", _HangingSessionManager()),
+    )
+
+    entering = asyncio.create_task(clients.__aenter__())
+    await sleep(0.05)
+    entering.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await entering
+
+    assert healthy.exited

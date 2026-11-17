@@ -1,5 +1,15 @@
 import json
-from asyncio import AbstractEventLoop, Event, Future, Task, gather, get_running_loop
+from asyncio import (
+    FIRST_EXCEPTION,
+    AbstractEventLoop,
+    Event,
+    Future,
+    Task,
+    create_task,
+    gather,
+    get_running_loop,
+    wait,
+)
 from base64 import b64decode, urlsafe_b64decode, urlsafe_b64encode
 from collections.abc import AsyncGenerator, Callable, Collection, Coroutine, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
@@ -640,6 +650,8 @@ class MCPClient:
             self._session_closing.set()
             if not self._session_owner.done():
                 self._session_owner.cancel()
+                # wait for the teardown without replacing the original failure
+                await wait({self._session_owner})
 
             raise
 
@@ -793,11 +805,9 @@ async def _convert_content(  # noqa: C901, PLR0911
             return MultimodalContent.of(
                 ResourceReference.of(
                     scope_uri(link.uri) if scope_uri is not None else link.uri,
+                    name=link.name,
+                    description=link.description,
                     mime_type=link.mime_type,
-                    meta={
-                        "name": link.name,
-                        "description": link.description,
-                    },
                 )
             )
 
@@ -1098,29 +1108,41 @@ class MCPClients:
         else:
             return ()
 
-    async def __aenter__(self) -> Sequence[ResourcesRepository | ToolsProvider]:
+    async def _enter_clients(self) -> Sequence[Sequence[ResourcesRepository | ToolsProvider]]:
         clients: Sequence[MCPClient] = tuple(self._clients.values())
-        outcomes: Sequence[
-            Sequence[ResourcesRepository | ToolsProvider] | BaseException
-        ] = await gather(
-            *[client.__aenter__() for client in clients],
-            return_exceptions=True,
+        entering: Sequence[Task[Sequence[ResourcesRepository | ToolsProvider]]] = tuple(
+            create_task(client.__aenter__()) for client in clients
         )
-        if failure := next((o for o in outcomes if isinstance(o, BaseException)), None):
-            # clients which did enter have to be released, `__aexit__` is not called after a failure
+        try:
+            await wait(entering, return_when=FIRST_EXCEPTION)
+            # `wait` does not raise, a failed entry has to be surfaced explicitly
+            for task in entering:
+                if task.done() and not task.cancelled() and (failure := task.exception()):
+                    raise failure
+
+        except BaseException:
+            # failure or cancellation - stop pending entries and release the ones which entered,
+            # `__aexit__` is not called after a failed enter
+            for task in entering:
+                task.cancel()
+
+            await wait(entering)
             await gather(
                 *[
                     client.__aexit__(None, None, None)
-                    for client, outcome in zip(clients, outcomes, strict=True)
-                    if not isinstance(outcome, BaseException)
+                    for client, task in zip(clients, entering, strict=True)
+                    if not task.cancelled() and task.exception() is None
                 ],
                 return_exceptions=True,
             )
-            raise failure
+            raise
 
-        features: Sequence[Sequence[ResourcesRepository | ToolsProvider]] = cast(
-            Sequence[Sequence[ResourcesRepository | ToolsProvider]], outcomes
-        )
+        return [task.result() for task in entering]
+
+    async def __aenter__(self) -> Sequence[ResourcesRepository | ToolsProvider]:
+        features: Sequence[
+            Sequence[ResourcesRepository | ToolsProvider]
+        ] = await self._enter_clients()
 
         self._resources = {}
         self._prompts = {}
