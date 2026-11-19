@@ -1,7 +1,7 @@
 from collections.abc import MutableSequence, Sequence
-from typing import Any
+from typing import Any, Final
 
-from haiway import Meta, State, gather
+from haiway import Meta, State, concurrently
 
 from draive.generation.decision.types import (
     DecisionAnswer,
@@ -23,6 +23,9 @@ from draive.steps.decoding import decode_content
 
 __all__ = ("generate_decisions",)
 
+# bounds the number of simultaneous completions within a single decision batch
+_CONCURRENT_QUESTIONS: Final[int] = 8
+
 
 async def generate_decisions(
     *,
@@ -31,8 +34,8 @@ async def generate_decisions(
     **extra: Any,
 ) -> Sequence[DecisionAnswer]:
     # each question is answered in isolation, same as dedicated decision models do
-    return await gather(
-        *(
+    return await concurrently(
+        (
             _decide(
                 question,
                 input=input,
@@ -40,6 +43,7 @@ async def generate_decisions(
             )
             for question in questions
         ),
+        concurrent_tasks=_CONCURRENT_QUESTIONS,
     )
 
 

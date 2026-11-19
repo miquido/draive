@@ -56,4 +56,12 @@ class GeminiEmbeddingConfig(Configuration):
 
 
 class GeminiDecisionConfig(Configuration):
+    """Configuration of Gemini Decisions API decisions.
+
+    Attributes
+    ----------
+    model : str
+        Decision model served by the Gemini Decisions API.
+    """
+
     model: str = "gemini-decision-1"

@@ -1,3 +1,4 @@
+import asyncio
 import json
 from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
 from typing import Any
@@ -352,3 +353,35 @@ async def test_default_selection_rejects_unknown_options() -> None:
                 criteria="Which apply?",
                 options=_options("a", "b"),
             )
+
+
+@pytest.mark.asyncio
+async def test_default_decisions_bound_concurrent_completions() -> None:
+    running: int = 0
+    peak: int = 0
+
+    async def generating(
+        *,
+        instructions: str,
+        tools: ModelTools,
+        context: ModelContext,
+        output: Any,
+        **extra: Any,
+    ) -> AsyncGenerator[ModelOutputChunk]:
+        nonlocal running, peak
+        running += 1
+        peak = max(peak, running)
+        await asyncio.sleep(0.01)
+        running -= 1
+        yield TextContent.of(json.dumps({"reasoning": "-", "value": True}))
+
+    async with ctx.scope("test", GenerativeModel(generating=generating)):
+        answers = await DecisionGeneration.decide(
+            input="any",
+            questions=tuple(
+                DecisionCheck(identifier=f"q{index}", criteria="Is it?") for index in range(20)
+            ),
+        )
+
+    assert [answer.identifier for answer in answers] == [f"q{index}" for index in range(20)]
+    assert 1 < peak <= 8

@@ -50,6 +50,8 @@
 
 ### Fixed
 
+- Gemini requests with system instructions no longer fail on the Gemini Developer API, the client
+  uses its `v1beta` API version unless a version or Vertex AI is selected explicitly.
 - MCP resource URIs survive the client identifier round trip: custom schemes without an
   authority (`notes:///docs/a`) keep their `//`, and dots within client identifiers are escaped
   (`my%2Eserver`) so listed URIs route back to the client which listed them unambiguously.

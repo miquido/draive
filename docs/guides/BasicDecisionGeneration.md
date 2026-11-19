@@ -275,8 +275,8 @@ mind the question limit of the server, i.e. 64 questions for Ollama.
 ## 6. Default Model Based Decisions
 
 Without a dedicated backend, each question is answered by a separate structured `GenerativeModel`
-completion, without tools, using the model bound in the scope, all of them running concurrently. A
-selection is answered with a single completion listing every option which applies. Answers outside
+completion, without tools, using the model bound in the scope, up to 8 of them running concurrently.
+A selection is answered with a single completion listing every option which applies. Answers outside
 of the given options or levels raise `GenerationOutputMissing`. The model reasoning behind each
 decision is reported in the answer meta under `reasoning`. Questions are answered concurrently, so
 several of them failing together raise an `ExceptionGroup` of the underlying failures -
