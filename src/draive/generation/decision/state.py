@@ -80,12 +80,13 @@ class DecisionGeneration(State):
         AssertionError
             When questions are empty or their identifiers are not unique.
         GenerationOutputMissing
-            When the default implementation could not resolve a valid answer,
-            several of them failing together raise an ``ExceptionGroup`` of
-            them.
+            When the default implementation could not resolve a valid answer.
         ModelException
             When the backend failed, i.e. ``ModelInputInvalid`` for input it
             does not support or ``ModelRateLimit`` when rate limited.
+        ExceptionGroup
+            When several questions failed together within the default
+            implementation, grouping their underlying failures.
         """
         assert questions and len({question.identifier for question in questions}) == len(questions)  # nosec: B101
         async with ctx.scope("decision_generation"):

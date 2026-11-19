@@ -131,7 +131,8 @@ answer = await DecisionGeneration.choose(input=ticket, criteria="Which team?", o
   fallback reports no estimates, and option meta merged into the answer could carry a
   `confidence` key of its own, so know which backend the scope binds.
 - The model fallback answers questions concurrently: several failing together raise an
-  `ExceptionGroup` of `GenerationOutputMissing`, a single one raises it directly.
+  `ExceptionGroup` of the underlying failures (`GenerationOutputMissing` for invalid answers, model
+  errors such as `ModelRateLimit`), a single one raises directly.
 - Bind a backend like any provider: `Gemini()` (`GeminiDecisionConfig`, on by default), `Ollama()`
   (`OllamaDecisionConfig`, needs a pulled decision model such as `tev1`, text only) or
   `SystemOne(server_url=..., images=...)` for TypeSafe Jev, Ollama with images, gateways.

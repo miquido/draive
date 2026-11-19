@@ -279,8 +279,9 @@ completion, without tools, using the model bound in the scope, all of them runni
 selection is answered with a single completion listing every option which applies. Answers outside
 of the given options or levels raise `GenerationOutputMissing`. The model reasoning behind each
 decision is reported in the answer meta under `reasoning`. Questions are answered concurrently, so
-several of them failing together raise an `ExceptionGroup` of `GenerationOutputMissing` errors -
-handle both when calling `decide` with multiple questions.
+several of them failing together raise an `ExceptionGroup` of the underlying failures -
+`GenerationOutputMissing` for invalid answers, or model errors such as `ModelRateLimit`. Handle the
+grouped case as well when calling `decide` with multiple questions.
 
 ```python
 from draive import DecisionGeneration, DecisionOption, ctx

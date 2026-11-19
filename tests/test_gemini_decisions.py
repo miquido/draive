@@ -431,6 +431,7 @@ async def test_client_provides_decisions_unless_defaulted_on_vertexai(
         client._client = SimpleNamespace(vertexai=vertexai)  # pyright: ignore[reportAttributeAccessIssue]
 
     client._initialize_client = initialize  # pyright: ignore[reportAttributeAccessIssue]
-    state = await client.__aenter__()
+    async with ctx.scope("test"):
+        state = await client.__aenter__()
 
     assert any(isinstance(element, DecisionGeneration) for element in state) is expected
