@@ -6,10 +6,11 @@ except ImportError as exc:  # pragma: no cover
     ) from exc
 
 from draive.ollama.client import Ollama
-from draive.ollama.config import OllamaChatConfig, OllamaEmbeddingConfig
+from draive.ollama.config import OllamaChatConfig, OllamaDecisionConfig, OllamaEmbeddingConfig
 
 __all__ = (
     "Ollama",
     "OllamaChatConfig",
+    "OllamaDecisionConfig",
     "OllamaEmbeddingConfig",
 )

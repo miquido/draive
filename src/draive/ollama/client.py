@@ -5,9 +5,11 @@ from typing import Any, final
 from haiway import State
 
 from draive.embedding import TextEmbedding
+from draive.generation import DecisionGeneration
 from draive.models import GenerativeModel
 from draive.ollama.api import OllamaAPI
 from draive.ollama.chat import OllamaChat
+from draive.ollama.decisions import OllamaDecisions
 from draive.ollama.embedding import OllamaEmbedding
 
 __all__ = ("Ollama",)
@@ -17,6 +19,7 @@ __all__ = ("Ollama",)
 class Ollama(
     OllamaChat,
     OllamaEmbedding,
+    OllamaDecisions,
     OllamaAPI,
 ):
     """
@@ -29,7 +32,8 @@ class Ollama(
         self,
         server_url: str | None = None,
         timeout: float | None = None,
-        features: Collection[type[GenerativeModel | TextEmbedding]] | None = None,
+        features: Collection[type[GenerativeModel | TextEmbedding | DecisionGeneration]]
+        | None = None,
         **extra: Any,
     ) -> None:
         super().__init__(
@@ -41,7 +45,7 @@ class Ollama(
         self._features: frozenset[type[State]] = (
             frozenset(features)
             if features is not None
-            else frozenset((GenerativeModel, TextEmbedding))
+            else frozenset((GenerativeModel, TextEmbedding, DecisionGeneration))
         )
 
     async def __aenter__(self) -> Iterable[State]:
@@ -53,6 +57,9 @@ class Ollama(
 
         if TextEmbedding in self._features:
             state.append(TextEmbedding(embedding=self.create_texts_embedding))
+
+        if DecisionGeneration in self._features:
+            state.append(DecisionGeneration(generating=self.decide))
 
         return state
 

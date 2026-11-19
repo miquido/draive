@@ -7,9 +7,11 @@ from haiway import State
 
 from draive.embedding import TextEmbedding
 from draive.gemini.api import GeminiAPI
+from draive.gemini.decisions import GeminiDecisions
 from draive.gemini.embedding import GeminiEmbedding
 from draive.gemini.generating import GeminiGenerating
 from draive.gemini.live import GeminiLive
+from draive.generation import DecisionGeneration
 from draive.models import GenerativeModel, RealtimeGenerativeModel
 
 __all__ = ("Gemini",)
@@ -20,6 +22,7 @@ class Gemini(
     GeminiLive,
     GeminiGenerating,
     GeminiEmbedding,
+    GeminiDecisions,
     GeminiAPI,
 ):
     """
@@ -33,7 +36,9 @@ class Gemini(
         api_key: str | None = None,
         vertexai: bool | None = None,
         http_options: HttpOptionsDict | None = None,
-        features: Collection[type[GenerativeModel | RealtimeGenerativeModel | TextEmbedding]]
+        features: Collection[
+            type[GenerativeModel | RealtimeGenerativeModel | TextEmbedding | DecisionGeneration]
+        ]
         | None = None,
         **extra: Any,
     ) -> None:
@@ -47,7 +52,9 @@ class Gemini(
         self._features: Set[type[State]] = (
             frozenset(features)
             if features is not None
-            else frozenset((GenerativeModel, RealtimeGenerativeModel, TextEmbedding))
+            else frozenset(
+                (GenerativeModel, RealtimeGenerativeModel, TextEmbedding, DecisionGeneration)
+            )
         )
 
     async def __aenter__(self) -> Iterable[State]:
@@ -61,6 +68,9 @@ class Gemini(
 
         if TextEmbedding in self._features:
             state.append(TextEmbedding(embedding=self.create_texts_embedding))
+
+        if DecisionGeneration in self._features:
+            state.append(DecisionGeneration(generating=self.decide))
 
         return state
 

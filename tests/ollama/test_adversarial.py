@@ -8,6 +8,7 @@ from haiway import State, ctx
 from ollama import ChatResponse, Message, ResponseError
 
 from draive.embedding import TextEmbedding
+from draive.generation import DecisionGeneration
 from draive.models import (
     GenerativeModel,
     ModelInput,
@@ -271,9 +272,10 @@ def test_server_url_falls_back_to_environment(monkeypatch: pytest.MonkeyPatch) -
 @pytest.mark.parametrize(
     ("features", "expected"),
     [
-        (None, {GenerativeModel, TextEmbedding}),
+        (None, {GenerativeModel, TextEmbedding, DecisionGeneration}),
         ((GenerativeModel,), {GenerativeModel}),
         ((TextEmbedding,), {TextEmbedding}),
+        ((DecisionGeneration,), {DecisionGeneration}),
     ],
 )
 async def test_client_provides_requested_features(

@@ -5,6 +5,7 @@ from haiway import Configuration, Missing
 
 __all__ = (
     "GeminiConfig",
+    "GeminiDecisionConfig",
     "GeminiEmbeddingConfig",
     "GeminiSafetyConfig",
     "GeminiSafetyThreshold",
@@ -52,3 +53,7 @@ class GeminiEmbeddingConfig(Configuration):
     model: str
     dimensions: int | Missing = Missing
     batch_size: int = 128
+
+
+class GeminiDecisionConfig(Configuration):
+    model: str = "gemini-decision-1"

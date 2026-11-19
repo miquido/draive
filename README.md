@@ -152,6 +152,15 @@ Use Ollama services client.
 pip install 'draive[ollama]'
 ```
 
+- System One:
+
+Use decision models served through the System One API (`/v1/systemone`) - hosted TypeSafe Jev, local
+Ollama, gateways such as OpenRouter, or self-hosted OpenJev.
+
+```bash
+pip install 'draive[systemone]'
+```
+
 - VLLM:
 
 Use VLLM services through OpenAI client.

@@ -38,8 +38,8 @@ openai_realtime = ["openai[realtime]~=3.2"]
 anthropic = ["anthropic~=2.6"]
 anthropic_bedrock = ["anthropic[bedrock]~=2.6"]
 mistral = ["mistralai~=3.7"]
-gemini = ["google-genai~=3.0"]
-ollama = ["ollama~=0.6.2"]
+gemini = ["google-genai~=3.6.1"]
+ollama = ["ollama~=0.6.3"]
 bedrock = ["boto3~=1.43"]
 aws = ["boto3~=1.43"]
 vllm = ["openai~=3.2"]
@@ -51,6 +51,7 @@ opentelemetry = [
   "opentelemetry-exporter-otlp-proto-grpc",
 ]
 httpx = ["haiway[httpx]"]
+systemone = ["haiway[httpx]"]
 starlette = ["haiway[starlette]", "starlette~=1.10"]
 fastapi = ["haiway[fastapi]", "fastapi~=0.162", "starlette~=1.10"]
 postgres = ["haiway[postgres]", "asyncpg"]
@@ -63,7 +64,7 @@ surrealdb_embedded = ["surrealdb[embedded]~=3.0"]
 # development tooling lives in dependency groups (synced by default, never published)
 # while the integration extras stay optional dependencies of the package itself
 dev = [
-  "draive[cohere,cohere_bedrock,openai,openai_realtime,anthropic,anthropic_bedrock,mistral,gemini,ollama,bedrock,aws,vllm,mcp,opentelemetry,httpx,starlette,fastapi,postgres,rabbitmq,qdrant,surrealdb,surrealdb_embedded]",
+  "draive[cohere,cohere_bedrock,openai,openai_realtime,anthropic,anthropic_bedrock,mistral,gemini,ollama,systemone,bedrock,aws,vllm,mcp,opentelemetry,httpx,starlette,fastapi,postgres,rabbitmq,qdrant,surrealdb,surrealdb_embedded]",
   "bandit~=1.9",
   "jsonschema~=4.26",
   "pyright~=1.1",
@@ -73,7 +74,7 @@ dev = [
   "ruff~=0.17",
 ]
 docs = [
-  "draive[cohere,cohere_bedrock,openai,openai_realtime,anthropic,anthropic_bedrock,mistral,gemini,ollama,bedrock,aws,vllm,mcp,opentelemetry,httpx,starlette,fastapi,postgres,rabbitmq,qdrant,surrealdb,surrealdb_embedded]",
+  "draive[cohere,cohere_bedrock,openai,openai_realtime,anthropic,anthropic_bedrock,mistral,gemini,ollama,systemone,bedrock,aws,vllm,mcp,opentelemetry,httpx,starlette,fastapi,postgres,rabbitmq,qdrant,surrealdb,surrealdb_embedded]",
   "mkdocs~=1.6",
   "mkdocs-material~=9.8",
   "mkdocstrings[python]~=1.0",

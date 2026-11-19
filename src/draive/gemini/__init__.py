@@ -8,6 +8,7 @@ except ImportError as exc:  # pragma: no cover
 from draive.gemini.client import Gemini
 from draive.gemini.config import (
     GeminiConfig,
+    GeminiDecisionConfig,
     GeminiEmbeddingConfig,
     GeminiSafetyConfig,
     GeminiSafetyThreshold,
@@ -16,6 +17,7 @@ from draive.gemini.config import (
 __all__ = (
     "Gemini",
     "GeminiConfig",
+    "GeminiDecisionConfig",
     "GeminiEmbeddingConfig",
     "GeminiSafetyConfig",
     "GeminiSafetyThreshold",

@@ -5,6 +5,7 @@ from haiway import Configuration, Missing
 
 __all__ = (
     "OllamaChatConfig",
+    "OllamaDecisionConfig",
     "OllamaEmbeddingConfig",
 )
 
@@ -19,6 +20,18 @@ class OllamaChatConfig(Configuration):
     stop_sequences: Sequence[str] | Missing = Missing
     # reasoning models require explicitly requesting thinking to report it
     thinking: bool | Literal["low", "medium", "high"] | Missing = Missing
+
+
+class OllamaDecisionConfig(Configuration):
+    """Configuration of Ollama decisions.
+
+    Attributes
+    ----------
+    model : str
+        Decision model served by Ollama, it has to be pulled to the server.
+    """
+
+    model: str = "tev1"
 
 
 class OllamaEmbeddingConfig(Configuration):

@@ -613,6 +613,9 @@ surrealdb = [
 surrealdb-embedded = [
     { name = "surrealdb", extra = ["embedded"] },
 ]
+systemone = [
+    { name = "haiway", extra = ["httpx"] },
+]
 vllm = [
     { name = "openai" },
 ]
@@ -620,7 +623,7 @@ vllm = [
 [package.dev-dependencies]
 dev = [
     { name = "bandit" },
-    { name = "draive", extra = ["anthropic", "anthropic-bedrock", "aws", "bedrock", "cohere", "cohere-bedrock", "fastapi", "gemini", "httpx", "mcp", "mistral", "ollama", "openai", "openai-realtime", "opentelemetry", "postgres", "qdrant", "rabbitmq", "starlette", "surrealdb", "surrealdb-embedded", "vllm"] },
+    { name = "draive", extra = ["anthropic", "anthropic-bedrock", "aws", "bedrock", "cohere", "cohere-bedrock", "fastapi", "gemini", "httpx", "mcp", "mistral", "ollama", "openai", "openai-realtime", "opentelemetry", "postgres", "qdrant", "rabbitmq", "starlette", "surrealdb", "surrealdb-embedded", "systemone", "vllm"] },
     { name = "jsonschema" },
     { name = "pyright" },
     { name = "pytest" },
@@ -629,7 +632,7 @@ dev = [
     { name = "ruff" },
 ]
 docs = [
-    { name = "draive", extra = ["anthropic", "anthropic-bedrock", "aws", "bedrock", "cohere", "cohere-bedrock", "fastapi", "gemini", "httpx", "mcp", "mistral", "ollama", "openai", "openai-realtime", "opentelemetry", "postgres", "qdrant", "rabbitmq", "starlette", "surrealdb", "surrealdb-embedded", "vllm"] },
+    { name = "draive", extra = ["anthropic", "anthropic-bedrock", "aws", "bedrock", "cohere", "cohere-bedrock", "fastapi", "gemini", "httpx", "mcp", "mistral", "ollama", "openai", "openai-realtime", "opentelemetry", "postgres", "qdrant", "rabbitmq", "starlette", "surrealdb", "surrealdb-embedded", "systemone", "vllm"] },
     { name = "mdformat" },
     { name = "mdformat-gfm" },
     { name = "mdformat-mkdocs" },
@@ -651,10 +654,11 @@ requires-dist = [
     { name = "cohere", marker = "extra == 'cohere'", specifier = "~=7.0" },
     { name = "cohere", marker = "extra == 'cohere-bedrock'", specifier = "~=7.0" },
     { name = "fastapi", marker = "extra == 'fastapi'", specifier = "~=0.162" },
-    { name = "google-genai", marker = "extra == 'gemini'", specifier = "~=3.0" },
+    { name = "google-genai", marker = "extra == 'gemini'", specifier = "~=3.6.1" },
     { name = "haiway", specifier = "~=0.62.1" },
     { name = "haiway", extras = ["fastapi"], marker = "extra == 'fastapi'" },
     { name = "haiway", extras = ["httpx"], marker = "extra == 'httpx'" },
+    { name = "haiway", extras = ["httpx"], marker = "extra == 'systemone'" },
     { name = "haiway", extras = ["opentelemetry"], marker = "extra == 'opentelemetry'" },
     { name = "haiway", extras = ["postgres"], marker = "extra == 'postgres'" },
     { name = "haiway", extras = ["rabbitmq"], marker = "extra == 'rabbitmq'" },
@@ -663,7 +667,7 @@ requires-dist = [
     { name = "mcp", marker = "extra == 'mcp'", specifier = "~=2.1" },
     { name = "mistralai", marker = "extra == 'mistral'", specifier = "~=3.7" },
     { name = "numpy", specifier = "~=2.5" },
-    { name = "ollama", marker = "extra == 'ollama'", specifier = "~=0.6.2" },
+    { name = "ollama", marker = "extra == 'ollama'", specifier = "~=0.6.3" },
     { name = "openai", marker = "extra == 'openai'", specifier = "~=3.2" },
     { name = "openai", marker = "extra == 'vllm'", specifier = "~=3.2" },
     { name = "openai", extras = ["realtime"], marker = "extra == 'openai-realtime'", specifier = "~=3.2" },
@@ -678,12 +682,12 @@ requires-dist = [
     { name = "surrealdb", marker = "extra == 'surrealdb'", specifier = "~=3.0" },
     { name = "surrealdb", extras = ["embedded"], marker = "extra == 'surrealdb-embedded'", specifier = "~=3.0" },
 ]
-provides-extras = ["cohere", "cohere-bedrock", "openai", "openai-realtime", "anthropic", "anthropic-bedrock", "mistral", "gemini", "ollama", "bedrock", "aws", "vllm", "mcp", "opentelemetry", "httpx", "starlette", "fastapi", "postgres", "rabbitmq", "qdrant", "surrealdb", "surrealdb-embedded"]
+provides-extras = ["cohere", "cohere-bedrock", "openai", "openai-realtime", "anthropic", "anthropic-bedrock", "mistral", "gemini", "ollama", "bedrock", "aws", "vllm", "mcp", "opentelemetry", "httpx", "systemone", "starlette", "fastapi", "postgres", "rabbitmq", "qdrant", "surrealdb", "surrealdb-embedded"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "bandit", specifier = "~=1.9" },
-    { name = "draive", extras = ["cohere", "cohere-bedrock", "openai", "openai-realtime", "anthropic", "anthropic-bedrock", "mistral", "gemini", "ollama", "bedrock", "aws", "vllm", "mcp", "opentelemetry", "httpx", "starlette", "fastapi", "postgres", "rabbitmq", "qdrant", "surrealdb", "surrealdb-embedded"] },
+    { name = "draive", extras = ["cohere", "cohere-bedrock", "openai", "openai-realtime", "anthropic", "anthropic-bedrock", "mistral", "gemini", "ollama", "systemone", "bedrock", "aws", "vllm", "mcp", "opentelemetry", "httpx", "starlette", "fastapi", "postgres", "rabbitmq", "qdrant", "surrealdb", "surrealdb-embedded"] },
     { name = "jsonschema", specifier = "~=4.26" },
     { name = "pyright", specifier = "~=1.1" },
     { name = "pytest", specifier = "~=9.2" },
@@ -692,7 +696,7 @@ dev = [
     { name = "ruff", specifier = "~=0.17" },
 ]
 docs = [
-    { name = "draive", extras = ["cohere", "cohere-bedrock", "openai", "openai-realtime", "anthropic", "anthropic-bedrock", "mistral", "gemini", "ollama", "bedrock", "aws", "vllm", "mcp", "opentelemetry", "httpx", "starlette", "fastapi", "postgres", "rabbitmq", "qdrant", "surrealdb", "surrealdb-embedded"] },
+    { name = "draive", extras = ["cohere", "cohere-bedrock", "openai", "openai-realtime", "anthropic", "anthropic-bedrock", "mistral", "gemini", "ollama", "systemone", "bedrock", "aws", "vllm", "mcp", "opentelemetry", "httpx", "starlette", "fastapi", "postgres", "rabbitmq", "qdrant", "surrealdb", "surrealdb-embedded"] },
     { name = "mdformat", specifier = "~=1.0" },
     { name = "mdformat-gfm", specifier = "~=1.0" },
     { name = "mdformat-mkdocs", specifier = "~=5.3" },
@@ -804,7 +808,7 @@ requests = [
 
 [[package]]
 name = "google-genai"
-version = "3.4.0"
+version = "3.6.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -818,9 +822,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c5/db/1b80f0357e67a226e53560e42b5e5b5534f1b134adb96c5c8476764d8226/google_genai-3.4.0.tar.gz", hash = "sha256:498ff46909743b7c84929a77263a8b5e3cfb030fcf0505eab32aae8d424e2e77", size = 849822, upload-time = "2026-11-16T21:45:13.063Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0f/15/ecebc770eb7edec0e588498d6b872aff6091ce1af1a9c503bd70b5a1ea7a/google_genai-3.6.1.tar.gz", hash = "sha256:dfd4120a15ba5aff6a3de8a85d76e1d5d0af65c70a54c459b1c5e76f503e46e7", size = 885277, upload-time = "2026-11-18T22:18:48.819Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2b/7a/daed011805af7b3ef07c18d4ea8e9534891c7dfeeac438b0d22361f65e0a/google_genai-3.4.0-py3-none-any.whl", hash = "sha256:1da2cb06b4560e2046d04c0a5c91b3ba0a0b9155e98158b584f3583ad000090d", size = 1403713, upload-time = "2026-11-16T21:45:11.203Z" },
+    { url = "https://files.pythonhosted.org/packages/c0/1a/576adc030b48c7491b33ab94b96521151ef5b956552c0057628ef39c69bb/google_genai-3.6.1-py3-none-any.whl", hash = "sha256:4b35064da644f61d7e5f6c0e9406bf63b945e7e96b4af18cadb3371cbc3acf74", size = 1472097, upload-time = "2026-11-18T22:18:46.803Z" },
 ]
 
 [[package]]
