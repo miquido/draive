@@ -80,7 +80,9 @@ class DecisionGeneration(State):
         AssertionError
             When questions are empty or their identifiers are not unique.
         GenerationOutputMissing
-            When the default implementation could not resolve a valid answer.
+            When the default implementation could not resolve a valid answer,
+            several of them failing together raise an ``ExceptionGroup`` of
+            them.
         ModelException
             When the backend failed, i.e. ``ModelInputInvalid`` for input it
             does not support or ``ModelRateLimit`` when rate limited.

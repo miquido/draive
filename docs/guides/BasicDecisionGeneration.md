@@ -189,11 +189,13 @@ async with ctx.scope(
     answers = await DecisionGeneration.decide(input=ticket, questions=questions)
 ```
 
-The Gemini Decisions API is not available through Vertex AI. Its limits are validated before sending
-a request: up to 1000 questions, up to 255 options or levels, and choice option identifiers up to
-128 characters without control characters. The API has no multi-select question, each selection
-option is asked as a separate yes / no question within the same request and counts against the
-question limit. Supported input is text, images, audio, video and PDF documents.
+The Gemini Decisions API is not available through Vertex AI, a `Gemini()` client using Vertex AI
+keeps the model based decisions unless `DecisionGeneration` is requested in `features` explicitly.
+Its limits are validated before sending a request: up to 1000 questions, up to 255 options or
+levels, and choice option identifiers up to 128 characters without control characters. The API has
+no multi-select question, each selection option is asked as a separate yes / no question within the
+same request and counts against the question limit. Supported input is text, images, audio, video
+and PDF documents.
 
 ## 4. Bind Ollama Decisions
 
@@ -276,7 +278,9 @@ Without a dedicated backend, each question is answered by a separate structured 
 completion, without tools, using the model bound in the scope, all of them running concurrently. A
 selection is answered with a single completion listing every option which applies. Answers outside
 of the given options or levels raise `GenerationOutputMissing`. The model reasoning behind each
-decision is reported in the answer meta under `reasoning`.
+decision is reported in the answer meta under `reasoning`. Questions are answered concurrently, so
+several of them failing together raise an `ExceptionGroup` of `GenerationOutputMissing` errors -
+handle both when calling `decide` with multiple questions.
 
 ```python
 from draive import DecisionGeneration, DecisionOption, ctx

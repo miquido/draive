@@ -10,7 +10,7 @@ from google.genai._interactions import APIStatusError
 from google.genai.decisions import CreateDecisionRequest, CreateDecisionResponse
 from haiway import ctx
 
-from draive.gemini import GeminiDecisionConfig
+from draive.gemini import Gemini, GeminiDecisionConfig
 from draive.gemini.decisions import GeminiDecisions
 from draive.generation import (
     DecisionCheck,
@@ -409,3 +409,28 @@ async def test_decide_counts_selection_options_against_question_limit() -> None:
                     ),
                 ),
             )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("vertexai", "features", "expected"),
+    [
+        (False, None, True),
+        (True, None, False),
+        (True, (DecisionGeneration,), True),
+    ],
+)
+async def test_client_provides_decisions_unless_defaulted_on_vertexai(
+    vertexai: bool,
+    features: Sequence[Any] | None,
+    expected: bool,
+) -> None:
+    client = Gemini(api_key="test", features=features)
+
+    async def initialize() -> None:
+        client._client = SimpleNamespace(vertexai=vertexai)  # pyright: ignore[reportAttributeAccessIssue]
+
+    client._initialize_client = initialize  # pyright: ignore[reportAttributeAccessIssue]
+    state = await client.__aenter__()
+
+    assert any(isinstance(element, DecisionGeneration) for element in state) is expected

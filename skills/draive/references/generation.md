@@ -95,12 +95,13 @@ from draive import (
 )
 
 billing = DecisionOption(identifier="billing", description="payment issues", meta={"queue": "l1"})
+shipping = DecisionOption(identifier="shipping", meta={"queue": "logistics"})
 angry, route, topics, urgency = await DecisionGeneration.decide(
     input=ticket,                            # Multimodal or a Template, shared by all questions
     questions=(                              # unique identifiers, answered independently
         DecisionCheck(identifier="angry", criteria="Is the customer angry?"),
         DecisionChoice(identifier="route", criteria="Which team?",
-                       options=(billing, DecisionOption(identifier="shipping"))),
+                       options=(billing, shipping)),
         DecisionSelection(identifier="topics", criteria="Which topics apply?",
                           options=(billing, DecisionOption(identifier="delivery"))),
         DecisionRating(identifier="urgency", criteria="How urgent?",       # lowest to highest
@@ -108,7 +109,7 @@ angry, route, topics, urgency = await DecisionGeneration.decide(
     ),
 )
 route.choice.identifier, route.meta["queue"]      # decided option, its meta merged into the answer
-confidence = route.meta.get_float("confidence")   # None without a calibrated backend
+confidence = route.meta.get_float("confidence")   # calibrated only with a decision backend bound
 answer = await DecisionGeneration.choose(input=ticket, criteria="Which team?", options=(...))
 ```
 
@@ -126,7 +127,11 @@ answer = await DecisionGeneration.choose(input=ticket, criteria="Which team?", o
   the decided outcome), normalized 0-1 `score` (rating), or `reasoning` from the model fallback.
   Choice and rating answers merge the decided option meta in, selected options keep their own.
 - Prefer it over `ModelGeneration` with an enum field when the job is picking among fixed options,
-  especially when thresholds matter - but only threshold with a calibrated backend bound.
+  especially when thresholds matter - but only threshold with a calibrated backend bound: the model
+  fallback reports no estimates, and option meta merged into the answer could carry a
+  `confidence` key of its own, so know which backend the scope binds.
+- The model fallback answers questions concurrently: several failing together raise an
+  `ExceptionGroup` of `GenerationOutputMissing`, a single one raises it directly.
 - Bind a backend like any provider: `Gemini()` (`GeminiDecisionConfig`, on by default), `Ollama()`
   (`OllamaDecisionConfig`, needs a pulled decision model such as `tev1`, text only) or
   `SystemOne(server_url=..., images=...)` for TypeSafe Jev, Ollama with images, gateways.
@@ -298,9 +303,11 @@ async def test_weather() -> None:
   `TextGeneration(generating=fn)`, `ImageGeneration(generating=fn)` where `fn` is keyword-only
   `(instructions=..., input=..., toolbox=..., examples=..., **extra)` (`generated` positional first
   for the model one, plus `decoder=`; image/audio take only `instructions`, `input`, `**extra`).
-- Fake decisions with `DecisionGeneration(generating=fn)`, `fn(*, input, questions, **extra)`
-  returning one answer per question in question order, e.g.
-  `(DecisionChoiceAnswer(identifier="route", choice=billing),)` - the facade passes them through.
+- Fake decisions with `DecisionGeneration(generating=fn)`, where `fn` is
+  `async def fn(*, input, questions, **extra)` returning one answer per question in question order,
+  with the decided option meta merged like real backends do, e.g.
+  `(DecisionChoiceAnswer(identifier="route", choice=billing, meta=billing.meta),)` - the facade
+  passes them through unchanged.
 - Fake templates with `TemplatesRepository.volatile(...)`.
 
 ## Gotchas

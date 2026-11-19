@@ -29,7 +29,10 @@ class Gemini(
     Access to Gemini services, can be used to prepare various functionalities like lmm.
     """
 
-    __slots__ = ("_features",)
+    __slots__ = (
+        "_default_features",
+        "_features",
+    )
 
     def __init__(
         self,
@@ -49,6 +52,7 @@ class Gemini(
             **extra,
         )
 
+        self._default_features: bool = features is None
         self._features: Set[type[State]] = (
             frozenset(features)
             if features is not None
@@ -69,7 +73,10 @@ class Gemini(
         if TextEmbedding in self._features:
             state.append(TextEmbedding(embedding=self.create_texts_embedding))
 
-        if DecisionGeneration in self._features:
+        # decisions are not available through Vertex AI, keep the model based ones by default
+        if DecisionGeneration in self._features and not (
+            self._default_features and self._client.vertexai
+        ):
             state.append(DecisionGeneration(generating=self.decide))
 
         return state
