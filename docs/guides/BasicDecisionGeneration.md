@@ -5,8 +5,16 @@ choices, multi-select selections and ratings on ordered scales.
 
 Decisions follow the contract of dedicated decision models - one shared input is evaluated against a
 set of independent, named questions. A backend built for decisions, such as the Gemini Decisions
-API, additionally reports calibrated probabilities you can threshold. Without one, decisions fall
-back to the model bound in the active scope.
+API, Ollama decision models or any System One API server, additionally reports calibrated
+probabilities you can threshold. Without one, decisions fall back to the model bound in the active
+scope.
+
+Reach for decisions whenever the answer is one of a fixed set of outcomes rather than generated
+content: classifying or routing a ticket, moderating input, tagging topics, grading a draft against
+a rubric, or gating a workflow step. Compared to asking `ModelGeneration` for an enum field, every
+question is answered independently, decided options come back as your own `DecisionOption`s with
+their meta, and dedicated backends tell you how certain each decision is, so uncertain cases can be
+escalated instead of trusted blindly.
 
 ## Prerequisites
 

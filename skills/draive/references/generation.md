@@ -1,4 +1,4 @@
-# Generation - providers, text/structured/image/audio, content, templates, tools, skills
+# Generation - providers, text/structured/image/audio, decisions, content, templates, tools, skills
 
 Everything here is `from draive import ...` unless noted. Generation facades are Haiway `State`s
 with `statemethod`s: call `TextGeneration.generate(...)` on the class and it resolves the instance
@@ -27,13 +27,15 @@ async with ctx.scope(
 | --- | --- | --- |
 | OpenAI | `draive.openai.OpenAI` | `OpenAIResponsesConfig` (`OpenAIImageGenerationConfig`, `OpenAIEmbeddingConfig`, ...) |
 | Anthropic | `draive.anthropic.Anthropic` | `AnthropicConfig` |
-| Gemini | `draive.gemini.Gemini` | `GeminiConfig` |
-| Mistral / Ollama | `draive.mistral.Mistral` / `draive.ollama.Ollama` | `MistralChatConfig` / `OllamaChatConfig` |
+| Gemini | `draive.gemini.Gemini` | `GeminiConfig` (`GeminiDecisionConfig`, ...) |
+| Mistral / Ollama | `draive.mistral.Mistral` / `draive.ollama.Ollama` | `MistralChatConfig` / `OllamaChatConfig` (`OllamaDecisionConfig`) |
+| System One (decisions only) | `draive.systemone.SystemOne` | `SystemOneConfig` |
 
 - Each client takes `features=` - the set of state types it installs - and reads credentials from
   the environment (`api_key=` overrides, where the provider has one). `Anthropic()` installs only
-  `GenerativeModel`; `OpenAI()` also installs realtime, embedding, image generation and moderation.
-  The full table is in `providers-and-data.md`.
+  `GenerativeModel`; `OpenAI()` also installs realtime, embedding, image generation and moderation;
+  `Gemini()` and `Ollama()` also install `DecisionGeneration`. The full table is in
+  `providers-and-data.md`.
 - Change config for a block: `with
   ctx.updating(ctx.state(OpenAIResponsesConfig).updating(model=...)):`. For one call pass `config=`
   - it travels through `**extra` to the provider: `TextGeneration.generate(...,
@@ -63,7 +65,7 @@ city: City = await ModelGeneration.generate(
 image = await ImageGeneration.generate(input="a red cat")    # ResourceContent | ResourceReference
 ```
 
-- All four share `instructions`, `input`, `**extra`; keyword-only. `AudioGeneration` is
+- These four share `instructions`, `input`, `**extra`; keyword-only. `AudioGeneration` is
   the same as `ImageGeneration`. Text and model also take `tools=` and `examples=`
   (`(Multimodal, Generated)` pairs for `ModelGeneration`).
 - `ModelGeneration` always requests `generated` as the output schema from the provider; extra
@@ -77,6 +79,59 @@ image = await ImageGeneration.generate(input="a red cat")    # ResourceContent |
 - Image/audio raise `GenerationOutputMissing` when the model returned no such output; the default
   goes through `GenerativeModel` with image/audio output, `OpenAI()` installs its own image one.
 - Pipelines of calls are `Step`s and agents; see `workflows.md`.
+
+## Decisions
+
+`DecisionGeneration` answers typed questions about one shared input - classification, routing,
+moderation, rubric scoring - instead of generating content. Dedicated decision models (Gemini
+Decisions API, System One models through `SystemOne` or `Ollama()`) answer with calibrated
+probabilities you can threshold; without one bound, each question becomes a structured
+`GenerativeModel` completion of the scope model (no probabilities, `reasoning` in meta).
+
+```python
+from draive import (
+    DecisionCheck, DecisionChoice, DecisionGeneration, DecisionOption, DecisionRating,
+    DecisionSelection,
+)
+
+billing = DecisionOption(identifier="billing", description="payment issues", meta={"queue": "l1"})
+angry, route, topics, urgency = await DecisionGeneration.decide(
+    input=ticket,                            # Multimodal or a Template, shared by all questions
+    questions=(                              # unique identifiers, answered independently
+        DecisionCheck(identifier="angry", criteria="Is the customer angry?"),
+        DecisionChoice(identifier="route", criteria="Which team?",
+                       options=(billing, DecisionOption(identifier="shipping"))),
+        DecisionSelection(identifier="topics", criteria="Which topics apply?",
+                          options=(billing, DecisionOption(identifier="delivery"))),
+        DecisionRating(identifier="urgency", criteria="How urgent?",       # lowest to highest
+                       levels=(DecisionOption(identifier="low"), DecisionOption(identifier="high"))),
+    ),
+)
+route.choice.identifier, route.meta["queue"]      # decided option, its meta merged into the answer
+confidence = route.meta.get_float("confidence")   # None without a calibrated backend
+answer = await DecisionGeneration.choose(input=ticket, criteria="Which team?", options=(...))
+```
+
+- Question kinds: `DecisionCheck` (yes / no -> `value: bool`), `DecisionChoice` (exactly one of
+  2+ options -> `choice`), `DecisionSelection` (any of 1+ options, possibly none -> `selected`),
+  `DecisionRating` (one of 2+ ordered levels -> `level`). Shortcuts for one question: `check`,
+  `choose`, `select`, `rate` return the typed answer.
+- Questions take `criteria` (not `instructions`); options and levels are `DecisionOption`
+  (`identifier`, optional `description`, `meta` never sent to the backend). Invalid questions
+  (empty criteria, duplicated option identifiers, too few options) fail at construction with
+  `ValidationError`.
+- `decide` returns answers in question order, each carrying its question `identifier`. The decided
+  value is all every backend guarantees; everything else lives in answer `meta`: calibrated
+  `probability` (check), `probabilities` keyed by option identifier, `confidence` (probability of
+  the decided outcome), normalized 0-1 `score` (rating), or `reasoning` from the model fallback.
+  Choice and rating answers merge the decided option meta in, selected options keep their own.
+- Prefer it over `ModelGeneration` with an enum field when the job is picking among fixed options,
+  especially when thresholds matter - but only threshold with a calibrated backend bound.
+- Bind a backend like any provider: `Gemini()` (`GeminiDecisionConfig`, on by default), `Ollama()`
+  (`OllamaDecisionConfig`, needs a pulled decision model such as `tev1`, text only) or
+  `SystemOne(server_url=..., images=...)` for TypeSafe Jev, Ollama with images, gateways.
+  `Gemini(features=...)` / `Ollama(features=...)` without `DecisionGeneration` keeps the model
+  fallback. Guide: `docs/guides/BasicDecisionGeneration.md`.
 
 ## Content: `MultimodalContent`
 
@@ -243,6 +298,9 @@ async def test_weather() -> None:
   `TextGeneration(generating=fn)`, `ImageGeneration(generating=fn)` where `fn` is keyword-only
   `(instructions=..., input=..., toolbox=..., examples=..., **extra)` (`generated` positional first
   for the model one, plus `decoder=`; image/audio take only `instructions`, `input`, `**extra`).
+- Fake decisions with `DecisionGeneration(generating=fn)`, `fn(*, input, questions, **extra)`
+  returning one answer per question in question order, e.g.
+  `(DecisionChoiceAnswer(identifier="route", choice=billing),)` - the facade passes them through.
 - Fake templates with `TemplatesRepository.volatile(...)`.
 
 ## Gotchas

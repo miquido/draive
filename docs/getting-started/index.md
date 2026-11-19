@@ -39,7 +39,8 @@ Throughout the getting-started journey you will assemble:
 1. **Context scoping** – `ctx.scope(...)` activates a stack of `State` instances and disposables for
     a logical unit of work, ensuring structured concurrency and clean teardown.
 1. **Generation flows** – typed facades in `draive.generation` orchestrate text, structured model,
-    image, and audio calls, while provider adapters translate the request to each backend.
+    image, and audio calls, and typed decisions (checks, choices, selections, ratings), while
+    provider adapters translate the request to each backend.
 1. **Tools and multimodal content** – `MultimodalContent`, `ResourceContent`, and tool abstractions
     let you stream artifacts, call Python functions, or chain agents without sacrificing type
     safety.

@@ -1,6 +1,6 @@
 ---
 name: draive
-description: Write, review and refactor Python code that uses the Draive framework (`from draive import State, ctx, ...`) for Gen-AI applications - immutable State types, Protocol-based services, contextual dependencies through ctx.scope, structured concurrency, observability, plus the Draive layer - model providers (OpenAI, Anthropic, Gemini, Mistral, Ollama, Bedrock...), text/structured/image/audio generation, tools, skills, steps, agents and memory, conversations, resources and templates, MCP, embeddings and vector stores, evaluation, guardrails. Use whenever a project imports draive, or when asked to add a model call, tool, agent, pipeline, evaluator or integration to such a project, or to design an application "the Draive way".
+description: Write, review and refactor Python code that uses the Draive framework (`from draive import State, ctx, ...`) for Gen-AI applications - immutable State types, Protocol-based services, contextual dependencies through ctx.scope, structured concurrency, observability, plus the Draive layer - model providers (OpenAI, Anthropic, Gemini, Mistral, Ollama, Bedrock, System One decision servers...), text/structured/image/audio generation, typed decisions (checks, choices, selections, ratings with calibrated probabilities), tools, skills, steps, agents and memory, conversations, resources and templates, MCP, embeddings and vector stores, evaluation, guardrails. Use whenever a project imports draive, or when asked to add a model call, tool, agent, pipeline, evaluator or integration to such a project, or to design an application "the Draive way".
 ---
 
 # Writing code with Draive
@@ -90,7 +90,8 @@ underlying primitives) rather than guessing - names change between versions.
 Gen-AI work follows the same rules: models, tools, memory and stores are `State`s installed in a
 scope, called through their `@statemethod`s, replaceable by fakes in tests.
 
-- Pick the facade by the job: text/structured/image/audio generation, a `Step` pipeline, an `Agent`,
+- Pick the facade by the job: text/structured/image/audio generation, `DecisionGeneration` for
+  classifying, routing, moderating or scoring against fixed options, a `Step` pipeline, an `Agent`,
   a conversation, an evaluator. Do not call a provider SDK directly - go through the provider
   adapter (`draive.openai`, `draive.anthropic`, ...) installed as a disposable of the scope.
 - Structured output is a `State` type (its schema is generated from the type); give it field

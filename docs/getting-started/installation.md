@@ -46,8 +46,9 @@ uv sync --all-groups --all-extras --frozen
     LLMs.
 - `draive[bedrock]`, `draive[aws]` for AWS model/runtime integrations.
 - `draive[ollama]`, `draive[vllm]` for local or self-hosted deployments.
-- `draive[systemone]` for System One API decision models (hosted TypeSafe Jev, local Ollama, or
-    self-hosted OpenJev).
+- `draive[systemone]` for System One API decision models (`/v1/systemone`) - hosted TypeSafe Jev,
+    local Ollama, gateways such as OpenRouter, or self-hosted OpenJev. Gemini and Ollama decisions
+    come with their own extras.
 - `draive[qdrant]`, `draive[postgres]`, `draive[surrealdb]` (plus `draive[surrealdb_embedded]` for
     in-process `mem://`/`file://` connections) for vector/storage backends; the Postgres index
     requires the `pgvector` server extension, while a remote SurrealDB connection requires a

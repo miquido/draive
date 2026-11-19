@@ -15,10 +15,14 @@ hidden global state.
 - Explicitly typed API surface built on `State`, with runtime validation and JSON schema support.
 - Unified generation interfaces: `TextGeneration`, `ModelGeneration`, `ImageGeneration`, and
     `AudioGeneration`.
+- Typed decisions with `DecisionGeneration` - yes / no checks, choices, multi-select selections and
+    ratings about content, answered by dedicated decision models with calibrated probabilities or by
+    the active model.
 - Built-in tool orchestration through `@tool` and `Toolbox` with model-managed tool turns.
 - Shared multimodal model for text, resources, and artifacts across generation and retrieval flows.
 - First-class evaluation and guardrails integrated in the same context/state model.
-- Provider adapters for OpenAI, Anthropic, Gemini, Mistral, Cohere, Bedrock, Ollama, and vLLM.
+- Provider adapters for OpenAI, Anthropic, Gemini, Mistral, Cohere, Bedrock, Ollama, and vLLM, plus
+    System One API decision servers (TypeSafe Jev, Ollama, gateways, OpenJev).
 - Storage and infrastructure integrations for Postgres, Qdrant, SurrealDB, MCP, AWS, RabbitMQ, and
     OpenTelemetry.
 
