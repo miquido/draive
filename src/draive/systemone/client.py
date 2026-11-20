@@ -4,7 +4,7 @@ from typing import Any, final
 
 from haiway import State
 
-from draive.generation import DecisionGeneration
+from draive.models import DecisionModel
 from draive.systemone.api import SystemOneAPI, SystemOneImages
 from draive.systemone.decisions import SystemOneDecisions
 
@@ -16,7 +16,7 @@ class SystemOne(
     SystemOneDecisions,
     SystemOneAPI,
 ):
-    """Access to a System One API decision server, prepares ``DecisionGeneration``.
+    """Access to a System One API decision server, prepares ``DecisionModel``.
 
     Works with the hosted TypeSafe API and with self-hosted OpenJev servers,
     which follow the same request shape but differ in image delivery.
@@ -65,7 +65,7 @@ class SystemOne(
 
     async def __aenter__(self) -> Iterable[State]:
         await self._initialize_client()
-        return (DecisionGeneration(generating=self.decide),)
+        return (DecisionModel(generating=self.decide),)
 
     async def __aexit__(
         self,

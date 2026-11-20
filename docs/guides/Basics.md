@@ -93,6 +93,7 @@ Draive records a few metrics out of the box, available through any observability
 | `evaluator.suite.<name>.performance`        | histogram | `passed`, `cases`, `cases.passed`                         |
 | `model.input_tokens`, `model.output_tokens` | counter   | `model.provider`, `model.name`                            |
 | `embedding.items`, `embedding.input_tokens` | counter   | `embedding.provider`, `embedding.model`, `embedding.type` |
+| `decision.questions`, `decision.requests`   | counter   | `decision.provider`, `decision.model`                     |
 | `qdrant.operation.duration`                 | histogram | `qdrant.operation`, `qdrant.outcome`                      |
 | `surreal.query.duration`                    | histogram | `surreal.outcome`, `surreal.rows`                         |
 

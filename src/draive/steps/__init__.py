@@ -3,6 +3,7 @@ from draive.steps.step import Step, StepSelecting, step
 from draive.steps.types import (
     StepConditionVerifying,
     StepContextMutating,
+    StepDecisionInputPreparing,
     StepException,
     StepExecuting,
     StepLoopConditionVerifying,
@@ -20,6 +21,7 @@ __all__ = (
     "Step",
     "StepConditionVerifying",
     "StepContextMutating",
+    "StepDecisionInputPreparing",
     "StepException",
     "StepExecuting",
     "StepLoopConditionVerifying",

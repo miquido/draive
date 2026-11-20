@@ -9,7 +9,7 @@ raises an `ImportError` naming it. Extras: `openai` (+`openai_realtime`), `anthr
 ## Provider adapters
 
 An adapter is a **disposable**: entering it installs capability states (`GenerativeModel`,
-`TextEmbedding`, ...) in the scope, so the rest of the code stays provider-agnostic
+`TextEmbedding`, `DecisionModel`, ...) in the scope, so the rest of the code stays provider-agnostic
 (`TextGeneration`, `ModelGeneration`, `DecisionGeneration`, `Conversation`, `TextEmbedding`). The model is a
 `Configuration` **state in the scope**; adapters resolve `config or ctx.state(XConfig)` per call, so
 a missing config is a wiring error and a per-call override is `generate(..., config=XConfig(...))`.
@@ -28,9 +28,9 @@ async with ctx.scope("app", OpenAIResponsesConfig(model="gpt-5.5"), disposables=
 | `OpenAI()` | `OPENAI_API_KEY/BASE_URL/ORGANIZATION`; Azure `AZURE_OPENAI_API_KEY/API_BASE/API_VERSION/DEPLOYMENT_NAME` | `GenerativeModel`, `RealtimeGenerativeModel`, `TextEmbedding`, `ImageGeneration`, `GuardrailsModeration` | `OpenAIResponsesConfig`, `OpenAIEmbeddingConfig`, `OpenAIRealtimeConfig`, `OpenAIImageGenerationConfig`, `OpenAIModerationConfig` |
 | `Anthropic()`, `Anthropic("bedrock", aws_region=)` | `ANTHROPIC_API_KEY`, `AWS_BEDROCK_REGION` | `GenerativeModel` | `AnthropicConfig` |
 | `Mistral()` | `MISTRAL_API_KEY`, `MISTRAL_SERVER_URL` (or `MISTRAL_ENDPOINT`) | `GenerativeModel`, `TextEmbedding`, `GuardrailsModeration` | `MistralChatConfig`, `MistralEmbeddingConfig`, `MistralModerationConfig` |
-| `Gemini()`, `Gemini(vertexai=True)` | `GEMINI_API_KEY` | `GenerativeModel`, `RealtimeGenerativeModel`, `TextEmbedding`, `DecisionGeneration` (not by default on Vertex AI, where the Decisions API is unavailable) | `GeminiConfig`, `GeminiEmbeddingConfig`, `GeminiDecisionConfig` |
-| `Ollama()` | `OLLAMA_SERVER_URL` or `OLLAMA_HOST` | `GenerativeModel`, `TextEmbedding`, `DecisionGeneration` (needs a pulled decision model, text only) | `OllamaChatConfig`, `OllamaEmbeddingConfig`, `OllamaDecisionConfig` |
-| `SystemOne(server_url=, images=)` | `SYSTEMONE_SERVER_URL` (default TypeSafe), `SYSTEMONE_API_KEY` or `TYPESAFE_API_KEY` | `DecisionGeneration` | `SystemOneConfig` |
+| `Gemini()`, `Gemini(vertexai=True)` | `GEMINI_API_KEY` | `GenerativeModel`, `RealtimeGenerativeModel`, `TextEmbedding`, `DecisionModel` (not by default on Vertex AI, where the Decisions API is unavailable) | `GeminiConfig`, `GeminiEmbeddingConfig`, `GeminiDecisionConfig` |
+| `Ollama()` | `OLLAMA_SERVER_URL` or `OLLAMA_HOST` | `GenerativeModel`, `TextEmbedding`, `DecisionModel` (needs a pulled decision model, text only) | `OllamaChatConfig`, `OllamaEmbeddingConfig`, `OllamaDecisionConfig` |
+| `SystemOne(server_url=, images=)` | `SYSTEMONE_SERVER_URL` (default TypeSafe), `SYSTEMONE_API_KEY` or `TYPESAFE_API_KEY` | `DecisionModel` | `SystemOneConfig` |
 | `VLLM(base_url=)` | `VLLM_BASE_URL` (else `OPENAI_BASE_URL`, one is required), `VLLM_API_KEY` | `GenerativeModel`, `TextEmbedding` | `VLLMChatConfig`, `VLLMEmbeddingConfig` |
 | `Bedrock(aws_region=)` | `AWS_BEDROCK_REGION` | `GenerativeModel`, `GuardrailsModeration` | `BedrockChatConfig`, `BedrockInputGuardraisConfig`, `BedrockOutputGuardraisConfig` |
 | `Cohere()`, `Cohere("bedrock", aws_region=)` | `COHERE_API_KEY`, `COHERE_SERVER_URL` | `TextEmbedding`, `ImageEmbedding` (no chat) | `CohereTextEmbeddingConfig`, `CohereImageEmbeddingConfig` |

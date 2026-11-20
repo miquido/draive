@@ -15,7 +15,7 @@ from ollama import (
     SystemOneScoreQuestion,
 )
 
-from draive.generation.decision import (
+from draive.models import (
     DecisionAnswer,
     DecisionCheck,
     DecisionCheckAnswer,
@@ -27,12 +27,12 @@ from draive.generation.decision import (
     DecisionRatingAnswer,
     DecisionSelection,
     DecisionSelectionAnswer,
-)
-from draive.models import (
     ModelException,
     ModelInputInvalid,
     ModelOutputFailed,
     model_rate_limit,
+    record_decision_invocation,
+    record_decision_metrics,
     record_usage_metrics,
 )
 from draive.multimodal import ArtifactContent, Multimodal, MultimodalContent, TextContent
@@ -94,12 +94,10 @@ class OllamaDecisions(OllamaAPI):
         """
         async with ctx.scope("model.decision"):
             config = config or ctx.state(OllamaDecisionConfig)
-            ctx.record_info(
-                attributes={
-                    "model.provider": "ollama",
-                    "model.name": config.model,
-                    "model.decision.questions": [question.identifier for question in questions],
-                },
+            record_decision_invocation(
+                provider="ollama",
+                model=config.model,
+                questions=questions,
             )
 
             state: str
@@ -139,6 +137,12 @@ class OllamaDecisions(OllamaAPI):
                     reason=str(exc),
                 ) from exc
 
+            record_decision_metrics(
+                provider="ollama",
+                model=config.model,
+                questions=len(request_questions),
+                requests=1,
+            )
             record_usage_metrics(
                 provider="ollama",
                 model=config.model,

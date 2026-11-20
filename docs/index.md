@@ -17,7 +17,7 @@ hidden global state.
     `AudioGeneration`.
 - Typed decisions with `DecisionGeneration` - yes / no checks, choices, multi-select selections and
     ratings about content, answered by dedicated decision models with calibrated probabilities or by
-    the active model.
+    explicitly bound completion based decisions.
 - Built-in tool orchestration through `@tool` and `Toolbox` with model-managed tool turns.
 - Shared multimodal model for text, resources, and artifacts across generation and retrieval flows.
 - First-class evaluation and guardrails integrated in the same context/state model.
@@ -174,6 +174,7 @@ Common patterns include:
 
 - sequential orchestration (`Step.sequence(...)`),
 - guarded loops (`Step.loop(...)`, limited by `max_iterations`),
+- model driven branching (`Step.route(...)`, steps described with `with_meta(...)`),
 - resilience wrappers (`with_retry`, `with_fallback`, `with_timeout`),
 - typed output decoding into artifacts (`Step.decoding_artifact(...)`),
 - explicit state preservation/restoration across phases.

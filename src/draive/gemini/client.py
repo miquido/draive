@@ -11,8 +11,7 @@ from draive.gemini.decisions import GeminiDecisions
 from draive.gemini.embedding import GeminiEmbedding
 from draive.gemini.generating import GeminiGenerating
 from draive.gemini.live import GeminiLive
-from draive.generation import DecisionGeneration
-from draive.models import GenerativeModel, RealtimeGenerativeModel
+from draive.models import DecisionModel, GenerativeModel, RealtimeGenerativeModel
 
 __all__ = ("Gemini",)
 
@@ -40,7 +39,7 @@ class Gemini(
         vertexai: bool | None = None,
         http_options: HttpOptionsDict | None = None,
         features: Collection[
-            type[GenerativeModel | RealtimeGenerativeModel | TextEmbedding | DecisionGeneration]
+            type[GenerativeModel | RealtimeGenerativeModel | TextEmbedding | DecisionModel]
         ]
         | None = None,
         **extra: Any,
@@ -56,9 +55,7 @@ class Gemini(
         self._features: Set[type[State]] = (
             frozenset(features)
             if features is not None
-            else frozenset(
-                (GenerativeModel, RealtimeGenerativeModel, TextEmbedding, DecisionGeneration)
-            )
+            else frozenset((GenerativeModel, RealtimeGenerativeModel, TextEmbedding, DecisionModel))
         )
 
     async def __aenter__(self) -> Iterable[State]:
@@ -74,10 +71,10 @@ class Gemini(
             state.append(TextEmbedding(embedding=self.create_texts_embedding))
 
         # decisions are not available through Vertex AI, keep the model based ones by default
-        if DecisionGeneration in self._features and not (
+        if DecisionModel in self._features and not (
             self._default_features and self._client.vertexai
         ):
-            state.append(DecisionGeneration(generating=self.decide))
+            state.append(DecisionModel(generating=self.decide))
 
         return state
 

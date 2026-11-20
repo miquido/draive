@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from haiway import BasicValue, HTTPClientError, HTTPResponse, Meta, ctx
 
-from draive.generation.decision import (
+from draive.models import (
     DecisionAnswer,
     DecisionCheck,
     DecisionCheckAnswer,
@@ -17,12 +17,12 @@ from draive.generation.decision import (
     DecisionRatingAnswer,
     DecisionSelection,
     DecisionSelectionAnswer,
-)
-from draive.models import (
     ModelException,
     ModelInputInvalid,
     ModelOutputFailed,
     model_rate_limit,
+    record_decision_invocation,
+    record_decision_metrics,
     record_usage_metrics,
 )
 from draive.multimodal import ArtifactContent, Multimodal, MultimodalContent, TextContent
@@ -89,12 +89,10 @@ class SystemOneDecisions(SystemOneAPI):
         """
         async with ctx.scope("model.decision"):
             config = config or ctx.state(SystemOneConfig)
-            ctx.record_info(
-                attributes={
-                    "model.provider": "systemone",
-                    "model.name": config.model,
-                    "model.decision.questions": [question.identifier for question in questions],
-                },
+            record_decision_invocation(
+                provider="systemone",
+                model=config.model,
+                questions=questions,
             )
 
             request: Mapping[str, Any]
@@ -140,6 +138,12 @@ class SystemOneDecisions(SystemOneAPI):
                     reason=str(exc),
                 ) from exc
 
+            record_decision_metrics(
+                provider="systemone",
+                model=config.model,
+                questions=len(request["questions"]),
+                requests=1,
+            )
             try:
                 return _answers(
                     response_body,

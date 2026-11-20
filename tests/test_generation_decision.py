@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 from haiway import ValidationError, ctx
 
-from draive.generation import (
+from draive import (
     DecisionAnswer,
     DecisionCheck,
     DecisionCheckAnswer,
@@ -20,6 +20,7 @@ from draive.generation import (
     DecisionSelection,
     DecisionSelectionAnswer,
     GenerationOutputMissing,
+    generate_completion_decisions,
 )
 from draive.models import GenerativeModel, ModelContext, ModelOutputChunk, ModelTools
 from draive.multimodal import Multimodal, TextContent
@@ -193,6 +194,9 @@ async def test_single_question_helpers_return_typed_answers() -> None:
     )
 
 
+_COMPLETIONS = DecisionGeneration(generating=generate_completion_decisions)
+
+
 def _model_answering(
     results: Mapping[str, dict[str, Any]],
     captured: list[str] | None = None,
@@ -227,7 +231,7 @@ async def test_default_decisions_use_generative_model_without_probabilities() ->
         instructions,
     )
 
-    async with ctx.scope("test", model):
+    async with ctx.scope("test", model, _COMPLETIONS):
         result = await DecisionGeneration.decide(
             input="I was charged twice",
             questions=(
@@ -297,7 +301,7 @@ async def test_default_decisions_reject_answers_outside_of_criteria(
     question: DecisionQuestion,
     results: Mapping[str, dict[str, Any]],
 ) -> None:
-    async with ctx.scope("test", _model_answering(results)):
+    async with ctx.scope("test", _model_answering(results), _COMPLETIONS):
         with pytest.raises(GenerationOutputMissing):
             await DecisionGeneration.decide(input="any", questions=(question,))
 
@@ -328,7 +332,7 @@ async def test_default_selection_uses_generative_model(
         {"_SelectionResult": {"reasoning": "-", "selected": selected}},
         instructions,
     )
-    async with ctx.scope("test", model):
+    async with ctx.scope("test", model, _COMPLETIONS):
         answer = await DecisionGeneration.select(
             input="any",
             criteria="Which apply?",
@@ -346,7 +350,7 @@ async def test_default_selection_uses_generative_model(
 @pytest.mark.asyncio
 async def test_default_selection_rejects_unknown_options() -> None:
     model = _model_answering({"_SelectionResult": {"reasoning": "-", "selected": ["x"]}})
-    async with ctx.scope("test", model):
+    async with ctx.scope("test", model, _COMPLETIONS):
         with pytest.raises(GenerationOutputMissing):
             await DecisionGeneration.select(
                 input="any",
@@ -375,7 +379,7 @@ async def test_default_decisions_bound_concurrent_completions() -> None:
         running -= 1
         yield TextContent.of(json.dumps({"reasoning": "-", "value": True}))
 
-    async with ctx.scope("test", GenerativeModel(generating=generating)):
+    async with ctx.scope("test", GenerativeModel(generating=generating), _COMPLETIONS):
         answers = await DecisionGeneration.decide(
             input="any",
             questions=tuple(

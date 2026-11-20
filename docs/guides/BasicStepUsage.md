@@ -71,7 +71,9 @@ to garbage collection finalizes it within an unrelated context and breaks scoped
     `Step.looping_completion` stop with a `StepException` after `max_iterations` (32 by default,
     `None` disables the limit).
 - `Step.concurrent(..., merge=...)` for fan-out/fan-in branches.
-- `Step.selection(...)` for choosing the next step from the current state.
+- `Step.selection(...)` for choosing the next step from the current state in your own code.
+- `Step.route(criteria, *steps)` for letting `DecisionModel` pick which of the given steps runs,
+    steps are described by their `with_meta(name=..., description=...)` (see below).
 - `Step.generating_completion(...)` for one model completion stage.
 - `Step.looping_completion(...)` for model + tool iterative loops.
 - `Step.decoding_artifact(...)` for decoding structured model output into an artifact.
@@ -105,6 +107,8 @@ should not be passed further.
 
 Any step can be wrapped without breaking composition:
 
+- `step.with_meta(name=..., description=...)` for describing a step, i.e. for `Step.route(...)`. The
+    other modifiers keep the meta of the step they wrap.
 - `step.with_ctx(...)` for scoped state and disposables.
 - `step.with_retry(...)` and `step.with_fallback(...)` for failure handling. Every attempt (and the
     fallback) starts from the original input state, partial state of a failed attempt is discarded.
@@ -123,11 +127,11 @@ Any step can be wrapped without breaking composition:
 
 Step failures carry the `StepState` they happened with (`exception.state`):
 
-| Exception              | Raised when                                                                                         |
-| ---------------------- | --------------------------------------------------------------------------------------------------- |
-| `StepException`        | evaluation fails with `raise_on_failure`, decoding fails, or a loop exceeds `max_iterations`        |
-| `StepTimeout`          | `with_timeout(...)` limit is exceeded (`exception.timeout`)                                         |
-| `StepRetriesExhausted` | `with_retry(...)` failed after at least one retry (`exception.attempts`, last error as `__cause__`) |
+| Exception              | Raised when                                                                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `StepException`        | evaluation fails with `raise_on_failure`, decoding fails, a loop exceeds `max_iterations`, or `Step.route(...)` is answered with an unknown step |
+| `StepTimeout`          | `with_timeout(...)` limit is exceeded (`exception.timeout`)                                                                                      |
+| `StepRetriesExhausted` | `with_retry(...)` failed after at least one retry (`exception.attempts`, last error as `__cause__`)                                              |
 
 Errors that are not matched by `catching`, or that happen with `limit=0`, are raised unchanged.
 
@@ -153,3 +157,46 @@ from draive import StepExecuting, StepMerging, StepProcessing, StepSelecting
 `StepExecuting` describes the low-level streaming interface accepted by `Step(...)`.
 `StepProcessing` describes state-only functions accepted by the `@step` decorator. The remaining
 protocols describe the callbacks accepted by composition and modifier methods.
+
+## Routing To A Step
+
+`Step.route(criteria, *steps)` asks `DecisionModel` to choose exactly one of the given steps for the
+current state and executes it. It requires a `DecisionModel` in the scope, for example installed by
+`Gemini()` or `Ollama()`. Nothing falls back to model completions on its own - `Gemini()` using
+Vertex AI does not install it by default, and a scope without any decision backend fails with a
+missing `DecisionModel`. Bind `DecisionModel(generating=generate_completion_decisions)` there, see
+below.
+
+Steps are offered to the model by the `name` and optional `description` of their meta, set with
+`with_meta(...)`. At least two steps are required, a missing or repeated `name` raises a
+`ValueError` when the step is built. Wrapping modifiers such as `with_retry(...)` or
+`with_timeout(...)` keep the meta of the step, combining steps, i.e. `Step.sequence(...)`, starts
+with an empty one - describe the result.
+
+```python
+from draive import ModelInput, MultimodalContent, Step, ctx
+from draive.gemini import Gemini
+
+support = Step.generating_completion(instructions="Help with the support request.").with_meta(
+    name="support",
+    description="Problems with an existing product",
+)
+sales = Step.generating_completion(instructions="Answer the sales question.").with_meta(
+    name="sales",
+)
+
+router = Step.route("What is the user asking about?", support, sales)
+
+async with ctx.scope("routing", disposables=(Gemini(),)):
+    result = await router.run((ModelInput.of(MultimodalContent.of("My device stopped working")),))
+```
+
+By default the whole context is the decision input: content blocks are wrapped in `user` and
+`assistant` tags, tool requests and responses in `tool_request` and `tool_response` tags carrying
+the tool name, so routing can depend on tool results. Reasoning is left out. Pass `input=` (an async
+callable receiving the `StepState` and returning the content to decide about) to decide from
+something else. A backend answering with an unknown step fails the step with a `StepException`,
+backend failures are raised as they are, so `with_fallback(...)` can recover from them.
+
+To decide with plain model completions bind
+`DecisionModel(generating=generate_completion_decisions)` explicitly, it is never used implicitly.

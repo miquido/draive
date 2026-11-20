@@ -4,7 +4,7 @@ from typing import Any, overload
 from haiway import State, ctx, statemethod
 
 from draive.generation.decision.default import generate_decisions
-from draive.generation.decision.types import (
+from draive.models import (
     DecisionAnswer,
     DecisionCheck,
     DecisionCheckAnswer,

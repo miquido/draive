@@ -13,7 +13,7 @@ Draive is a python framework helping to build high-quality Gen-AI applications. 
 
 Top-level code lives under `src/draive/`, with key packages:
 
-- `draive/models/` — core model abstractions (`GenerativeModel`, context/input/output types, session and tool-related model types)
+- `draive/models/` — core model abstractions (`GenerativeModel`, `DecisionModel` with decision question/answer types, context/input/output types, session and tool-related model types)
 - `draive/tools/` — tool abstractions and orchestration (`tool`, `Tool`, `CoroutineTool`, `GeneratorTool`, `Toolbox`, `ToolsProvider`)
 - `draive/agents/` — lightweight async agent wrappers and delegation (`Agent`, `AgentsGroup`, `AgentMemory`, agent message/identity types)
 - `draive/generation/` — typed generation facades (`text/`, `image/`, `audio/`, `model/`) with `state.py`, `types.py`, and `default.py`

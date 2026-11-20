@@ -6,12 +6,13 @@ import pytest
 from haiway import ctx
 from ollama import ResponseError, SystemOneResponse
 
-from draive.generation import (
+from draive import (
     DecisionCheck,
     DecisionCheckAnswer,
     DecisionChoice,
     DecisionChoiceAnswer,
     DecisionGeneration,
+    DecisionModel,
     DecisionOption,
     DecisionQuestion,
     DecisionRating,
@@ -64,7 +65,7 @@ def _ollama(
 
         return SystemOneResponse.model_validate(response)
 
-    ollama = Ollama(features=(DecisionGeneration,))
+    ollama = Ollama(features=(DecisionModel,))
     ollama._client = SimpleNamespace(systemone=systemone)  # pyright: ignore[reportAttributeAccessIssue]
     return ollama
 
@@ -233,3 +234,81 @@ async def test_decide_translates_failures(
                 input="any",
                 questions=(DecisionCheck(identifier="q", criteria="Is it?"),),
             )
+
+
+@pytest.mark.asyncio
+async def test_decide_records_decision_invocation_and_metrics(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    records: list[dict[str, Any]] = []
+    monkeypatch.setattr(ctx, "record_info", lambda **kwargs: records.append(kwargs))
+    ollama = _ollama(
+        {
+            "model": "tev1",
+            "answers": {"q0": {"type": "noul", "noul": 0.7}},
+            "usage": {"input_tokens": 1, "output_tokens": 1},
+        }
+    )
+
+    async with ctx.scope("test", OllamaDecisionConfig(model="tev1")):
+        await ollama.decide(
+            input="text",
+            questions=(DecisionCheck(identifier="angry", criteria="Is it?"),),
+        )
+
+    invocations = [
+        record["attributes"]
+        for record in records
+        if "metric" not in record and "decision.provider" in record.get("attributes", {})
+    ]
+    assert invocations == [
+        {
+            "decision.provider": "ollama",
+            "decision.model": "tev1",
+            "decision.questions": ["angry"],
+            "decision.question_types": ["check"],
+        }
+    ]
+    counters = {
+        record["metric"]: record["value"]
+        for record in records
+        if record.get("metric", "").startswith("decision.")
+    }
+    assert counters == {"decision.questions": 1, "decision.requests": 1}
+
+
+@pytest.mark.asyncio
+async def test_decide_counts_questions_sent_to_the_backend(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    records: list[dict[str, Any]] = []
+    monkeypatch.setattr(ctx, "record_info", lambda **kwargs: records.append(kwargs))
+    topics = DecisionSelection(
+        identifier="topics",
+        criteria="Which topics?",
+        options=(DecisionOption(identifier="a"), DecisionOption(identifier="b")),
+    )
+    ollama = _ollama(
+        {
+            "model": "tev1",
+            "answers": {
+                "q0": {"type": "noul", "noul": 0.3},
+                "q1_0": {"type": "noul", "noul": 0.9},
+                "q1_1": {"type": "noul", "noul": 0.1},
+            },
+            "usage": {"input_tokens": 1, "output_tokens": 1},
+        }
+    )
+
+    async with ctx.scope("test", OllamaDecisionConfig(model="tev1")):
+        await ollama.decide(
+            input="text",
+            questions=(DecisionCheck(identifier="angry", criteria="Is it?"), topics),
+        )
+
+    counters = {
+        record["metric"]: record["value"]
+        for record in records
+        if record.get("metric", "").startswith("decision.")
+    }
+    assert counters == {"decision.questions": 3, "decision.requests": 1}  # selection per option
