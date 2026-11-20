@@ -30,7 +30,7 @@ Top-level code lives under `src/draive/`, with key packages:
 - `draive/helpers/` — high-level utilities (instruction preparation/refinement, evaluation case generation, volatile vector index)
 - `draive/utils/` — shared low-level utility helpers
 - Provider adapters (feature-specific modules per provider):
-  - `draive/openai/`, `draive/anthropic/`, `draive/mistral/`, `draive/gemini/`, `draive/vllm/`, `draive/ollama/`, `draive/bedrock/`, `draive/cohere/`
+  - `draive/openai/`, `draive/anthropic/`, `draive/mistral/`, `draive/gemini/`, `draive/vllm/`, `draive/ollama/`, `draive/systemone/`, `draive/bedrock/`, `draive/cohere/`
 - Integrations (opt-in extras):
   - `draive/httpx/`, `draive/aws/`, `draive/qdrant/`, `draive/surreal/`, `draive/mcp/`, `draive/postgres/`, `draive/opentelemetry/`, `draive/rabbitmq/`, `draive/starlette/`, `draive/fastapi/`
 

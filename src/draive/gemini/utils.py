@@ -12,6 +12,7 @@ __all__ = (
     "UNAVAILABLE_STATUS_CODE",
     "combined_input_tokens",
     "quota_limit",
+    "quota_limit_details",
     "speech_config",
     "thinking_config",
     "unwrap_missing",
@@ -165,10 +166,28 @@ def quota_limit(error: APIError) -> int | None:
         Smallest explicitly reported nonnegative quota, or None when unavailable.
         Missing values are not interpreted as zero.
     """
-    # The SDK exposes decoded JSON as Any; only structured QuotaFailure entries
-    # establish capacity. Missing quotaValue must never be interpreted as zero.
-    details: BasicValue = cast(Any, error).details
-    match details:
+    # The SDK exposes decoded JSON as Any
+    return quota_limit_details(cast(Any, error).details)
+
+
+def quota_limit_details(details: Any) -> int | None:
+    """Read the smallest enforced capacity from decoded Gemini error details.
+
+    Parameters
+    ----------
+    details
+        Decoded JSON error payload.
+
+    Returns
+    -------
+    int | None
+        Smallest explicitly reported nonnegative quota, or None when unavailable.
+        Missing values are not interpreted as zero.
+    """
+    # Only structured QuotaFailure entries establish capacity.
+    # Missing quotaValue must never be interpreted as zero.
+    payload: BasicValue = details
+    match payload:
         case {"error": {"details": list() as entries}} | {"details": list() as entries}:
             pass
 

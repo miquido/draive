@@ -163,4 +163,5 @@ async def joke_with_gemini() -> None:
 
 - [First Steps](./first-steps.md)
 - [Basic Model Generation](../guides/BasicModelGeneration.md)
+- [Basic Decision Generation](../guides/BasicDecisionGeneration.md)
 - [Basic Tools Use](../guides/BasicToolsUse.md)

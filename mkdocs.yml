@@ -107,6 +107,7 @@ nav:
       - Skills: guides/Skills.md
       - Basic Conversation: guides/BasicConversation.md
       - Basic Model Generation: guides/BasicModelGeneration.md
+      - Basic Decision Generation: guides/BasicDecisionGeneration.md
       - Basic Evaluation: guides/BasicEvaluation.md
       - Comprehensive Evaluation: guides/ComprehensiveEvaluation.md
       - Evaluator Catalog: guides/EvaluatorCatalog.md

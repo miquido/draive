@@ -2,7 +2,7 @@
 
 Install what you use: `pip install draive[<extra>]`; importing `draive.<pkg>` without its extra
 raises an `ImportError` naming it. Extras: `openai` (+`openai_realtime`), `anthropic`
-(+`anthropic_bedrock`), `mistral`, `gemini`, `ollama`, `vllm`, `cohere` (+`cohere_bedrock`),
+(+`anthropic_bedrock`), `mistral`, `gemini`, `ollama`, `systemone`, `vllm`, `cohere` (+`cohere_bedrock`),
 `bedrock`, `aws`, `mcp`, `qdrant`, `surrealdb` (+`surrealdb_embedded`; imports as `draive.surreal`),
 `postgres`, `opentelemetry`, `httpx`, `starlette`, `fastapi`, `rabbitmq`.
 
@@ -10,7 +10,7 @@ raises an `ImportError` naming it. Extras: `openai` (+`openai_realtime`), `anthr
 
 An adapter is a **disposable**: entering it installs capability states (`GenerativeModel`,
 `TextEmbedding`, ...) in the scope, so the rest of the code stays provider-agnostic
-(`TextGeneration`, `ModelGeneration`, `Conversation`, `TextEmbedding`). The model is a
+(`TextGeneration`, `ModelGeneration`, `DecisionGeneration`, `Conversation`, `TextEmbedding`). The model is a
 `Configuration` **state in the scope**; adapters resolve `config or ctx.state(XConfig)` per call, so
 a missing config is a wiring error and a per-call override is `generate(..., config=XConfig(...))`.
 
@@ -28,18 +28,23 @@ async with ctx.scope("app", OpenAIResponsesConfig(model="gpt-5.5"), disposables=
 | `OpenAI()` | `OPENAI_API_KEY/BASE_URL/ORGANIZATION`; Azure `AZURE_OPENAI_API_KEY/API_BASE/API_VERSION/DEPLOYMENT_NAME` | `GenerativeModel`, `RealtimeGenerativeModel`, `TextEmbedding`, `ImageGeneration`, `GuardrailsModeration` | `OpenAIResponsesConfig`, `OpenAIEmbeddingConfig`, `OpenAIRealtimeConfig`, `OpenAIImageGenerationConfig`, `OpenAIModerationConfig` |
 | `Anthropic()`, `Anthropic("bedrock", aws_region=)` | `ANTHROPIC_API_KEY`, `AWS_BEDROCK_REGION` | `GenerativeModel` | `AnthropicConfig` |
 | `Mistral()` | `MISTRAL_API_KEY`, `MISTRAL_SERVER_URL` (or `MISTRAL_ENDPOINT`) | `GenerativeModel`, `TextEmbedding`, `GuardrailsModeration` | `MistralChatConfig`, `MistralEmbeddingConfig`, `MistralModerationConfig` |
-| `Gemini()`, `Gemini(vertexai=True)` | `GEMINI_API_KEY` | `GenerativeModel`, `RealtimeGenerativeModel`, `TextEmbedding` | `GeminiConfig`, `GeminiEmbeddingConfig` |
-| `Ollama()` | `OLLAMA_SERVER_URL` or `OLLAMA_HOST` | `GenerativeModel`, `TextEmbedding` | `OllamaChatConfig`, `OllamaEmbeddingConfig` |
+| `Gemini()`, `Gemini(vertexai=True)` | `GEMINI_API_KEY` | `GenerativeModel`, `RealtimeGenerativeModel`, `TextEmbedding`, `DecisionGeneration` (not by default on Vertex AI, where the Decisions API is unavailable) | `GeminiConfig`, `GeminiEmbeddingConfig`, `GeminiDecisionConfig` |
+| `Ollama()` | `OLLAMA_SERVER_URL` or `OLLAMA_HOST` | `GenerativeModel`, `TextEmbedding`, `DecisionGeneration` (needs a pulled decision model, text only) | `OllamaChatConfig`, `OllamaEmbeddingConfig`, `OllamaDecisionConfig` |
+| `SystemOne(server_url=, images=)` | `SYSTEMONE_SERVER_URL` (default TypeSafe), `SYSTEMONE_API_KEY` or `TYPESAFE_API_KEY` | `DecisionGeneration` | `SystemOneConfig` |
 | `VLLM(base_url=)` | `VLLM_BASE_URL` (else `OPENAI_BASE_URL`, one is required), `VLLM_API_KEY` | `GenerativeModel`, `TextEmbedding` | `VLLMChatConfig`, `VLLMEmbeddingConfig` |
 | `Bedrock(aws_region=)` | `AWS_BEDROCK_REGION` | `GenerativeModel`, `GuardrailsModeration` | `BedrockChatConfig`, `BedrockInputGuardraisConfig`, `BedrockOutputGuardraisConfig` |
 | `Cohere()`, `Cohere("bedrock", aws_region=)` | `COHERE_API_KEY`, `COHERE_SERVER_URL` | `TextEmbedding`, `ImageEmbedding` (no chat) | `CohereTextEmbeddingConfig`, `CohereImageEmbeddingConfig` |
 
+- `SystemOne` speaks the System One decision API (`/v1/systemone`) of TypeSafe Jev, Ollama,
+  gateways (OpenRouter, ...) and OpenJev; pick image delivery per server with `images=`
+  (`"assets"` TypeSafe default, `"images"` Ollama, `"inline"` OpenJev).
 - `features=(...)` narrows what an adapter installs (`Mistral(features=(TextEmbedding,))`): chat
   from one provider, embeddings from another. Without it a later adapter's states replace the
   earlier one's of the same type.
 - Configs are `State`s (`cfg.updating(max_output_tokens=3)`); unset options are `Missing`.
   `model` is required except for `OpenAIEmbeddingConfig`, `OpenAIRealtimeConfig`,
-  `OpenAIImageGenerationConfig`, `OpenAIModerationConfig` and `MistralModerationConfig`, which
+  `OpenAIImageGenerationConfig`, `OpenAIModerationConfig`, `MistralModerationConfig` and the
+  decision configs (`GeminiDecisionConfig`, `OllamaDecisionConfig`, `SystemOneConfig`), which
   default it (`OpenAIRealtimeConfig` still requires `input_parameters`/`output_parameters`).
   `CohereTextEmbeddingConfig.purpose` is required (`"search_query"` / `"search_document"` / ...).
 - Defaults that bite: `AnthropicConfig.max_output_tokens=16384` and thinking consumes it (a small

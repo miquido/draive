@@ -22,6 +22,9 @@
   `Directory`, `PaginationToken`, `Paths`, `ScopeKind`, `gather` and `parse_bool`.
 - Mistral reads `MISTRAL_ENDPOINT` as an alias for `MISTRAL_SERVER_URL`.
 - SurrealDB 3.x or newer is required (verified with 3.2 and 4.0).
+- `Gemini()` and `Ollama()` provide `DecisionGeneration` within their default features, pass
+  `features` explicitly to keep the model based decisions instead.
+- Gemini requires google-genai 3.6.1, Ollama requires ollama 0.6.3.
 
 ### Added
 
@@ -35,9 +38,20 @@
 - `docs/guides/Resources.md`.
 - `GenerationOutputMissing` raised by image and audio generation instead of a bare
   `ValueError`; `AWSInvalidArgument`.
+- Decision generation: `DecisionGeneration` with `decide`, `check`, `choose`, `select` and `rate`
+  answering `DecisionCheck`, `DecisionChoice`, `DecisionSelection` and `DecisionRating` questions
+  about a shared input. Options and levels are `DecisionOption`s carrying caller meta, answers
+  carry the decided option with backend specific values (i.e. calibrated probabilities) in meta.
+  Falls back to structured `GenerativeModel` completions when no decision backend is bound.
+- Gemini Decisions API support (`GeminiDecisionConfig`), Ollama decision models support
+  (`OllamaDecisionConfig`) and `draive.systemone` (`draive[systemone]`) for any System One API
+  server - TypeSafe Jev, Ollama, gateways or self-hosted OpenJev.
+- `docs/guides/BasicDecisionGeneration.md`.
 
 ### Fixed
 
+- Gemini requests with system instructions no longer fail on the Gemini Developer API, the client
+  uses its `v1beta` API version unless a version or Vertex AI is selected explicitly.
 - MCP resource URIs survive the client identifier round trip: custom schemes without an
   authority (`notes:///docs/a`) keep their `//`, and dots within client identifiers are escaped
   (`my%2Eserver`) so listed URIs route back to the client which listed them unambiguously.

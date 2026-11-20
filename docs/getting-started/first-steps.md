@@ -145,3 +145,5 @@ await GuardrailsModeration.check_input(MultimodalContent.of("some user content")
 1. Continue with [Basic Usage](../guides/BasicUsage.md).
 1. Explore [Basic RAG](../cookbooks/BasicRAG.md).
 1. Add quality checks with [Basic Evaluation](../guides/BasicEvaluation.md).
+1. Classify, route or score content with
+    [Basic Decision Generation](../guides/BasicDecisionGeneration.md).
