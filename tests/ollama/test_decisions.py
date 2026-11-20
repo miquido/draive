@@ -98,7 +98,7 @@ async def test_decide_sends_questions_and_maps_answers() -> None:
         captured,
     )
     async with ctx.scope(
-        "test", OllamaDecisionConfig(), DecisionGeneration(generating=ollama.decide)
+        "test", OllamaDecisionConfig(model="tev1"), DecisionGeneration(generating=ollama.decide)
     ):
         answers = await DecisionGeneration.decide(
             input="I was charged twice",
@@ -195,7 +195,7 @@ async def test_decide_rejects_input_unsupported_by_ollama(
     questions: Sequence[DecisionQuestion],
 ) -> None:
     captured: dict[str, Any] = {}
-    async with ctx.scope("test", OllamaDecisionConfig()):
+    async with ctx.scope("test", OllamaDecisionConfig(model="tev1")):
         with pytest.raises(ModelInputInvalid):
             await _ollama({}, captured).decide(input=input, questions=questions)
 
@@ -227,7 +227,7 @@ async def test_decide_translates_failures(
     failure: dict[str, Any] | Exception,
     expected: type[Exception],
 ) -> None:
-    async with ctx.scope("test", OllamaDecisionConfig()):
+    async with ctx.scope("test", OllamaDecisionConfig(model="tev1")):
         with pytest.raises(expected):
             await _ollama(failure).decide(
                 input="any",

@@ -133,8 +133,8 @@ answer = await DecisionGeneration.choose(input=ticket, criteria="Which team?", o
 - The model fallback answers questions concurrently: several failing together raise an
   `ExceptionGroup` of the underlying failures (`GenerationOutputMissing` for invalid answers, model
   errors such as `ModelRateLimit`), a single one raises directly.
-- Bind a backend like any provider: `Gemini()` (`GeminiDecisionConfig`, on by default), `Ollama()`
-  (`OllamaDecisionConfig`, needs a pulled decision model such as `tev1`, text only) or
+- Bind a backend like any provider: `Gemini()` (`GeminiDecisionConfig`, model set explicitly, on by default), `Ollama()`
+  (`OllamaDecisionConfig`, model set explicitly, needs a pulled decision model such as `tev1`, text only) or
   `SystemOne(server_url=..., images=...)` for TypeSafe Jev, Ollama with images, gateways.
   `Gemini(features=...)` / `Ollama(features=...)` without `DecisionGeneration` keeps the model
   fallback. Guide: `docs/guides/BasicDecisionGeneration.md`.

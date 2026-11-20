@@ -132,7 +132,7 @@ async def test_decide_builds_request_and_maps_answers() -> None:
 
     async with ctx.scope(
         "test",
-        GeminiDecisionConfig(),
+        GeminiDecisionConfig(model="gemini-decision-1"),
         DecisionGeneration(generating=decisions.decide),
     ):
         answers = await DecisionGeneration.decide(
@@ -224,14 +224,14 @@ async def test_decide_rejects_input_unsupported_by_the_api(
     input: Any,  # noqa: A002
     questions: Sequence[DecisionQuestion],
 ) -> None:
-    async with ctx.scope("test", GeminiDecisionConfig()):
+    async with ctx.scope("test", GeminiDecisionConfig(model="gemini-decision-1")):
         with pytest.raises(ModelInputInvalid):
             await _decisions({}).decide(input=input, questions=questions)
 
 
 @pytest.mark.asyncio
 async def test_decide_rejects_vertexai() -> None:
-    async with ctx.scope("test", GeminiDecisionConfig()):
+    async with ctx.scope("test", GeminiDecisionConfig(model="gemini-decision-1")):
         with pytest.raises(ModelInputInvalid):
             await _decisions({}, vertexai=True).decide(
                 input="any",
@@ -276,7 +276,7 @@ async def test_decide_translates_failures(
     response: Mapping[str, Any] | Exception,
     expected: type[Exception],
 ) -> None:
-    async with ctx.scope("test", GeminiDecisionConfig()):
+    async with ctx.scope("test", GeminiDecisionConfig(model="gemini-decision-1")):
         with pytest.raises(expected) as error:
             await _decisions(response).decide(
                 input="any",
@@ -294,7 +294,7 @@ async def test_decide_translates_failures(
 )
 async def test_decide_request_is_accepted_by_the_sdk_request_model(mime_type: str) -> None:
     captured: dict[str, Any] = {}
-    async with ctx.scope("test", GeminiDecisionConfig()):
+    async with ctx.scope("test", GeminiDecisionConfig(model="gemini-decision-1")):
         await _decisions(
             {
                 "answers": {
@@ -342,7 +342,7 @@ async def test_decide_resolves_selection_as_noul_question_per_option() -> None:
         criteria="Which topics does the ticket mention?",
         options=(_BILLING, _SHIPPING, DecisionOption(identifier="refund")),
     )
-    async with ctx.scope("test", GeminiDecisionConfig()):
+    async with ctx.scope("test", GeminiDecisionConfig(model="gemini-decision-1")):
         answers = await _decisions(
             {
                 "answers": {
@@ -395,7 +395,7 @@ async def test_decide_resolves_selection_as_noul_question_per_option() -> None:
 
 @pytest.mark.asyncio
 async def test_decide_counts_selection_options_against_question_limit() -> None:
-    async with ctx.scope("test", GeminiDecisionConfig()):
+    async with ctx.scope("test", GeminiDecisionConfig(model="gemini-decision-1")):
         with pytest.raises(ModelInputInvalid):
             await _decisions({}).decide(
                 input="any",

@@ -64,4 +64,4 @@ class GeminiDecisionConfig(Configuration):
         Decision model served by the Gemini Decisions API.
     """
 
-    model: str = "gemini-decision-1"
+    model: str

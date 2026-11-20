@@ -31,7 +31,7 @@ class OllamaDecisionConfig(Configuration):
         Decision model served by Ollama, it has to be pulled to the server.
     """
 
-    model: str = "tev1"
+    model: str
 
 
 class OllamaEmbeddingConfig(Configuration):
