@@ -32,7 +32,7 @@ Top-level code lives under `src/draive/`, with key packages:
 - Provider adapters (feature-specific modules per provider):
   - `draive/openai/`, `draive/anthropic/`, `draive/mistral/`, `draive/gemini/`, `draive/vllm/`, `draive/ollama/`, `draive/systemone/`, `draive/bedrock/`, `draive/cohere/`
 - Integrations (opt-in extras):
-  - `draive/httpx/`, `draive/aws/`, `draive/qdrant/`, `draive/surreal/`, `draive/mcp/`, `draive/postgres/`, `draive/opentelemetry/`, `draive/rabbitmq/`, `draive/starlette/`, `draive/fastapi/`
+  - `draive/httpx/`, `draive/aws/`, `draive/qdrant/`, `draive/surreal/`, `draive/mcp/`, `draive/claude/` (Claude Code agent, no extra), `draive/postgres/`, `draive/opentelemetry/`, `draive/rabbitmq/`, `draive/starlette/`, `draive/fastapi/`
 
 Public exports are centralized in `src/draive/__init__.py`.
 

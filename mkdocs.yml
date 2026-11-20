@@ -105,6 +105,7 @@ nav:
       - Basic Tools Use: guides/BasicToolsUse.md
       - Agents: guides/Agents.md
       - Skills: guides/Skills.md
+      - Claude Code Agents: guides/ClaudeCode.md
       - Basic Conversation: guides/BasicConversation.md
       - Basic Model Generation: guides/BasicModelGeneration.md
       - Basic Decision Generation: guides/BasicDecisionGeneration.md

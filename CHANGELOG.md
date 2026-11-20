@@ -1,10 +1,80 @@
 # Changelog
 
+## 0.121.0
+
+### Changed
+
+- Requires haiway 0.64.0.
+- `Gemini()` and `Ollama()` provide `DecisionModel` within their default features.
+- Gemini requires google-genai 3.6.1, Ollama requires ollama 0.6.3.
+- Public re-exports from haiway now include `StateResponse` of `draive.starlette` and
+  `draive.fastapi` (haiway 0.64.0), which answers with a `State` or a sequence of them as the JSON
+  body.
+
+### Added
+
+- `draive.claude` - a Claude Code agent (`claude_code_agent`) running the `claude` executable as a
+  fully managed process, no extra needed (see `docs/guides/ClaudeCode.md`):
+    - Authenticates only with the given credential, `ClaudeCodeApiKey` or `ClaudeCodeOAuthToken`
+      (`ClaudeCode`), handed over through a file descriptor and kept out of arguments, environment
+      and reprs. The user login is out of reach of the isolated process and runs reporting another
+      authentication are stopped.
+    - `ClaudeCodeConfig` configures the model and effort, permission mode, tools and rules, limits
+      (turns, cost, deadline), MCP servers, subagents, plugins, settings, directories, environment
+      and compaction. It refuses what can not work when created, `compaction` and credentials are
+      sum types. Runs are isolated and read-only by default, the file tools are confined to the
+      working and additional directories, `setting_sources` opts into the project `CLAUDE.md`.
+    - Streams text and tool use as `ProcessingEvent`s, supports images, failures are the variants
+      of `ClaudeCodeFailed` (`ClaudeCodeErrored`, `ClaudeCodeTimedOut`, `ClaudeCodeEnded`,
+      `ClaudeCodeOutputTooLarge`) and `ClaudeCodeUnavailable`, MCP servers which fail to connect are
+      reported.
+    - The `memory` of the agent is either `AgentMemory` of draive or `ClaudeCodeSessions` kept by
+      Claude Code in a state directory, resumed also after an interrupted run. Sessions are found
+      by the stable identity of the agent.
+    - Exports Claude Code telemetry to the collector of draive with the trace of the calling agent
+      continued (`ClaudeCodeTelemetry`), and records usage and cost in draive telemetry.
+    - A run is stopped with its closed stream, cancellation or deadline - terminated gracefully,
+      killed after `stop_grace` - and on Linux what it started with its environment marker is
+      stopped too, also a command detached from the process group. POSIX platforms only.
+- `Step.route(criteria, *steps, input=)` lets `DecisionModel` pick the step to execute from the
+  context (or a custom `StepDecisionInputPreparing`), steps are offered by the `name` and
+  `description` of their meta.
+- `Step.meta` and `Step.with_meta(...)`, wrapping modifiers (`with_retry`, `with_timeout`,
+  `with_fallback`, ...) keep the meta of the step.
+- Decision generation: `DecisionGeneration` with `decide`, `check`, `choose`, `select` and `rate`
+  answering `DecisionCheck`, `DecisionChoice`, `DecisionSelection` and `DecisionRating` questions
+  about a shared input. Options and levels are `DecisionOption`s carrying caller meta, answers
+  carry the decided option with backend specific values (i.e. calibrated probabilities) in meta.
+  A decision backend has to be bound; `generate_completion_decisions` is the optional
+  implementation answering with structured `GenerativeModel` completions (slow and costly, never
+  used implicitly). See `docs/guides/BasicDecisionGeneration.md`.
+- `DecisionModel` (`draive.models`) - thin decision layer next to `GenerativeModel` holding the
+  decision question and answer types and the backend, `DecisionGeneration` is the high level
+  facade over it. Providers install `DecisionModel`.
+- Gemini Decisions API support (`GeminiDecisionConfig`), Ollama decision models support
+  (`OllamaDecisionConfig`) and `draive.systemone` (`draive[systemone]`) for any System One API
+  server - TypeSafe Jev, Ollama, gateways or self-hosted OpenJev.
+- Decision telemetry: `record_decision_invocation` (attributes `decision.provider`,
+  `decision.model`, `decision.questions`, `decision.question_types`) and `record_decision_metrics`
+  (counters `decision.questions`, `decision.requests`), recorded by the Gemini, Ollama, System One
+  and completion based decision backends.
+- `State` types take a `description` class keyword (haiway 0.63.0), e.g.
+  `class Answer(State, description="Final answer")`. It is written into the type's JSON schema, so
+  structured output, tool arguments and MCP specifications carry it, and it survives `python -OO`.
+
+### Fixed
+
+- Merging many text chunks into `MultimodalContent` is linear instead of quadratic, joining a run of
+  texts once. Together with a text fast path of `model_output_blocks` aggregating long output
+  streams is up to ~35x faster (32k chunks: 131 ms to 3.7 ms).
+- Gemini requests with system instructions no longer fail on the Gemini Developer API, the client
+  uses its `v1beta` API version unless a version or Vertex AI is selected explicitly.
+
 ## 0.120.0
 
 ### Changed
 
-- Requires Python 3.15 and haiway 0.63.0.
+- Requires Python 3.15 and haiway 0.62.1.
 - `draive.utils.gather_all` is removed in favor of haiway `gather` (exported from `draive`).
   Several coroutines failing together now raise an `ExceptionGroup` instead of the first failure.
 - `draive.fastapi` no longer exports `ExceptionHandling` (removed in haiway 0.62.1), pass the
@@ -22,21 +92,12 @@
   `Directory`, `PaginationToken`, `Paths`, `ScopeKind`, `gather` and `parse_bool`.
 - Mistral reads `MISTRAL_ENDPOINT` as an alias for `MISTRAL_SERVER_URL`.
 - SurrealDB 3.x or newer is required (verified with 3.2 and 4.0).
-- `Gemini()` and `Ollama()` provide `DecisionModel` within their default features.
-- Gemini requires google-genai 3.6.1, Ollama requires ollama 0.6.3.
 
 ### Added
 
-- `State` types take a `description` class keyword (haiway 0.63.0), e.g.
-  `class Answer(State, description="Final answer")`. It is written into the type's JSON schema, so
-  structured output, tool arguments and MCP specifications carry it, and it survives `python -OO`.
 - `ToolArgumentsException` is exported from `draive` and `draive.tools`.
 - `skills/draive` - an Agent Skill for coding agents writing Draive code.
-- Telemetry: decision invocations (`record_decision_invocation`, attributes `decision.provider`,
-  `decision.model`, `decision.questions`, `decision.question_types`) and counters
-  (`record_decision_metrics`: `decision.questions`, `decision.requests`) recorded by the Gemini,
-  Ollama, System One and completion based decision backends, provider failure/rate-limit metrics,
-  embedding token usage, tool invocations,
+- Telemetry: provider failure/rate-limit metrics, embedding token usage, tool invocations,
   guardrail verdicts, evaluator suite case errors and durations, Qdrant and SurrealDB
   operation metrics, per-root AWS CloudWatch traces.
 - `ConversationException`; iteration limits raising typed exceptions: `max_iterations` for
@@ -44,33 +105,9 @@
 - `docs/guides/Resources.md`.
 - `GenerationOutputMissing` raised by image and audio generation instead of a bare
   `ValueError`; `AWSInvalidArgument`.
-- `Step.route(criteria, *steps, input=)` lets `DecisionModel` pick the step to execute from the
-  context (or a custom `StepDecisionInputPreparing`), steps are offered by the `name` and
-  `description` of their meta.
-- `Step.meta` and `Step.with_meta(...)`, wrapping modifiers (`with_retry`, `with_timeout`,
-  `with_fallback`, ...) keep the meta of the step.
-- `DecisionModel` (`draive.models`) - thin decision layer next to `GenerativeModel` holding the
-  decision question and answer types and the backend, `DecisionGeneration` is the high level
-  facade over it. Providers install `DecisionModel`.
-- Decision generation: `DecisionGeneration` with `decide`, `check`, `choose`, `select` and `rate`
-  answering `DecisionCheck`, `DecisionChoice`, `DecisionSelection` and `DecisionRating` questions
-  about a shared input. Options and levels are `DecisionOption`s carrying caller meta, answers
-  carry the decided option with backend specific values (i.e. calibrated probabilities) in meta.
-  A decision backend has to be bound; `generate_completion_decisions` is the optional
-  implementation answering with structured `GenerativeModel` completions (slow and costly,
-  never used implicitly).
-- Gemini Decisions API support (`GeminiDecisionConfig`), Ollama decision models support
-  (`OllamaDecisionConfig`) and `draive.systemone` (`draive[systemone]`) for any System One API
-  server - TypeSafe Jev, Ollama, gateways or self-hosted OpenJev.
-- `docs/guides/BasicDecisionGeneration.md`.
 
 ### Fixed
 
-- Merging many text chunks into `MultimodalContent` is linear instead of quadratic, joining a run of
-  texts once. Together with a text fast path of `model_output_blocks` aggregating long output
-  streams is up to ~35x faster (32k chunks: 131 ms to 3.7 ms).
-- Gemini requests with system instructions no longer fail on the Gemini Developer API, the client
-  uses its `v1beta` API version unless a version or Vertex AI is selected explicitly.
 - MCP resource URIs survive the client identifier round trip: custom schemes without an
   authority (`notes:///docs/a`) keep their `//`, and dots within client identifiers are escaped
   (`my%2Eserver`) so listed URIs route back to the client which listed them unambiguously.

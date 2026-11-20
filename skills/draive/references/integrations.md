@@ -139,7 +139,11 @@ app = application(context, routers=(router,), exception_handler=handle_500)
 - Stream with `StreamResponse(generator, media_type="text/event-stream")`; it keeps the request
   scope open until the last chunk.
 - A `State` is not a pydantic type: FastAPI refuses it as a return annotation or body parameter.
-  Return `state.to_mapping()` and read input with `State.from_mapping(...)`/`from_json(...)`.
+  Answer with `StateResponse(state)` (or a sequence of states, written as a JSON array by
+  `State.to_json`) - in FastAPI annotate the endpoint `-> StateResponse`, as returning a `Response`
+  skips its serialization. Its body carries the actual values, `Sensitive` attributes included, so
+  answer with a State holding only what the caller may see. Read input with
+  `State.from_mapping(...)`/`from_json(...)`.
 
 ## OpenTelemetry - `draive.opentelemetry`
 

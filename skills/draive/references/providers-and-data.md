@@ -1,4 +1,4 @@
-# Providers, MCP, embeddings, datastores, AWS, evaluation
+# Providers, Claude Code, MCP, embeddings, datastores, AWS, evaluation
 
 Install what you use: `pip install draive[<extra>]`; importing `draive.<pkg>` without its extra
 raises an `ImportError` naming it. Extras: `openai` (+`openai_realtime`), `anthropic`
@@ -63,6 +63,57 @@ schema (debug log "OpenAI strict output is unavailable"). So: a field that may b
 recursive models and `Mapping[str, Any]`/`Meta` fields in outputs. Tool parameters are strict only
 with `strict_parameters` set to true in the tool's `meta`; a free-form mapping argument leaves
 that schema unenforced.
+
+## Claude Code agent - `draive.claude`
+
+Needs no extra, only the `claude` executable. It runs Claude Code as a fully managed process and
+exposes it as an `Agent`.
+
+```python
+from draive.claude import (
+    ClaudeCode, ClaudeCodeApiKey, ClaudeCodeConfig, ClaudeCodeSessions, ClaudeCodeTelemetry, claude_code_agent,
+)
+
+async with ctx.scope(
+    "app",
+    ClaudeCodeConfig(model="sonnet", tools=("Read", "Grep", "Edit"), max_turns=20, directory="/project",
+                     telemetry=ClaudeCodeTelemetry.from_env(signals={"metrics", "logs", "traces"})),
+    disposables=(ClaudeCode(credential=ClaudeCodeApiKey("sk-ant-api...")),),   # or ClaudeCodeOAuthToken, env
+):
+    coder = claude_code_agent("coder", instructions="Fix bugs.", memory=AgentMemory.volatile())
+    async for chunk in coder.call(input="Fix the failing test"): ...   # text + ProcessingEvents
+```
+
+- Invalid states do not exist: `ClaudeCodeConfig` refuses non-positive limits, relative directories and
+  reserved environment variables when created (`ValidationError`); a credential is one of
+  `ClaudeCodeApiKey`/`ClaudeCodeOAuthToken` (1-4096 bytes); `compaction` is `ClaudeCodeAutoCompaction(percent=,
+  window=)` or `ClaudeCodeNoCompaction()`; telemetry `signals` are a non-empty set.
+- Authentication is only the given credential (handed over through a file descriptor, kept out of
+  arguments, environment and reprs). Nothing of the user's login is reachable: private home, an
+  environment built from scratch, and the run is stopped if Claude Code reports another
+  authentication source. No credential means entering the scope fails.
+- File tools (`Read`, `Grep`, `Glob`, `Edit`, `Write`) are confined to the working and additional
+  directories by default (no symlink or `..` escape), `Bash` is not confined - disposable environments only.
+- Isolated and deny-by-default: no user/project settings (nor the working directory `CLAUDE.md`,
+  `setting_sources=("project",)` opts in), no plugins/skills/auto memory, no MCP
+  except `mcp_servers`, tools `Read`, `Grep`, `Glob`, `permission_mode="dontAsk"`. `Bash` and
+  `bypassPermissions` only in a disposable environment.
+- Output: text parts + `ProcessingEvent`s (`claude_code.tool_use`, `.tool_result`, `.subagent_text`,
+  `.result`). Failures are variants of `ClaudeCodeFailed`: `ClaudeCodeErrored` (`failure.reason`,
+  `api_error_status`, `terminal_reason`), `ClaudeCodeTimedOut`, `ClaudeCodeEnded` (`exit_code`,
+  redacted `stderr`), `ClaudeCodeOutputTooLarge`; a missing binary/credential is `ClaudeCodeUnavailable`. Limits: `max_turns`,
+  `max_budget_usd`, `timeout` (terminated gracefully so Claude Code stops its own commands, killed
+  after `stop_grace`; on Linux detached commands which keep the run marker of their environment are
+  stopped too, elsewhere they can outlive the run), `stop_grace`.
+- `memory=` is one choice: `AgentMemory` (history replayed into a fresh session, any backend) or
+  `ClaudeCodeSessions(state_directory=)` (Claude Code resumes the session of each thread, full
+  context, also of an interrupted run) - they can not be combined. Default is stateless. Context
+  injection and usage reading are not possible with Claude Code.
+- Telemetry: `ClaudeCodeTelemetry` exports Claude Code's OTLP metrics/events (traces are beta) and
+  continues the trace of the calling agent (`TRACEPARENT`); draive also records `model.*` usage
+  (provider `claude_code`) and `agent.claude_code.cost`.
+- Fake it with `ClaudeCodeRunner(binary="/fake", running=fn)` where `fn(launch)` yields
+  `ClaudeCodeText`/`ClaudeCodeToolUse`/... and a final `ClaudeCodeResult(outcome=ClaudeCodeSuccess(text=))`.
 
 ## MCP - `draive.mcp`
 
@@ -283,7 +334,7 @@ app = application(context, routers=(router,), exception_handler=handle_500)
 - `application(context, /, *, routers=, middleware=, exception_handler=, **extra)` takes the
   unhandled-error handler as `exception_handler` (`(Request, Exception)` callable returning a
   `Response`; there is no `ExceptionHandling` type). The Starlette variant takes `routes=`. Also
-  exported: `StreamResponse`, `ContextMiddleware`, `request_trace_context`,
+  exported: `StreamResponse`, `StateResponse`, `ContextMiddleware`, `request_trace_context`,
   `ObservabilityPreparing`.
 - Adapters in the context's `disposables` are entered once at startup, inherited by every request.
   `HTTPXClient(base_url=, headers=, timeout=5)` from `draive.httpx`;
