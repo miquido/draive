@@ -174,8 +174,8 @@ behind each decision instead. Thresholds therefore need a calibrated backend.
 ## 3. Bind Gemini Decisions
 
 `Gemini` prepares `DecisionGeneration` by default, alongside its other features. Pass `features`
-without it to keep the model based decisions instead. `GeminiDecisionConfig` selects the model, it has to be
-set explicitly.
+without it to keep the model based decisions instead. `GeminiDecisionConfig` selects the model, it
+has to be set explicitly.
 
 ```python
 from draive import DecisionGeneration, ctx
@@ -201,7 +201,8 @@ and PDF documents.
 
 `Ollama()` provides `DecisionGeneration` out of the box, answered by a System One decision model
 served by Ollama (0.35 or newer). Decision models are separate from chat models and have to be
-pulled first, i.e. `ollama pull tev1`. `OllamaDecisionConfig` selects the model, it has to be set explicitly.
+pulled first, i.e. `ollama pull tev1`. `OllamaDecisionConfig` selects the model, it has to be set
+explicitly.
 
 ```python
 from draive import DecisionGeneration, ctx
