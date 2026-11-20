@@ -6,10 +6,11 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
-from haiway import ctx
+from haiway import ValidationError, ctx
 from haiway.context.types import ContextStateMissing
 
 from draive import (
+    Agent,
     AgentMemory,
     ModelInput,
     ModelOutput,
@@ -21,15 +22,22 @@ from draive import (
 )
 from draive.claude import (
     ClaudeCode,
+    ClaudeCodeApiKey,
     ClaudeCodeConfig,
+    ClaudeCodeEnded,
+    ClaudeCodeErrored,
     ClaudeCodeFailed,
+    ClaudeCodeOAuthToken,
     ClaudeCodeResult,
     ClaudeCodeRunner,
+    ClaudeCodeSessions,
+    ClaudeCodeStarted,
+    ClaudeCodeSuccess,
     ClaudeCodeTelemetry,
     ClaudeCodeUnavailable,
     claude_code_agent,
 )
-from draive.claude.workspace import session_exists, session_identifier
+from draive.claude.sessions import session_exists, session_identifier
 from draive.multimodal import ArtifactContent, MultimodalContent
 from draive.utils import ProcessingEvent
 from tests._claude_cli import alive, write_fake_claude
@@ -38,7 +46,14 @@ SECRET = "sk-ant-api03-secret-credential"
 
 
 class _Setup:
-    def __init__(self, root: Path, **config: Any) -> None:
+    def __init__(
+        self,
+        root: Path,
+        *,
+        sessions: ClaudeCodeSessions | None = None,
+        **config: Any,
+    ) -> None:
+        self.sessions = sessions
         self.binary = write_fake_claude(root)
         self.record = root / "record.json"
         scenario = config.pop("scenario", "echo")
@@ -60,8 +75,17 @@ class _Setup:
             "test",
             self.config,
             *state,
-            disposables=(ClaudeCode(binary=self.binary, api_key=SECRET),),
+            disposables=(
+                ClaudeCode(binary=self.binary, credential=ClaudeCodeApiKey(value=SECRET)),
+            ),
         )
+
+    def agent(self, name: str, **arguments: Any) -> Agent:
+        """An agent of these sessions when there are any."""
+        if self.sessions is not None:
+            arguments["memory"] = self.sessions
+
+        return claude_code_agent(name, **arguments)
 
     def recorded(self) -> Any:
         return json.loads(self.record.read_text())
@@ -161,7 +185,7 @@ async def test_failed_runs_raise_with_the_reason_reported_by_the_run(tmp_path: P
     setup = _Setup(tmp_path, scenario="error401")
 
     async with setup.scope():
-        with pytest.raises(ClaudeCodeFailed, match="Invalid API key") as raised:
+        with pytest.raises(ClaudeCodeErrored, match="Invalid API key") as raised:
             await _call(claude_code_agent("coder"))
 
     assert raised.value.api_error_status == 401
@@ -244,8 +268,8 @@ async def test_remembered_turns_are_available_to_any_memory(tmp_path: Path) -> N
 @pytest.mark.asyncio
 async def test_resumable_sessions_continue_the_session_of_the_thread(tmp_path: Path) -> None:
     state = tmp_path / "state"
-    setup = _Setup(tmp_path, persistence="resumable", state_directory=str(state))
-    agent = claude_code_agent("coder")
+    setup = _Setup(tmp_path, sessions=ClaudeCodeSessions(state_directory=str(state)))
+    agent = setup.agent("coder")
     thread = uuid4()
 
     async with setup.scope():
@@ -278,25 +302,14 @@ async def test_resumable_sessions_continue_the_session_of_the_thread(tmp_path: P
 
 
 @pytest.mark.asyncio
-async def test_resumable_sessions_are_not_combined_with_memory(tmp_path: Path) -> None:
-    setup = _Setup(tmp_path, persistence="resumable", state_directory=str(tmp_path / "state"))
-    agent = claude_code_agent("coder", memory=AgentMemory.volatile())
-
-    async with setup.scope():
-        with pytest.raises(ValueError, match="either"):
-            await _call(agent)
-
-
-@pytest.mark.asyncio
 async def test_a_failed_run_keeps_its_session_for_the_next_one(tmp_path: Path) -> None:
     state = tmp_path / "state"
     setup = _Setup(
         tmp_path,
         scenario="error401",
-        persistence="resumable",
-        state_directory=str(state),
+        sessions=ClaudeCodeSessions(state_directory=str(state)),
     )
-    agent = claude_code_agent("coder")
+    agent = setup.agent("coder")
     thread = uuid4()
 
     async with setup.scope():
@@ -348,15 +361,24 @@ async def test_a_missing_configured_directory_is_refused(tmp_path: Path) -> None
             await _call(claude_code_agent("coder"))
 
 
+def test_invalid_configuration_can_not_reach_a_run() -> None:
+    # nothing to refuse when a run starts, the configuration could not be created
+    with pytest.raises(ValidationError):
+        ClaudeCodeConfig(env={"ANTHROPIC_API_KEY": "sneaky"})
+
+
 @pytest.mark.asyncio
-async def test_invalid_configuration_is_refused_before_anything_runs(tmp_path: Path) -> None:
-    setup = _Setup(tmp_path, env={"ANTHROPIC_API_KEY": "sneaky"})
+async def test_a_runner_which_ends_without_a_result_fails_the_run() -> None:
+    async def running(launch: Any) -> Any:
+        yield ClaudeCodeStarted(session_id="s")
 
-    async with setup.scope():
-        with pytest.raises(ValueError, match="reserved"):
+    async with ctx.scope(
+        "test",
+        ClaudeCodeConfig(),
+        ClaudeCodeRunner(binary="/fake", running=running),
+    ):
+        with pytest.raises(ClaudeCodeEnded):
             await _call(claude_code_agent("coder"))
-
-    assert not setup.record.exists()
 
 
 @pytest.mark.asyncio
@@ -371,7 +393,7 @@ async def test_telemetry_continues_the_trace_of_the_agent(
     )
     setup = _Setup(
         tmp_path,
-        telemetry=ClaudeCodeTelemetry(endpoint="http://collector:4317", traces=True),
+        telemetry=ClaudeCodeTelemetry(endpoint="http://collector:4317", signals={"traces"}),
     )
     agent = claude_code_agent("coder")
     thread = uuid4()
@@ -548,7 +570,7 @@ async def test_without_a_configuration_the_defaults_apply(tmp_path: Path) -> Non
     async with ctx.scope(
         "test",
         ClaudeCodeConfig(env=setup.config.env),
-        disposables=(ClaudeCode(binary=binary, api_key=SECRET),),
+        disposables=(ClaudeCode(binary=binary, credential=ClaudeCodeApiKey(value=SECRET)),),
     ):
         await _call(claude_code_agent("coder"))
 
@@ -580,13 +602,21 @@ async def test_binary_is_resolved_and_verified(
     monkeypatch.setenv("CLAUDE_CODE_BINARY", binary)
     monkeypatch.setenv("PATH", str(tmp_path / "nothing"))
 
-    async with ctx.scope("test", disposables=(ClaudeCode(api_key=SECRET),)):
+    async with ctx.scope(
+        "test",
+        disposables=(ClaudeCode(credential=ClaudeCodeApiKey(value=SECRET)),),
+    ):
         pass  # resolved from the environment
 
     with pytest.raises(ClaudeCodeUnavailable, match="not found"):
         async with ctx.scope(
             "test",
-            disposables=(ClaudeCode(binary=str(tmp_path / "missing"), api_key=SECRET),),
+            disposables=(
+                ClaudeCode(
+                    binary=str(tmp_path / "missing"),
+                    credential=ClaudeCodeApiKey(value=SECRET),
+                ),
+            ),
         ):
             pass
 
@@ -595,13 +625,18 @@ async def test_binary_is_resolved_and_verified(
     with pytest.raises(ClaudeCodeUnavailable, match="not found"):
         async with ctx.scope(
             "test",
-            disposables=(ClaudeCode(binary=str(not_executable), api_key=SECRET),),
+            disposables=(
+                ClaudeCode(
+                    binary=str(not_executable),
+                    credential=ClaudeCodeApiKey(value=SECRET),
+                ),
+            ),
         ):
             pass
 
 
 @pytest.mark.asyncio
-async def test_credentials_are_required_and_exclusive(
+async def test_credentials_are_required(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -612,9 +647,6 @@ async def test_credentials_are_required_and_exclusive(
     with pytest.raises(ClaudeCodeUnavailable, match="credentials"):
         async with ctx.scope("test", disposables=(ClaudeCode(binary=binary),)):
             pass
-
-    with pytest.raises(ValueError, match="not both"):
-        ClaudeCode(binary=binary, api_key="a", oauth_token="b")
 
 
 @pytest.mark.asyncio
@@ -646,7 +678,11 @@ async def test_gateway_endpoint_is_passed_to_the_run(tmp_path: Path) -> None:
         "test",
         setup.config,
         disposables=(
-            ClaudeCode(binary=setup.binary, api_key=SECRET, base_url="https://gateway.example"),
+            ClaudeCode(
+                binary=setup.binary,
+                credential=ClaudeCodeApiKey(value=SECRET),
+                base_url="https://gateway.example",
+            ),
         ),
     ):
         await _call(claude_code_agent("coder"))
@@ -655,7 +691,7 @@ async def test_gateway_endpoint_is_passed_to_the_run(tmp_path: Path) -> None:
 
 
 def test_the_client_never_shows_its_credentials() -> None:
-    client = ClaudeCode(api_key=SECRET)
+    client = ClaudeCode(credential=ClaudeCodeApiKey(value=SECRET))
 
     assert SECRET not in repr(client)
     assert SECRET not in str(client)
@@ -708,7 +744,12 @@ async def test_oauth_tokens_are_verified_by_their_own_source(tmp_path: Path) -> 
     async with ctx.scope(
         "test",
         setup.config,
-        disposables=(ClaudeCode(binary=setup.binary, oauth_token="sk-ant-oat01-token"),),
+        disposables=(
+            ClaudeCode(
+                binary=setup.binary,
+                credential=ClaudeCodeOAuthToken(value="sk-ant-oat01-token"),
+            ),
+        ),
     ):
         assert _texts(await _call(claude_code_agent("coder"))) == ["echo: hello"]
 
@@ -718,27 +759,38 @@ async def test_oauth_tokens_are_verified_by_their_own_source(tmp_path: Path) -> 
     async with ctx.scope(
         "test",
         setup.config,
-        disposables=(ClaudeCode(binary=setup.binary, oauth_token="sk-ant-oat01-token"),),
+        disposables=(
+            ClaudeCode(
+                binary=setup.binary,
+                credential=ClaudeCodeOAuthToken(value="sk-ant-oat01-token"),
+            ),
+        ),
     ):
         with pytest.raises(ClaudeCodeUnavailable, match="instead of the provided OAuth token"):
             await _call(claude_code_agent("coder"))
 
 
 @pytest.mark.parametrize(
-    ("arguments", "message"),
+    ("credential", "message"),
     [
-        ({"api_key": "sk-ant-oat01-token"}, "OAuth token"),
-        ({"oauth_token": "sk-ant-api03-key"}, "API key"),
+        (ClaudeCodeApiKey(value="sk-ant-oat01-token"), "OAuth token"),
+        (ClaudeCodeOAuthToken(value="sk-ant-api03-key"), "API key"),
     ],
 )
-def test_credentials_of_the_wrong_kind_are_refused(arguments: dict[str, str], message: str) -> None:
+def test_credentials_of_the_wrong_kind_are_refused(credential: Any, message: str) -> None:
     with pytest.raises(ValueError, match=message):
-        ClaudeCode(**arguments)
+        ClaudeCode(credential=credential)
 
 
 def test_gateways_may_use_any_credential() -> None:
-    ClaudeCode(api_key="sk-ant-oat01-token", base_url="https://gateway.example")
-    ClaudeCode(oauth_token="gateway-token", base_url="https://gateway.example")
+    ClaudeCode(
+        credential=ClaudeCodeApiKey(value="sk-ant-oat01-token"),
+        base_url="https://gateway.example",
+    )
+    ClaudeCode(
+        credential=ClaudeCodeOAuthToken(value="gateway-token"),
+        base_url="https://gateway.example",
+    )
 
 
 @pytest.mark.asyncio
@@ -759,18 +811,18 @@ async def test_sessions_of_different_agents_never_collide_and_survive_a_restart(
     tmp_path: Path,
 ) -> None:
     state = tmp_path / "state"
-    setup = _Setup(tmp_path, persistence="resumable", state_directory=str(state))
+    setup = _Setup(tmp_path, sessions=ClaudeCodeSessions(state_directory=str(state)))
     thread = uuid4()
 
     async with setup.scope():
-        await _call(claude_code_agent("one"), "hello", thread)
+        await _call(setup.agent("one"), "hello", thread)
         first = setup.recorded()["arguments"]
-        await _call(claude_code_agent("two"), "hello", thread)  # the same thread
+        await _call(setup.agent("two"), "hello", thread)  # the same thread
         second = setup.recorded()["arguments"]
         assert first[first.index("--session-id") + 1] != second[second.index("--session-id") + 1]
 
         # a new instance of the same agent continues its session, as after a restart
-        await _call(claude_code_agent("one"), "again", thread)
+        await _call(setup.agent("one"), "again", thread)
         third = setup.recorded()["arguments"]
         assert "--session-id" not in third
         assert third[third.index("--resume") + 1] == first[first.index("--session-id") + 1]
@@ -790,10 +842,9 @@ async def test_a_session_which_did_not_finish_is_resumed_not_started_again(
     setup = _Setup(
         tmp_path,
         scenario="hang",
-        persistence="resumable",
-        state_directory=str(state),
+        sessions=ClaudeCodeSessions(state_directory=str(state)),
     )
-    agent = claude_code_agent("coder")
+    agent = setup.agent("coder")
     thread = uuid4()
 
     async with setup.scope():
@@ -825,10 +876,9 @@ async def test_a_session_is_started_until_claude_code_stored_it(tmp_path: Path) 
     setup = _Setup(
         tmp_path,
         scenario="noresult",
-        persistence="resumable",
-        state_directory=str(state),
+        sessions=ClaudeCodeSessions(state_directory=str(state)),
     )
-    agent = claude_code_agent("coder")
+    agent = setup.agent("coder")
     thread = uuid4()
 
     async with setup.scope():
@@ -848,7 +898,11 @@ async def test_a_session_is_started_until_claude_code_stored_it(tmp_path: Path) 
 @pytest.mark.asyncio
 async def test_the_text_of_the_result_is_streamed_when_nothing_else_was(tmp_path: Path) -> None:
     async def running(launch: Any) -> Any:
-        yield ClaudeCodeResult(session_id="s", text="only the result says it", turns=1)
+        yield ClaudeCodeResult(
+            session_id="s",
+            outcome=ClaudeCodeSuccess(text="only the result says it"),
+            turns=1,
+        )
 
     memory = AgentMemory.volatile()
     agent = claude_code_agent("coder", memory=memory)
@@ -878,25 +932,16 @@ async def test_a_relative_state_directory_is_resolved_for_the_process(
 ) -> None:
     (tmp_path / "work").mkdir()
     monkeypatch.chdir(tmp_path / "work")
-    setup = _Setup(tmp_path, persistence="resumable", state_directory="relative-state")
+    setup = _Setup(tmp_path, sessions=ClaudeCodeSessions(state_directory="relative-state"))
 
     async with setup.scope():
-        await _call(claude_code_agent("coder"))
+        await _call(setup.agent("coder"))
 
     recorded = setup.recorded()
     expected = (tmp_path / "work" / "relative-state").resolve()
     assert recorded["directory"] == str(expected / "workspace")
     assert recorded["environment"]["HOME"] == str(expected / "home")
     assert recorded["environment"]["CLAUDE_CONFIG_DIR"] == str(expected / "claude")
-
-
-@pytest.mark.asyncio
-async def test_oversized_credentials_are_refused_when_entering_the_scope(tmp_path: Path) -> None:
-    binary = write_fake_claude(tmp_path)
-
-    with pytest.raises(ClaudeCodeUnavailable, match="larger than"):
-        async with ctx.scope("test", disposables=(ClaudeCode(binary=binary, api_key="k" * 5000),)):
-            pass
 
 
 @pytest.mark.asyncio

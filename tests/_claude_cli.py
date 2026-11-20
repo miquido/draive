@@ -8,9 +8,21 @@ from collections.abc import Mapping
 from pathlib import Path
 from uuid import uuid4
 
-from draive.claude import ClaudeCodeConfig, ClaudeCodeLaunch
-from draive.claude.launch import ClaudeCodeSession, build_launch
+from haiway import Missing
+
+from draive.claude import (
+    ClaudeCodeApiKey,
+    ClaudeCodeConfig,
+    ClaudeCodeCredential,
+    ClaudeCodeLaunch,
+    ClaudeCodeNoSession,
+    ClaudeCodeSession,
+)
+from draive.claude.launch import build_launch
 from draive.claude.process import marked_processes
+from draive.claude.workspace import ClaudeCodeWorkspace
+
+SECRET = "sk-ant-api03-secret-credential"
 
 # a fake `claude` executable speaking the stream-json protocol, the scenario is selected by
 # FAKE_CLAUDE_SCENARIO and whatever it received is written to FAKE_CLAUDE_RECORD
@@ -216,6 +228,16 @@ elif scenario == "late_output":
     assistant({{"type": "text", "text": "done"}})
     result(result="done")
 
+elif scenario == "stderr_held":
+    child = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(4)"],
+        start_new_session=True,
+        stdout=subprocess.DEVNULL,
+    )
+    with open(os.environ["FAKE_CLAUDE_CHILD"], "w") as file:
+        file.write(str(child.pid))
+    sys.exit(5)
+
 elif scenario == "noresult":
     sys.stderr.write("fatal: bad credentials " + (key or "") + "\\n")
     sys.exit(3)
@@ -246,10 +268,13 @@ def write_fake_claude(
     plugins: str = "[]",
 ) -> str:
     """Write the fake executable, returns its path."""
-    script: Path = directory / "claude.py"
+    # its own directory, the one given is the root of a run, which has a `claude` of its own
+    binaries: Path = directory / "bin"
+    binaries.mkdir(exist_ok=True)
+    script: Path = binaries / "claude.py"
     script.write_text(_SCRIPT.format(python="/usr/bin/env python3", plugins=plugins))
     # a shebang can not take an interpreter path containing spaces, the launcher can
-    path: Path = directory / "claude"
+    path: Path = binaries / "claude"
     command: str = f"exec {shlex.quote(sys.executable)} {shlex.quote(str(script))}"
     path.write_text(f'#!/bin/sh\n{command} "$@"\n')
     path.chmod(path.stat().st_mode | stat.S_IXUSR)
@@ -263,8 +288,8 @@ def launch_for(
     scenario: str = "echo",
     *,
     prompt: str = "hello",
-    credential: str | None = "sk-ant-api03-secret-credential",
-    session: ClaudeCodeSession = ClaudeCodeSession(),  # noqa: B008
+    credential: ClaudeCodeCredential | Missing = ClaudeCodeApiKey(value=SECRET),  # noqa: B008
+    session: ClaudeCodeSession = ClaudeCodeNoSession(),  # noqa: B008
     timeout: float = 30.0,
     grace: float = 2.0,
     env: Mapping[str, str] | None = None,
@@ -286,10 +311,7 @@ def launch_for(
         ),
         binary=binary,
         prompt=({"type": "text", "text": prompt},),
-        directory=str(directory / "work"),
-        home=str(directory),
-        config_directory=str(directory),
-        temporary_directory=str(directory),
+        workspace=ClaudeCodeWorkspace(root=str(directory), directory=str(directory / "work")),
         session=session,
         credential=credential,
     )

@@ -70,19 +70,25 @@ Needs no extra, only the `claude` executable. It runs Claude Code as a fully man
 exposes it as an `Agent`.
 
 ```python
-from draive.claude import ClaudeCode, ClaudeCodeConfig, ClaudeCodeTelemetry, claude_code_agent
+from draive.claude import (
+    ClaudeCode, ClaudeCodeApiKey, ClaudeCodeConfig, ClaudeCodeSessions, ClaudeCodeTelemetry, claude_code_agent,
+)
 
 async with ctx.scope(
     "app",
-    ClaudeCodeConfig(model="sonnet", tools=("Read", "Grep", "Edit"), max_turns=20,
-                     telemetry=ClaudeCodeTelemetry.from_env(traces=True)),
-    disposables=(ClaudeCode(api_key=...),),        # or oauth_token=, ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN
+    ClaudeCodeConfig(model="sonnet", tools=("Read", "Grep", "Edit"), max_turns=20, directory="/project",
+                     telemetry=ClaudeCodeTelemetry.from_env(signals={"metrics", "logs", "traces"})),
+    disposables=(ClaudeCode(credential=ClaudeCodeApiKey("sk-ant-api...")),),   # or ClaudeCodeOAuthToken, env
 ):
     coder = claude_code_agent("coder", instructions="Fix bugs.", memory=AgentMemory.volatile())
     async for chunk in coder.call(input="Fix the failing test"): ...   # text + ProcessingEvents
 ```
 
-- Authentication is only the given key/token (handed over through a file descriptor, kept out of
+- Invalid states do not exist: `ClaudeCodeConfig` refuses non-positive limits, relative directories and
+  reserved environment variables when created (`ValidationError`); a credential is one of
+  `ClaudeCodeApiKey`/`ClaudeCodeOAuthToken` (1-4096 bytes); `compaction` is `ClaudeCodeAutoCompaction(percent=,
+  window=)` or `ClaudeCodeNoCompaction()`; telemetry `signals` are a non-empty set.
+- Authentication is only the given credential (handed over through a file descriptor, kept out of
   arguments, environment and reprs). Nothing of the user's login is reachable: private home, an
   environment built from scratch, and the run is stopped if Claude Code reports another
   authentication source. No credential means entering the scope fails.
@@ -93,20 +99,21 @@ async with ctx.scope(
   except `mcp_servers`, tools `Read`, `Grep`, `Glob`, `permission_mode="dontAsk"`. `Bash` and
   `bypassPermissions` only in a disposable environment.
 - Output: text parts + `ProcessingEvent`s (`claude_code.tool_use`, `.tool_result`, `.subagent_text`,
-  `.result`). Failures raise `ClaudeCodeFailed` (reason, `api_error_status`, `session_id`, redacted
-  `stderr`), a missing binary/credential `ClaudeCodeUnavailable`. Limits: `max_turns`,
+  `.result`). Failures are variants of `ClaudeCodeFailed`: `ClaudeCodeErrored` (`failure.reason`,
+  `api_error_status`, `terminal_reason`), `ClaudeCodeTimedOut`, `ClaudeCodeEnded` (`exit_code`,
+  redacted `stderr`), `ClaudeCodeOutputTooLarge`; a missing binary/credential is `ClaudeCodeUnavailable`. Limits: `max_turns`,
   `max_budget_usd`, `timeout` (terminated gracefully so Claude Code stops its own commands, killed
   after `stop_grace`; on Linux detached commands which keep the run marker of their environment are
   stopped too, elsewhere they can outlive the run), `stop_grace`.
-- Memory is either `AgentMemory` (history replayed into a fresh session, any backend) or
-  `persistence="resumable"` + `state_directory` (Claude Code resumes the session of each thread,
-  full context) - not both. Default is stateless. Context injection and usage reading are not
-  possible with Claude Code; compaction is tuned by `auto_compact*`.
+- `memory=` is one choice: `AgentMemory` (history replayed into a fresh session, any backend) or
+  `ClaudeCodeSessions(state_directory=)` (Claude Code resumes the session of each thread, full
+  context, also of an interrupted run) - they can not be combined. Default is stateless. Context
+  injection and usage reading are not possible with Claude Code.
 - Telemetry: `ClaudeCodeTelemetry` exports Claude Code's OTLP metrics/events (traces are beta) and
   continues the trace of the calling agent (`TRACEPARENT`); draive also records `model.*` usage
   (provider `claude_code`) and `agent.claude_code.cost`.
 - Fake it with `ClaudeCodeRunner(binary="/fake", running=fn)` where `fn(launch)` yields
-  `ClaudeCodeText`/`ClaudeCodeToolUse`/... and a final `ClaudeCodeResult`.
+  `ClaudeCodeText`/`ClaudeCodeToolUse`/... and a final `ClaudeCodeResult(outcome=ClaudeCodeSuccess(text=))`.
 
 ## MCP - `draive.mcp`
 

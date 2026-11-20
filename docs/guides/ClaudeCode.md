@@ -17,7 +17,7 @@ async with ctx.scope(
         tools=("Read", "Grep", "Glob", "Edit"),
         directory="/path/to/project",  # the project, a temporary empty directory when not set
     ),
-    disposables=(ClaudeCode(),),  # ANTHROPIC_API_KEY, or oauth_token= / CLAUDE_CODE_OAUTH_TOKEN
+    disposables=(ClaudeCode(),),  # ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN, or credential=
 ):
     coder = claude_code_agent(
         "coder",
@@ -41,11 +41,14 @@ in any other way the run is stopped, and entering the scope without a credential
 An OAuth token of a Team or Enterprise account may bring the `cc-plugin-sec-default` plugin its
 organization enforces. No setting disables it, and it is not reported as a leak of the isolation.
 
-| Source                                                   | Meaning                                                          |
-| -------------------------------------------------------- | ---------------------------------------------------------------- |
-| `ClaudeCode(api_key=...)`, `ANTHROPIC_API_KEY`           | Anthropic API key (`sk-ant-api...`)                              |
-| `ClaudeCode(oauth_token=...)`, `CLAUDE_CODE_OAUTH_TOKEN` | OAuth token of `claude setup-token` (`sk-ant-oat...`)            |
-| `ClaudeCode(base_url=...)`                               | custom API endpoint, i.e. a gateway - it can take any credential |
+| Source                                                                        | Meaning                                                          |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `ClaudeCode(credential=ClaudeCodeApiKey(...))`, `ANTHROPIC_API_KEY`           | Anthropic API key (`sk-ant-api...`)                              |
+| `ClaudeCode(credential=ClaudeCodeOAuthToken(...))`, `CLAUDE_CODE_OAUTH_TOKEN` | OAuth token of `claude setup-token` (`sk-ant-oat...`)            |
+| `ClaudeCode(base_url=...)`                                                    | custom API endpoint, i.e. a gateway - it can take any credential |
+
+A credential is exactly one of the two kinds - there is no pair of keys to choose between - and it
+can not be empty or larger than 4096 bytes, so it fits the pipe it is handed over through.
 
 The `claude` executable is resolved from `binary=`, `CLAUDE_CODE_BINARY`, the `PATH` and
 `~/.local/bin/claude`.
@@ -60,7 +63,9 @@ certificate variables are inherited, anything else of the parent process (especi
 a Claude Code running the parent) is left out. Claude Code never asks for a permission: what is not
 allowed is denied.
 
-`ClaudeCodeConfig` is a regular configuration state:
+`ClaudeCodeConfig` is a regular configuration state. It refuses what can not work when it is created
+(`ValidationError`) - non-positive limits, relative directories, reserved environment variables - so
+a run never starts with an invalid one:
 
 | Field                                                        | Default                 |                                                                                                                             |
 | ------------------------------------------------------------ | ----------------------- | --------------------------------------------------------------------------------------------------------------------------- |
@@ -108,14 +113,19 @@ there. Run agents which have `Bash` within a container or a disposable environme
 The text of the agent is streamed as text parts. Everything else is reported as `ProcessingEvent`s:
 `claude_code.tool_use` and `claude_code.tool_result` for each tool use, `claude_code.subagent_text`
 for the subagents and `claude_code.result` at the end, with the cost, turns and duration. A failed
-run - an API failure, an exhausted limit, a timeout, a process which ended without a result - raises
-`ClaudeCodeFailed` carrying the reason, the API status, the session and a redacted tail of the error
-output. Text and images are accepted as input.
+run raises a variant of `ClaudeCodeFailed`, each carrying only what is known of its kind:
+`ClaudeCodeErrored` for an error the run reported - an API failure, an exhausted limit - with its
+`failure` (`reason`, `api_error_status`, `terminal_reason`), `ClaudeCodeTimedOut`, `ClaudeCodeEnded`
+for a process which ended without a result (`exit_code` and a redacted tail of the error output) and
+`ClaudeCodeOutputTooLarge`. All have the `session_id` when the run reported one. Text and images are
+accepted as input.
 
 ## Context and memory
 
-Claude Code manages its own context and compacts it when it grows, `auto_compact`,
-`auto_compact_percent` and `auto_compact_window` tune that. What stays between calls is up to you:
+Claude Code manages its own context and compacts it when it grows. `compaction` tunes that:
+`ClaudeCodeAutoCompaction(percent=, window=)` lowers the point of compaction,
+`ClaudeCodeNoCompaction()` turns it off. What stays between calls is the `memory` of the agent, one
+of:
 
 - **Nothing (default).** Every call is a fresh session.
 
@@ -127,18 +137,17 @@ Claude Code manages its own context and compacts it when it grows, `auto_compact
     coder = claude_code_agent("coder", memory=AgentMemory.volatile())
     ```
 
-- **Sessions managed by Claude Code.** With `persistence="resumable"` and a `state_directory` the
-    session of each thread is kept and resumed by its next call, with the whole context Claude Code
-    had - tool use, compaction and prompt caching included. The directories are stable, as sessions
-    are stored by them. Claude Code sessions and `AgentMemory` are alternatives, using both is
-    refused.
+- **`ClaudeCodeSessions` managed by Claude Code.** The session of each thread is kept in the state
+    directory and resumed by its next call, with the whole context Claude Code had - tool use,
+    compaction and prompt caching included. The directories are stable, as sessions are stored by
+    them, and the session of an interrupted run is resumed too.
 
     ```python
-    ClaudeCodeConfig(persistence="resumable", state_directory="/var/lib/agent")
+    coder = claude_code_agent("coder", memory=ClaudeCodeSessions(state_directory="/var/lib/agent"))
     ```
 
-Injecting an arbitrary history into a session, or reading how much of the context is used, is not
-possible with Claude Code.
+The memory is a single choice, so the two can not be combined. Injecting an arbitrary history into a
+session, or reading how much of the context is used, is not possible with Claude Code.
 
 ## Telemetry
 
@@ -150,25 +159,30 @@ which called it, so its spans nest under the span of the agent.
 from draive.claude import ClaudeCodeConfig, ClaudeCodeTelemetry
 
 ClaudeCodeConfig(
-    telemetry=ClaudeCodeTelemetry.from_env(traces=True),  # OTEL_EXPORTER_OTLP_* of the process
+    telemetry=ClaudeCodeTelemetry.from_env(  # OTEL_EXPORTER_OTLP_* of the process
+        signals={"metrics", "logs", "traces"},
+    ),
 )
 ```
 
-Prompts, tool details and tool content are not exported unless `log_prompts`, `log_tool_details` and
-`log_tool_content` are set. Exports are short-lived like the runs, so the export intervals are short
-by default. The result of each run is also recorded by draive itself - the token usage as the usual
-`model.*` metrics (provider `claude_code`) and the cost as `agent.claude_code.cost`.
+`signals` choose what is exported - metrics and events by default, traces are a beta of Claude Code
+
+- and at least one is required. Prompts, tool details and tool content are not exported unless
+    `log_prompts`, `log_tool_details` and `log_tool_content` are set. Exports are short-lived like
+    the runs, so `export_interval_ms` is short by default. The result of each run is also recorded
+    by draive itself - the token usage as the usual `model.*` metrics (provider `claude_code`) and
+    the cost as `agent.claude_code.cost`.
 
 ## Testing
 
 `ClaudeCodeRunner` is the installed capability, replace its `running` to fake the process:
 
 ```python
-from draive.claude import ClaudeCodeResult, ClaudeCodeRunner, ClaudeCodeText
+from draive.claude import ClaudeCodeResult, ClaudeCodeRunner, ClaudeCodeSuccess, ClaudeCodeText
 
 async def running(launch):
     yield ClaudeCodeText(text="fixed")
-    yield ClaudeCodeResult(session_id="s", text="fixed")
+    yield ClaudeCodeResult(session_id="s", outcome=ClaudeCodeSuccess(text="fixed"))
 
 async with ctx.scope("test", ClaudeCodeRunner(binary="/fake", running=running)):
     ...

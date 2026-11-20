@@ -5,17 +5,15 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import final
-from uuid import NAMESPACE_URL, UUID, uuid5
 
 from haiway import Missing, State
 
 from draive.claude.config import ClaudeCodeConfig
+from draive.claude.sessions import ClaudeCodeSessions
 
 __all__ = (
     "ClaudeCodeWorkspace",
     "claude_workspace",
-    "session_exists",
-    "session_identifier",
 )
 
 
@@ -25,23 +23,29 @@ class ClaudeCodeWorkspace(State):
 
     Attributes
     ----------
-    directory
-        Working directory of the process.
-    home
-        Private home of the process.
-    config_directory
-        Configuration directory of Claude Code, it holds the sessions.
-    temporary_directory
-        Directory of temporary files.
     root
         Directory holding the private ones.
+    directory
+        Working directory of the process.
     """
 
-    directory: str
-    home: str
-    config_directory: str
-    temporary_directory: str
     root: str
+    directory: str
+
+    @property
+    def home(self) -> str:
+        """Private home of the process."""
+        return str(Path(self.root) / "home")
+
+    @property
+    def config_directory(self) -> str:
+        """Configuration directory of Claude Code, it holds the sessions."""
+        return str(Path(self.root) / "claude")
+
+    @property
+    def temporary_directory(self) -> str:
+        """Directory of temporary files."""
+        return str(Path(self.root) / "tmp")
 
 
 def _prepared(
@@ -49,45 +53,40 @@ def _prepared(
     directory: str | Missing,
     /,
 ) -> ClaudeCodeWorkspace:
-    home: Path = root / "home"
-    config_directory: Path = root / "claude"
-    temporary: Path = root / "tmp"
-    for path in (home, config_directory, temporary):
-        path.mkdir(mode=0o700, parents=True, exist_ok=True)
-
     working: Path
     if directory is Missing:
         working = root / "workspace"
-        working.mkdir(mode=0o700, parents=True, exist_ok=True)
 
     else:
         working = Path(directory)
-        if not working.is_absolute() or not working.is_dir():
+        if not working.is_dir():
             raise ValueError(f"Claude Code directory '{directory}' has to be an existing directory")
 
-    return ClaudeCodeWorkspace(
-        directory=str(working),
-        home=str(home),
-        config_directory=str(config_directory),
-        temporary_directory=str(temporary),
-        root=str(root),
-    )
+    workspace: ClaudeCodeWorkspace = ClaudeCodeWorkspace(root=str(root), directory=str(working))
+    for path in (workspace.home, workspace.config_directory, workspace.temporary_directory):
+        Path(path).mkdir(mode=0o700, parents=True, exist_ok=True)
+
+    working.mkdir(mode=0o700, parents=True, exist_ok=True)
+    return workspace
 
 
 @asynccontextmanager
 async def claude_workspace(
     config: ClaudeCodeConfig,
+    sessions: ClaudeCodeSessions | None,
     /,
 ) -> AsyncGenerator[ClaudeCodeWorkspace]:
     """Prepare the directories of a run.
 
-    Ephemeral runs get private temporary directories removed after the run, resumable ones
-    live within the state directory of the configuration and are kept.
+    Runs without sessions get private temporary directories removed after the run, runs with
+    them live within the state directory of the sessions and are kept.
 
     Parameters
     ----------
     config
         Configuration of the run.
+    sessions
+        Sessions kept by Claude Code, when the run is a part of them.
 
     Yields
     ------
@@ -97,13 +96,12 @@ async def claude_workspace(
     Raises
     ------
     ValueError
-        When the configured directories are not usable.
+        When the configured working directory does not exist.
     """
-    if config.persistence == "resumable":
-        assert config.state_directory is not Missing  # nosec: B101
+    if sessions is not None:
         yield await asyncio.to_thread(
             _prepared,
-            Path(config.state_directory).resolve(),  # the process changes its working directory
+            Path(sessions.state_directory).resolve(),  # the process changes its working directory
             config.directory,
         )
         return
@@ -114,62 +112,3 @@ async def claude_workspace(
 
     finally:
         await asyncio.shield(asyncio.to_thread(shutil.rmtree, root, ignore_errors=True))
-
-
-def session_identifier(
-    agent_uri: str,
-    thread: UUID,
-    /,
-) -> str:
-    """Identifier of the Claude Code session of an agent thread.
-
-    Sessions of different agents never share an identifier, even within the same thread,
-    sessions of the same agent and thread always do.
-
-    Parameters
-    ----------
-    agent_uri
-        URI of the agent.
-    thread
-        Identifier of the thread.
-
-    Returns
-    -------
-    str
-        Session identifier, a UUID as Claude Code requires.
-    """
-    return str(uuid5(NAMESPACE_URL, f"{agent_uri}#{thread}"))
-
-
-def _transcript_exists(
-    config_directory: str,
-    session_id: str,
-    /,
-) -> bool:
-    # sessions are stored by Claude Code as `projects/<project>/<session id>.jsonl`
-    return any(Path(config_directory, "projects").glob(f"*/{session_id}.jsonl"))
-
-
-async def session_exists(
-    config_directory: str,
-    session_id: str,
-    /,
-) -> bool:
-    """Check if Claude Code stored a session, whether it finished or not.
-
-    The transcript of a session is written while it runs, so also a run which was interrupted
-    or failed leaves a session which has to be resumed - it can not be started again.
-
-    Parameters
-    ----------
-    config_directory
-        Configuration directory of the runs.
-    session_id
-        Identifier of the session.
-
-    Returns
-    -------
-    bool
-        Whether the session has a stored transcript.
-    """
-    return await asyncio.to_thread(_transcript_exists, config_directory, session_id)

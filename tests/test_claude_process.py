@@ -9,20 +9,27 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
+from haiway import Missing
 
 from draive.claude import (
-    ClaudeCodeFailed,
+    ClaudeCodeEnded,
+    ClaudeCodeFailure,
+    ClaudeCodeNewSession,
+    ClaudeCodeOAuthToken,
     ClaudeCodeResult,
+    ClaudeCodeResumedSession,
     ClaudeCodeStarted,
+    ClaudeCodeSuccess,
     ClaudeCodeText,
+    ClaudeCodeTimedOut,
     ClaudeCodeToolResult,
     ClaudeCodeToolUse,
     ClaudeCodeUnavailable,
 )
 from draive.claude import process as process_module
-from draive.claude.launch import ClaudeCodeSession
 from draive.claude.process import marked_processes, run_process
 from tests._claude_cli import (
+    SECRET,
     alive,
     environment_listing_available,
     launch_for,
@@ -34,7 +41,8 @@ listing_required = pytest.mark.skipif(
     reason="the platform does not list the environments of processes",
 )
 
-SECRET = "sk-ant-api03-secret-credential"
+NEW_SESSION = "11111111-1111-5111-8111-111111111111"
+OLD_SESSION = "22222222-2222-5222-8222-222222222222"
 
 
 async def _events(launch: Any) -> list[Any]:
@@ -112,10 +120,10 @@ async def test_the_credential_is_handed_over_through_a_descriptor_only(tmp_path:
 
 @pytest.mark.asyncio
 async def test_oauth_tokens_use_their_own_descriptor(tmp_path: Path) -> None:
-    launch = launch_for(write_fake_claude(tmp_path), tmp_path, credential=None)
-    launch = launch.updating(
-        credential="sk-ant-oat-token",
-        credential_variable="CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR",
+    launch = launch_for(
+        write_fake_claude(tmp_path),
+        tmp_path,
+        credential=ClaudeCodeOAuthToken(value="sk-ant-oat-token"),
     )
 
     await _events(launch)
@@ -127,7 +135,7 @@ async def test_oauth_tokens_use_their_own_descriptor(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_runs_without_a_credential_have_no_descriptor(tmp_path: Path) -> None:
-    await _events(launch_for(write_fake_claude(tmp_path), tmp_path, credential=None))
+    await _events(launch_for(write_fake_claude(tmp_path), tmp_path, credential=Missing))
 
     recorded = _recorded(tmp_path)
     assert recorded["key"] is None
@@ -158,8 +166,8 @@ async def test_the_parent_environment_does_not_reach_the_process(
     ):
         assert name not in environment
 
-    assert environment["HOME"] == str(tmp_path)
-    assert environment["CLAUDE_CONFIG_DIR"] == str(tmp_path)
+    assert environment["HOME"] == str(tmp_path / "home")
+    assert environment["CLAUDE_CONFIG_DIR"] == str(tmp_path / "claude")
     assert environment["PATH"] == os.environ["PATH"]
 
 
@@ -168,14 +176,14 @@ async def test_sessions_are_passed_through_the_arguments(tmp_path: Path) -> None
     binary = write_fake_claude(tmp_path)
 
     new = await _events(
-        launch_for(binary, tmp_path, session=ClaudeCodeSession(mode="new", identifier="fixed-id"))
+        launch_for(binary, tmp_path, session=ClaudeCodeNewSession(identifier=NEW_SESSION))
     )
-    assert new[0].session_id == "fixed-id"
+    assert new[0].session_id == NEW_SESSION
 
     resumed = await _events(
-        launch_for(binary, tmp_path, session=ClaudeCodeSession(mode="resume", identifier="old-id"))
+        launch_for(binary, tmp_path, session=ClaudeCodeResumedSession(identifier=OLD_SESSION))
     )
-    assert resumed[0].session_id == "old-id"
+    assert resumed[0].session_id == OLD_SESSION
 
 
 @pytest.mark.asyncio
@@ -195,7 +203,7 @@ async def test_a_flood_of_error_output_does_not_block_the_process(tmp_path: Path
     )
 
     assert isinstance(events[-1], ClaudeCodeResult)
-    assert events[-1].text == "survived"
+    assert events[-1].outcome == ClaudeCodeSuccess(text="survived")
 
 
 @pytest.mark.asyncio
@@ -215,11 +223,10 @@ async def test_a_failed_turn_is_reported_by_its_result(tmp_path: Path) -> None:
 
     # the synthetic error message is not text, the failure is the result
     assert [type(event) for event in events] == [ClaudeCodeStarted, ClaudeCodeResult]
-    result = events[-1]
-    assert (result.failed, result.api_error_status, result.terminal_reason) == (
-        True,
-        401,
-        "api_error",
+    assert events[-1].outcome == ClaudeCodeFailure(
+        reason="Invalid API key",
+        api_error_status=401,
+        terminal_reason="api_error",
     )
 
 
@@ -229,7 +236,7 @@ async def test_a_process_ending_without_a_result_fails_with_redacted_error_outpu
 ) -> None:
     launch = launch_for(write_fake_claude(tmp_path), tmp_path, "noresult")
 
-    with pytest.raises(ClaudeCodeFailed, match="without a result") as raised:
+    with pytest.raises(ClaudeCodeEnded, match="without a result") as raised:
         await _events(launch)
 
     assert raised.value.exit_code == 3
@@ -260,7 +267,7 @@ async def test_the_deadline_stops_the_process_and_its_children(tmp_path: Path) -
     launch = launch_for(write_fake_claude(tmp_path), tmp_path, "hang", timeout=1.0)
     started = time.monotonic()
 
-    with pytest.raises(ClaudeCodeFailed, match="timed out after 1 seconds"):
+    with pytest.raises(ClaudeCodeTimedOut, match="timed out after 1 seconds"):
         await _events(launch)
 
     assert time.monotonic() - started < 10
@@ -373,7 +380,7 @@ async def test_children_detached_from_the_process_group_stop_with_the_deadline(
         env={"FAKE_CLAUDE_DETACH": "1"},
     )
 
-    with pytest.raises(ClaudeCodeFailed, match="timed out"):
+    with pytest.raises(ClaudeCodeTimedOut, match="timed out"):
         await _events(launch)
 
     (child,) = _children(tmp_path)
@@ -446,7 +453,7 @@ async def test_the_deadline_terminates_gracefully_before_it_kills(tmp_path: Path
     )
     started = time.monotonic()
 
-    with pytest.raises(ClaudeCodeFailed, match="timed out"):
+    with pytest.raises(ClaudeCodeTimedOut, match="timed out"):
         await _events(launch)
 
     assert flag.read_text() == "terminated"  # it had the chance to stop its own children
@@ -465,7 +472,7 @@ async def test_the_deadline_kills_a_process_which_does_not_terminate(tmp_path: P
     )
     started = time.monotonic()
 
-    with pytest.raises(ClaudeCodeFailed, match="timed out"):
+    with pytest.raises(ClaudeCodeTimedOut, match="timed out"):
         await _events(launch)
 
     assert 1.4 <= time.monotonic() - started < 6  # the deadline and then the grace
@@ -527,7 +534,7 @@ async def test_the_kill_of_the_deadline_is_not_sent_after_the_process_is_gone(
         env={"FAKE_CLAUDE_GRACEFUL": str(tmp_path / "terminated.flag")},
     )
 
-    with pytest.raises(ClaudeCodeFailed, match="timed out"):
+    with pytest.raises(ClaudeCodeTimedOut, match="timed out"):
         await _events(launch)
 
     sent = len(signals)
@@ -541,13 +548,13 @@ async def test_the_session_reported_before_a_crash_is_kept_in_the_failure(tmp_pa
         write_fake_claude(tmp_path),
         tmp_path,
         "init_then_exit",
-        session=ClaudeCodeSession(mode="new", identifier="reported-session"),
+        session=ClaudeCodeNewSession(identifier=NEW_SESSION),
     )
 
-    with pytest.raises(ClaudeCodeFailed, match="without a result") as raised:
+    with pytest.raises(ClaudeCodeEnded, match="without a result") as raised:
         await _events(launch)
 
-    assert raised.value.session_id == "reported-session"
+    assert raised.value.session_id == NEW_SESSION
     assert raised.value.exit_code == 4
 
 
@@ -557,7 +564,7 @@ async def test_credentials_are_redacted_across_the_boundaries_of_the_error_outpu
 ) -> None:
     launch = launch_for(write_fake_claude(tmp_path), tmp_path, "split_secret")
 
-    with pytest.raises(ClaudeCodeFailed) as raised:
+    with pytest.raises(ClaudeCodeEnded) as raised:
         await _events(launch)
 
     stderr = raised.value.stderr
@@ -569,17 +576,26 @@ async def test_credentials_are_redacted_across_the_boundaries_of_the_error_outpu
 
 
 @pytest.mark.asyncio
-async def test_waiting_for_the_error_output_does_not_swallow_cancellation() -> None:
-    never = asyncio.create_task(asyncio.sleep(60))
-    waiting = asyncio.create_task(process_module._settle(never))
-    await asyncio.sleep(0.1)
+async def test_waiting_for_the_error_output_does_not_swallow_cancellation(tmp_path: Path) -> None:
+    launch = launch_for(write_fake_claude(tmp_path), tmp_path, "stderr_held")
+    consuming = asyncio.create_task(_events(launch))
+    try:
+        # the process has ended, a child holds its error output which is waited for
+        await _eventually((tmp_path / "child.pid").exists)
+        await asyncio.sleep(0.4)
 
-    waiting.cancel()
+        consuming.cancel()
 
-    with pytest.raises(asyncio.CancelledError):
-        await waiting
+        with pytest.raises(asyncio.CancelledError):
+            await consuming
 
-    never.cancel()
+    finally:
+        for child in _children(tmp_path):
+            try:
+                os.kill(child, 9)
+
+            except ProcessLookupError:
+                pass
 
 
 @pytest.mark.asyncio
@@ -603,13 +619,3 @@ async def test_output_written_after_the_run_reaches_nobody(tmp_path: Path) -> No
                 pass
 
     assert problems == []
-
-
-@pytest.mark.asyncio
-async def test_oversized_credentials_are_refused_before_anything_starts(tmp_path: Path) -> None:
-    launch = launch_for(write_fake_claude(tmp_path), tmp_path, credential="k" * 5000)
-
-    with pytest.raises(ClaudeCodeUnavailable, match="larger than"):
-        await _events(launch)
-
-    assert not (tmp_path / "record.json").exists()

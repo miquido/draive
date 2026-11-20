@@ -7,14 +7,25 @@ from haiway import BasicValue, State
 __all__ = (
     "ClaudeCodeDelta",
     "ClaudeCodeEvent",
+    "ClaudeCodeFailure",
+    "ClaudeCodeMCPServer",
     "ClaudeCodeResult",
     "ClaudeCodeStarted",
+    "ClaudeCodeSuccess",
     "ClaudeCodeText",
     "ClaudeCodeToolResult",
     "ClaudeCodeToolUse",
     "ClaudeCodeUsage",
     "parse_events",
 )
+
+
+@final
+class ClaudeCodeMCPServer(State):
+    """MCP server reported by Claude Code, whether it was connected or not."""
+
+    name: str
+    connected: bool = True
 
 
 @final
@@ -27,9 +38,13 @@ class ClaudeCodeStarted(State):
     permission_mode: str | None = None
     api_key_source: str | None = None
     tools: Sequence[str] = ()
-    mcp_servers: Sequence[str] = ()
-    mcp_failed: Sequence[str] = ()  # configured servers which are not connected
+    mcp_servers: Sequence[ClaudeCodeMCPServer] = ()
     plugins: Sequence[str] = ()
+
+    @property
+    def failed_mcp_servers(self) -> Sequence[str]:
+        """Names of the configured MCP servers which are not connected."""
+        return tuple(server.name for server in self.mcp_servers if not server.connected)
 
 
 @final
@@ -80,29 +95,60 @@ class ClaudeCodeUsage(State):
 
 
 @final
-class ClaudeCodeResult(State):
-    """Outcome of the run, the last event of a stream.
+class ClaudeCodeSuccess(State):
+    """The run ended with an answer.
 
     Attributes
     ----------
-    failed
-        Whether the run ended with an error - an API failure, a reached limit, ...
-        Claude Code still reports ``subtype`` ``success`` for some of them.
     text
-        Final text of the run, or the error description of a failed one.
+        Final text of the run.
     """
 
-    session_id: str | None = None
-    failed: bool = False
-    subtype: str | None = None
+    text: str = ""
+
+
+@final
+class ClaudeCodeFailure(State):
+    """The run ended with an error - an API failure, a reached limit, ...
+
+    Claude Code still reports ``subtype`` ``success`` for some of them.
+
+    Attributes
+    ----------
+    reason
+        Description of the error, the text of the result or its subtype.
+    api_error_status
+        HTTP status of the API failure which ended the run, when it was one.
+    terminal_reason
+        Reason reported by Claude Code for ending the run, i.e. ``api_error``.
+    """
+
+    reason: str
     api_error_status: int | None = None
     terminal_reason: str | None = None
-    text: str = ""
+
+
+@final
+class ClaudeCodeResult(State):
+    """Outcome of the run and what it consumed, the last event of a stream.
+
+    Attributes
+    ----------
+    outcome
+        The answer or the error the run ended with.
+    """
+
+    outcome: ClaudeCodeSuccess | ClaudeCodeFailure
+    session_id: str | None = None
     turns: int = 0
     duration_ms: int = 0
     cost_usd: float | None = None
     permission_denials: int = 0
     usage: Sequence[ClaudeCodeUsage] = ()
+
+    @property
+    def failed(self) -> bool:
+        return isinstance(self.outcome, ClaudeCodeFailure)
 
 
 type ClaudeCodeEvent = (
@@ -163,8 +209,7 @@ def _started(
             permission_mode=_string(payload.get("permissionMode")),
             api_key_source=_string(payload.get("apiKeySource")),
             tools=tuple(item for item in _sequence(payload.get("tools")) if isinstance(item, str)),
-            mcp_servers=_names(payload.get("mcp_servers")),
-            mcp_failed=_failed(payload.get("mcp_servers")),
+            mcp_servers=_mcp_servers(payload.get("mcp_servers")),
             plugins=_names(payload.get("plugins")),
         ),
     )
@@ -289,14 +334,22 @@ def _result(
 ) -> ClaudeCodeResult:
     subtype: str | None = _string(payload.get("subtype"))
     status: Any = payload.get("api_error_status")
+    text: str = _string(payload.get("result")) or ""
+    outcome: ClaudeCodeSuccess | ClaudeCodeFailure
+    # Claude Code reports `success` even for a turn which failed with an API error
+    if payload.get("is_error") is True or (subtype or "success") != "success":
+        outcome = ClaudeCodeFailure(
+            reason=text or subtype or "the run failed",
+            api_error_status=status if isinstance(status, int) and status else None,
+            terminal_reason=_string(payload.get("terminal_reason")),
+        )
+
+    else:
+        outcome = ClaudeCodeSuccess(text=text)
+
     return ClaudeCodeResult(
+        outcome=outcome,
         session_id=_string(payload.get("session_id")),
-        # Claude Code reports `success` even for a turn which failed with an API error
-        failed=payload.get("is_error") is True or (subtype or "success") != "success",
-        subtype=subtype,
-        api_error_status=status if isinstance(status, int) and status else None,
-        terminal_reason=_string(payload.get("terminal_reason")),
-        text=_string(payload.get("result")) or "",
         turns=_integer(payload.get("num_turns")),
         duration_ms=_integer(payload.get("duration_ms")),
         cost_usd=_number(payload.get("total_cost_usd")),
@@ -346,22 +399,23 @@ def _names(
     return tuple(names)
 
 
-def _failed(
+def _mcp_servers(
     items: Any,
     /,
-) -> Sequence[str]:
-    failed: list[str] = []
+) -> Sequence[ClaudeCodeMCPServer]:
+    servers: list[ClaudeCodeMCPServer] = []
     for item in _sequence(items):
         entry: Mapping[str, Any] | None = _mapping(item)
-        if entry is None:
-            continue
+        if entry is not None and (name := _string(entry.get("name"))) is not None:
+            # a status is reported by the versions which connect the servers on start
+            servers.append(
+                ClaudeCodeMCPServer(
+                    name=name,
+                    connected=_string(entry.get("status")) in (None, "connected"),
+                )
+            )
 
-        name: str | None = _string(entry.get("name"))
-        status: str | None = _string(entry.get("status"))
-        if name is not None and status is not None and status != "connected":
-            failed.append(name)
-
-    return tuple(failed)
+    return tuple(servers)
 
 
 def _mapping(

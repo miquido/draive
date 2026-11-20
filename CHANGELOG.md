@@ -15,18 +15,22 @@
 
 - `draive.claude` - a Claude Code agent (`claude_code_agent`) running the `claude` executable as a
   fully managed process, no extra needed (see `docs/guides/ClaudeCode.md`):
-    - Authenticates only with the given API key or OAuth token (`ClaudeCode`), handed over through a
-      file descriptor and kept out of arguments, environment and reprs. The user login is out of
-      reach of the isolated process and runs reporting another authentication are stopped.
+    - Authenticates only with the given credential, `ClaudeCodeApiKey` or `ClaudeCodeOAuthToken`
+      (`ClaudeCode`), handed over through a file descriptor and kept out of arguments, environment
+      and reprs. The user login is out of reach of the isolated process and runs reporting another
+      authentication are stopped.
     - `ClaudeCodeConfig` configures the model and effort, permission mode, tools and rules, limits
       (turns, cost, deadline), MCP servers, subagents, plugins, settings, directories, environment
-      and compaction. Runs are isolated and read-only by default, the file tools are confined to
-      the working and additional directories, `setting_sources` opts into the project `CLAUDE.md`.
-    - Streams text and tool use as `ProcessingEvent`s, supports images, failures raise
-      `ClaudeCodeFailed` and `ClaudeCodeUnavailable`, MCP servers which fail to connect are
+      and compaction. It refuses what can not work when created, `compaction` and credentials are
+      sum types. Runs are isolated and read-only by default, the file tools are confined to the
+      working and additional directories, `setting_sources` opts into the project `CLAUDE.md`.
+    - Streams text and tool use as `ProcessingEvent`s, supports images, failures are the variants
+      of `ClaudeCodeFailed` (`ClaudeCodeErrored`, `ClaudeCodeTimedOut`, `ClaudeCodeEnded`,
+      `ClaudeCodeOutputTooLarge`) and `ClaudeCodeUnavailable`, MCP servers which fail to connect are
       reported.
-    - Memory is either `AgentMemory` of draive or resumable Claude Code sessions kept in a state
-      directory, sessions are found by the stable identity of the agent.
+    - The `memory` of the agent is either `AgentMemory` of draive or `ClaudeCodeSessions` kept by
+      Claude Code in a state directory, resumed also after an interrupted run. Sessions are found
+      by the stable identity of the agent.
     - Exports Claude Code telemetry to the collector of draive with the trace of the calling agent
       continued (`ClaudeCodeTelemetry`), and records usage and cost in draive telemetry.
     - A run is stopped with its closed stream, cancellation or deadline - terminated gracefully,

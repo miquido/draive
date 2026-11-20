@@ -2,11 +2,16 @@ import os
 import shutil
 from collections.abc import Iterable
 from types import TracebackType
-from typing import Final, Literal, final
+from typing import Final, final
 
-from haiway import Missing, State, getenv_str
+from haiway import Missing, State, ValidationError, getenv_str
 
-from draive.claude.process import MAX_CREDENTIAL_BYTES, run_process
+from draive.claude.credentials import (
+    ClaudeCodeApiKey,
+    ClaudeCodeCredential,
+    ClaudeCodeOAuthToken,
+)
+from draive.claude.process import run_process
 from draive.claude.types import ClaudeCodeRunner, ClaudeCodeUnavailable
 
 __all__ = ("ClaudeCode",)
@@ -21,25 +26,23 @@ class ClaudeCode:
     """Access to Claude Code, prepares the capability of running it for agents.
 
     Claude Code is run as a managed process of the ``claude`` executable, nothing of it is
-    imported - there is no additional dependency. The executable and the credentials are
+    imported - there is no additional dependency. The executable and the credential are
     verified when the scope is entered.
 
-    Runs always authenticate with the given credential. They never use the login of the
-    user - its session, keychain and configuration are out of reach of the isolated process -
-    and are stopped if Claude Code reports to authenticate in any other way. Without a
-    credential entering the scope fails.
+    Runs always authenticate with the credential. They never use the login of the user - its
+    session, keychain and configuration are out of reach of the isolated process - and are
+    stopped if Claude Code reports to authenticate in any other way. Without a credential
+    entering the scope fails.
 
     Parameters
     ----------
+    credential
+        ``ClaudeCodeApiKey`` or ``ClaudeCodeOAuthToken`` (``claude setup-token``). Resolved from
+        ``ANTHROPIC_API_KEY`` or ``CLAUDE_CODE_OAUTH_TOKEN`` when not set. A key given as the
+        token or the other way is refused unless a custom endpoint is used.
     binary
         Path of the ``claude`` executable. Resolved from ``CLAUDE_CODE_BINARY``, the
         ``PATH`` and ``~/.local/bin/claude`` when not set.
-    api_key
-        Anthropic API key, ``ANTHROPIC_API_KEY`` when not set.
-    oauth_token
-        Claude Code OAuth token (``claude setup-token``), ``CLAUDE_CODE_OAUTH_TOKEN`` when not
-        set. Use either the key or the token, a key given as the token or the other way is
-        refused unless a custom endpoint is used.
     base_url
         Custom API endpoint, i.e. a gateway.
 
@@ -48,75 +51,49 @@ class ClaudeCode:
     >>> async with ctx.scope(
     ...     "coding",
     ...     ClaudeCodeConfig(model="sonnet", tools=("Read", "Edit")),
-    ...     disposables=(ClaudeCode(),),
+    ...     disposables=(ClaudeCode(credential=ClaudeCodeApiKey("sk-ant-api...")),),
     ... ):
     ...     coder = claude_code_agent("coder", instructions="Fix the bugs.")
     ...     async for chunk in coder.call(input="Fix the failing test"):
     ...         ...
+
+    Raises
+    ------
+    ValueError
+        When the kind of the credential does not match its value.
     """
 
     __slots__ = (
-        "_api_key",
         "_base_url",
         "_binary",
-        "_oauth_token",
+        "_credential",
     )
 
     def __init__(
         self,
         *,
+        credential: ClaudeCodeCredential | None = None,
         binary: str | None = None,
-        api_key: str | None = None,
-        oauth_token: str | None = None,
         base_url: str | None = None,
     ) -> None:
-        if api_key and oauth_token:
-            raise ValueError("Claude Code takes either an API key or an OAuth token, not both")
+        if credential is not None:
+            _verify_kind(credential, custom_endpoint=bool(base_url))
 
-        _verify_kind(api_key, oauth_token, custom_endpoint=bool(base_url))
-
+        self._credential: ClaudeCodeCredential | None = credential
         self._binary: str | None = binary
-        self._api_key: str | None = api_key
-        self._oauth_token: str | None = oauth_token
         self._base_url: str | None = base_url
 
     def __repr__(self) -> str:
-        return "ClaudeCode()"  # nothing of the credentials
+        return "ClaudeCode()"  # nothing of the credential
 
     async def __aenter__(self) -> Iterable[State]:
-        credential: str
-        kind: Literal["api_key", "oauth_token"]
-        if self._api_key:
-            credential, kind = self._api_key, "api_key"
-
-        elif self._oauth_token:
-            credential, kind = self._oauth_token, "oauth_token"
-
-        elif key := getenv_str("ANTHROPIC_API_KEY"):
-            credential, kind = key, "api_key"
-            _verify_kind(key, None, custom_endpoint=bool(self._base_url))
-
-        elif token := getenv_str("CLAUDE_CODE_OAUTH_TOKEN"):
-            credential, kind = token, "oauth_token"
-            _verify_kind(None, token, custom_endpoint=bool(self._base_url))
-
-        else:
-            raise ClaudeCodeUnavailable(
-                "no credentials, provide an API key or an OAuth token or set"
-                " ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN"
-            )
-
-        if len(credential.encode()) > MAX_CREDENTIAL_BYTES:
-            raise ClaudeCodeUnavailable(
-                f"the credential is larger than {MAX_CREDENTIAL_BYTES} bytes"
-            )
-
+        credential: ClaudeCodeCredential = self._credential or _environment_credential()
+        _verify_kind(credential, custom_endpoint=bool(self._base_url))
         return (
             ClaudeCodeRunner(
                 binary=_resolved_binary(self._binary),
                 running=run_process,
                 credential=credential,
-                credential_kind=kind,
                 base_url=self._base_url or Missing,
             ),
         )
@@ -130,9 +107,24 @@ class ClaudeCode:
         pass  # runs release their processes on their own
 
 
+def _environment_credential() -> ClaudeCodeCredential:
+    try:
+        if key := getenv_str("ANTHROPIC_API_KEY"):
+            return ClaudeCodeApiKey(value=key)
+
+        if token := getenv_str("CLAUDE_CODE_OAUTH_TOKEN"):
+            return ClaudeCodeOAuthToken(value=token)
+
+    except ValidationError as exc:
+        raise ClaudeCodeUnavailable(f"the credential of the environment is invalid: {exc}") from exc
+
+    raise ClaudeCodeUnavailable(
+        "no credentials, provide a credential or set ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN"
+    )
+
+
 def _verify_kind(
-    api_key: str | None,
-    oauth_token: str | None,
+    credential: ClaudeCodeCredential,
     /,
     *,
     custom_endpoint: bool,
@@ -141,11 +133,15 @@ def _verify_kind(
     if custom_endpoint:
         return
 
-    if api_key and api_key.startswith(_OAUTH_TOKEN_PREFIX):
-        raise ValueError("The given API key is an OAuth token, pass it as oauth_token")
+    match credential:
+        case ClaudeCodeApiKey(value=value) if value.startswith(_OAUTH_TOKEN_PREFIX):
+            raise ValueError("The given API key is an OAuth token, use ClaudeCodeOAuthToken")
 
-    if oauth_token and oauth_token.startswith(_API_KEY_PREFIX):
-        raise ValueError("The given OAuth token is an API key, pass it as api_key")
+        case ClaudeCodeOAuthToken(value=value) if value.startswith(_API_KEY_PREFIX):
+            raise ValueError("The given OAuth token is an API key, use ClaudeCodeApiKey")
+
+        case _:
+            pass
 
 
 def _resolved_binary(

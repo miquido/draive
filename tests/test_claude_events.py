@@ -5,8 +5,11 @@ import pytest
 
 from draive.claude import (
     ClaudeCodeDelta,
+    ClaudeCodeFailure,
+    ClaudeCodeMCPServer,
     ClaudeCodeResult,
     ClaudeCodeStarted,
+    ClaudeCodeSuccess,
     ClaudeCodeText,
     ClaudeCodeToolResult,
     ClaudeCodeToolUse,
@@ -47,8 +50,11 @@ def test_init_is_parsed_into_started() -> None:
         permission_mode="dontAsk",
         api_key_source="ANTHROPIC_API_KEY",
         tools=("Read", "Grep"),
-        mcp_servers=("docs", "broken", "unknown"),
-        mcp_failed=("broken",),
+        mcp_servers=(
+            ClaudeCodeMCPServer(name="docs"),
+            ClaudeCodeMCPServer(name="broken", connected=False),
+            ClaudeCodeMCPServer(name="unknown"),  # no status is reported by every version
+        ),
         plugins=("cc-plugin-privacy",),
     )
 
@@ -208,9 +214,9 @@ def test_result_carries_cost_and_usage() -> None:
     )
 
     assert isinstance(event, ClaudeCodeResult)
-    assert (event.failed, event.text, event.turns, event.duration_ms) == (False, "done", 3, 1200)
-    assert event.cost_usd == 0.25
-    assert event.permission_denials == 1
+    assert event.outcome == ClaudeCodeSuccess(text="done")
+    assert not event.failed
+    assert (event.turns, event.duration_ms) == (3, 1200)
     (usage,) = event.usage
     assert (usage.model, usage.input_tokens, usage.output_tokens) == ("claude-sonnet-5-5", 10, 5)
     assert (usage.cache_read_tokens, usage.cache_creation_tokens, usage.cost_usd) == (2, 1, 0.25)
@@ -232,7 +238,58 @@ def test_result_failure_is_not_only_its_subtype(
     (event,) = parse_events(_line({"type": "result", "session_id": "s", **fields}))
 
     assert isinstance(event, ClaudeCodeResult)
-    assert (event.failed, event.api_error_status) == (failed, status)
+    assert event.failed is failed
+    match event.outcome:
+        case ClaudeCodeFailure(api_error_status=api_error_status):
+            assert api_error_status == status
+
+        case ClaudeCodeSuccess():
+            assert status is None
+
+
+def test_failed_result_describes_itself_by_its_text_or_subtype() -> None:
+    (with_text,) = parse_events(
+        _line(
+            {
+                "type": "result",
+                "is_error": True,
+                "result": "Invalid API key",
+                "api_error_status": 401,
+                "terminal_reason": "api_error",
+            }
+        )
+    )
+    (with_subtype,) = parse_events(_line({"type": "result", "subtype": "error_max_turns"}))
+    (with_nothing,) = parse_events(_line({"type": "result", "is_error": True}))
+
+    assert isinstance(with_text, ClaudeCodeResult)
+    assert with_text.outcome == ClaudeCodeFailure(
+        reason="Invalid API key", api_error_status=401, terminal_reason="api_error"
+    )
+    assert isinstance(with_subtype, ClaudeCodeResult)
+    assert with_subtype.outcome == ClaudeCodeFailure(reason="error_max_turns")
+    assert isinstance(with_nothing, ClaudeCodeResult)
+    assert with_nothing.outcome == ClaudeCodeFailure(reason="the run failed")
+
+
+def test_started_derives_its_failed_servers_from_their_status() -> None:
+    (event,) = parse_events(
+        _line(
+            {
+                "type": "system",
+                "subtype": "init",
+                "session_id": "s",
+                "mcp_servers": [
+                    {"name": "a", "status": "connected"},
+                    {"name": "b", "status": "needs-auth"},
+                    {"name": "c"},
+                ],
+            }
+        )
+    )
+
+    assert isinstance(event, ClaudeCodeStarted)
+    assert event.failed_mcp_servers == ("b",)
 
 
 def test_malformed_result_fields_fall_back_to_defaults() -> None:

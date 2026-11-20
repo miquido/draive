@@ -1,17 +1,23 @@
+from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
-from typing import Annotated, Literal, Protocol, final, runtime_checkable
+from typing import Protocol, final, runtime_checkable
 
-from haiway import Missing, Sensitive, State
+from haiway import Missing, State
 
 from draive.agents.types import AgentException
-from draive.claude.events import ClaudeCodeEvent
+from draive.claude.credentials import ClaudeCodeCredential
+from draive.claude.events import ClaudeCodeEvent, ClaudeCodeFailure
 from draive.claude.launch import ClaudeCodeLaunch
 
 __all__ = (
+    "ClaudeCodeEnded",
+    "ClaudeCodeErrored",
     "ClaudeCodeException",
     "ClaudeCodeFailed",
+    "ClaudeCodeOutputTooLarge",
     "ClaudeCodeRunner",
     "ClaudeCodeRunning",
+    "ClaudeCodeTimedOut",
     "ClaudeCodeUnavailable",
 )
 
@@ -36,56 +42,146 @@ class ClaudeCodeUnavailable(ClaudeCodeException):
         self,
         reason: str,
     ) -> None:
-        super().__init__(f"Claude Code is unavailable: {reason}")
+        super().__init__(reason)
         self.reason: str = reason
 
+    def __str__(self) -> str:
+        return f"Claude Code is unavailable: {self.reason}"
 
-@final
-class ClaudeCodeFailed(ClaudeCodeException):
-    """Raised when a Claude Code run failed.
+
+class ClaudeCodeFailed(ClaudeCodeException, ABC):
+    """Raised when a Claude Code run failed, one of the variants below.
 
     Parameters
     ----------
-    reason
-        Description of the failure, i.e. the error reported by the run.
     session_id
         Claude Code session of the run, when it got to report one.
-    api_error_status
-        HTTP status of the API failure which ended the run, when there was one.
-    terminal_reason
-        Reason reported by Claude Code for ending the run, i.e. ``"api_error"``.
+    """
+
+    __slots__ = ("session_id",)
+
+    def __init__(
+        self,
+        *,
+        session_id: str | None = None,
+    ) -> None:
+        super().__init__()
+        self.session_id: str | None = session_id
+
+    @property
+    @abstractmethod
+    def reason(self) -> str:
+        """Description of the failure."""
+
+    def __str__(self) -> str:
+        return f"Claude Code run failed: {self.reason}"
+
+
+@final
+class ClaudeCodeTimedOut(ClaudeCodeFailed):
+    """The run did not end before its deadline.
+
+    Parameters
+    ----------
+    timeout
+        Limit of the run duration which passed, in seconds.
+    session_id
+        Claude Code session of the run, when it got to report one.
+    """
+
+    __slots__ = ("timeout",)
+
+    def __init__(
+        self,
+        *,
+        timeout: float,
+        session_id: str | None = None,
+    ) -> None:
+        super().__init__(session_id=session_id)
+        self.timeout: float = timeout
+
+    @property
+    def reason(self) -> str:
+        return f"timed out after {self.timeout:g} seconds"
+
+
+@final
+class ClaudeCodeEnded(ClaudeCodeFailed):
+    """The process ended without reporting a result.
+
+    Parameters
+    ----------
     exit_code
         Exit code of the process, when it was available.
     stderr
         Tail of the process error output with credentials redacted.
+    session_id
+        Claude Code session of the run, when it got to report one.
     """
 
-    __slots__ = (
-        "api_error_status",
-        "exit_code",
-        "reason",
-        "session_id",
-        "stderr",
-        "terminal_reason",
-    )
+    __slots__ = ("exit_code", "stderr")
 
     def __init__(
         self,
-        reason: str,
         *,
-        session_id: str | None = None,
-        api_error_status: int | None = None,
-        terminal_reason: str | None = None,
         exit_code: int | None = None,
         stderr: str = "",
+        session_id: str | None = None,
     ) -> None:
-        super().__init__(f"Claude Code run failed: {reason}")
-        self.reason: str = reason
-        self.session_id: str | None = session_id
-        self.api_error_status: int | None = api_error_status
-        self.terminal_reason: str | None = terminal_reason
+        super().__init__(session_id=session_id)
         self.exit_code: int | None = exit_code
         self.stderr: str = stderr
+
+    @property
+    def reason(self) -> str:
+        return "the process ended without a result"
+
+
+@final
+class ClaudeCodeErrored(ClaudeCodeFailed):
+    """The run ended with an error reported by Claude Code.
+
+    Parameters
+    ----------
+    failure
+        The error the run ended with.
+    session_id
+        Claude Code session of the run, when it got to report one.
+    """
+
+    __slots__ = ("failure",)
+
+    def __init__(
+        self,
+        *,
+        failure: ClaudeCodeFailure,
+        session_id: str | None = None,
+    ) -> None:
+        super().__init__(session_id=session_id)
+        self.failure: ClaudeCodeFailure = failure
+
+    @property
+    def reason(self) -> str:
+        return self.failure.reason
+
+    @property
+    def api_error_status(self) -> int | None:
+        """HTTP status of the API failure which ended the run, when it was one."""
+        return self.failure.api_error_status
+
+    @property
+    def terminal_reason(self) -> str | None:
+        """Reason reported by Claude Code for ending the run, i.e. ``api_error``."""
+        return self.failure.terminal_reason
+
+
+@final
+class ClaudeCodeOutputTooLarge(ClaudeCodeFailed):
+    """A line of the output was larger than the run can read."""
+
+    @property
+    def reason(self) -> str:
+        return "the output line is too large"
 
 
 @runtime_checkable
@@ -114,15 +210,12 @@ class ClaudeCodeRunner(State):
     running
         Implementation of the run, replace it to fake the process in tests.
     credential
-        API key or OAuth token, never part of the representation of the state.
-    credential_kind
-        Kind of the credential.
+        The only credential of the runs, never part of the representation of the state.
     base_url
         Custom API endpoint, i.e. a gateway.
     """
 
     binary: str
     running: ClaudeCodeRunning
-    credential: Annotated[str, Sensitive()] | Missing = Missing
-    credential_kind: Literal["api_key", "oauth_token"] = "api_key"
+    credential: ClaudeCodeCredential | Missing = Missing
     base_url: str | Missing = Missing

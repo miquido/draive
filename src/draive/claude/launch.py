@@ -1,26 +1,36 @@
 import json
 import os
 from collections.abc import Mapping, Sequence
-from typing import Annotated, Any, Final, Literal, cast, final
+from typing import Annotated, Any, Final, cast, final
 from urllib.parse import quote
 from uuid import uuid4
 
-from haiway import Missing, Sensitive, State
+from haiway import Missing, Sensitive, State, Verifier
 
-from draive.claude.config import ClaudeCodeConfig, ClaudeCodeTelemetry
+from draive.claude.config import (
+    ClaudeCodeAutoCompaction,
+    ClaudeCodeConfig,
+    ClaudeCodeNoCompaction,
+    ClaudeCodeTelemetry,
+)
+from draive.claude.credentials import ClaudeCodeCredential
+from draive.claude.sessions import (
+    ClaudeCodeNewSession,
+    ClaudeCodeNoSession,
+    ClaudeCodeResumedSession,
+    ClaudeCodeSession,
+)
+from draive.claude.workspace import ClaudeCodeWorkspace
 
 __all__ = (
-    "RUN_MARKER_VARIABLE",
     "ClaudeCodeLaunch",
-    "ClaudeCodeSession",
     "build_launch",
     "claude_arguments",
     "claude_environment",
     "claude_settings",
-    "validate_config",
 )
 
-RUN_MARKER_VARIABLE: Final[str] = "DRAIVE_CLAUDE_RUN"
+_NO_SESSION: Final[ClaudeCodeNoSession] = ClaudeCodeNoSession()
 
 # Claude Code registers these plugins on its own - each is disabled, a later version might add
 # more which are reported by the started run
@@ -62,33 +72,23 @@ _INHERITED_ENV: Final[Sequence[str]] = (
     "NODE_EXTRA_CA_CERTS",
 )
 
-_RESERVED_ENV_PREFIXES: Final[Sequence[str]] = ("CLAUDE", "ANTHROPIC_", "DISABLE_", "OTEL_")
-_RESERVED_ENV_NAMES: Final[Sequence[str]] = (
-    RUN_MARKER_VARIABLE,
-    "HOME",
-    "TMPDIR",
-    "TRACEPARENT",
-    "TRACESTATE",
-    "DO_NOT_TRACK",
-    "NODE_OPTIONS",
-)
+# variables of the environment which carry credentials, redacted from whatever is reported
+_SENSITIVE_ENV: Final[Sequence[str]] = ("OTEL_EXPORTER_OTLP_HEADERS",)
+
+# tools working with paths, allowed within the directories of the run only - their bare names would
+# allow them to work with any path the process can reach, i.e. to read the keys of the user
+_READ_TOOLS: Final[Sequence[str]] = ("Read", "Grep", "Glob")
+# permission rules of every tool changing files are the ones of `Edit`, `Write(path)` never matches
+_EDIT_TOOLS: Final[Sequence[str]] = ("Edit", "Write", "MultiEdit", "NotebookEdit")
 
 
-@final
-class ClaudeCodeSession(State):
-    """Persistence of the run within Claude Code sessions.
+def _marker(
+    value: str,
+) -> str:
+    if not value:
+        raise ValueError("A run needs a marker to be found by")
 
-    Attributes
-    ----------
-    mode
-        ``ephemeral`` leaves no session, ``new`` starts the session with the given identifier,
-        ``resume`` continues the stored one.
-    identifier
-        Session identifier of the ``new`` and ``resume`` modes.
-    """
-
-    mode: Literal["ephemeral", "new", "resume"] = "ephemeral"
-    identifier: str | None = None
+    return value
 
 
 @final
@@ -102,25 +102,22 @@ class ClaudeCodeLaunch(State):
     arguments
         Arguments of the executable, no credentials among them.
     environment
-        The whole environment of the process, no credentials among it. Values such as
-        telemetry headers can still be sensitive, it is never a part of the representation.
+        Environment of the process without the credential descriptor and the marker, which the
+        run adds. Values such as telemetry headers can be sensitive, it is never a part of the
+        representation.
     directory
         Working directory of the process.
     prompt
         The ``user`` message sent to the process within a single ``stream-json`` line.
     credential
-        API key or OAuth token, handed over through a file descriptor only.
-    credential_variable
-        Variable pointing the process to the descriptor of the credential.
+        The only credential of the run, handed over through a file descriptor.
     marker
         Value of ``DRAIVE_CLAUDE_RUN`` within the environment of the process and of everything it
         starts - also of what detaches or outlives it, so a run can stop all of it.
-    secrets
-        Values redacted from anything reported out of the process output.
     timeout
         Limit of the run duration in seconds.
     grace
-        Time a stopped process has to exit before it is killed, in seconds.
+        Time a terminated process has to exit before it is killed, in seconds.
     """
 
     binary: str
@@ -128,68 +125,21 @@ class ClaudeCodeLaunch(State):
     environment: Annotated[Mapping[str, str], Sensitive()]
     directory: str
     prompt: str
-    credential: Annotated[str, Sensitive()] | Missing = Missing
-    credential_variable: str = "CLAUDE_CODE_API_KEY_FILE_DESCRIPTOR"
-    marker: str = ""
-    secrets: Annotated[Sequence[str], Sensitive()] = ()
-    timeout: float = 1800.0
-    grace: float = 10.0
+    credential: ClaudeCodeCredential | Missing
+    marker: Annotated[str, Verifier(_marker)]
+    timeout: float
+    grace: float
 
-
-def validate_config(
-    config: ClaudeCodeConfig,
-    /,
-) -> None:
-    """Verify the configuration can be used to run Claude Code.
-
-    Parameters
-    ----------
-    config
-        Configuration to verify.
-
-    Raises
-    ------
-    ValueError
-        When the configuration is invalid, i.e. it uses reserved environment variables.
-    """
-    if config.persistence == "resumable" and config.state_directory is Missing:
-        raise ValueError("Resumable Claude Code runs require state_directory")
-
-    _validate_limits(config)
-    for name in (*config.env, *config.inherit_env):
-        if _reserved(name):
-            raise ValueError(f"Claude Code environment variable '{name}' is reserved")
-
-    for directory in (*config.additional_directories, *config.plugin_directories):
-        if not os.path.isabs(directory):
-            raise ValueError(f"Claude Code directory '{directory}' has to be absolute")
-
-
-def _validate_limits(
-    config: ClaudeCodeConfig,
-    /,
-) -> None:
-    if config.timeout <= 0 or config.stop_grace < 0:
-        raise ValueError("Claude Code timeout has to be positive and stop_grace not negative")
-
-    if config.max_turns is not Missing and config.max_turns < 1:
-        raise ValueError("Claude Code max_turns has to be at least 1")
-
-    if config.max_budget_usd is not Missing and config.max_budget_usd <= 0:
-        raise ValueError("Claude Code max_budget_usd has to be positive")
-
-    if config.auto_compact_percent is not Missing and not 1 <= config.auto_compact_percent <= 100:  # noqa: PLR2004
-        raise ValueError("Claude Code auto_compact_percent has to be between 1 and 100")
-
-    if config.auto_compact_window is not Missing and config.auto_compact_window < 100_000:  # noqa: PLR2004
-        raise ValueError("Claude Code auto_compact_window has to be at least 100000 tokens")
-
-
-def _reserved(
-    name: str,
-    /,
-) -> bool:
-    return name in _RESERVED_ENV_NAMES or name.startswith(_RESERVED_ENV_PREFIXES)
+    @property
+    def redactions(self) -> Sequence[str]:
+        """Values redacted from anything reported out of the process output."""
+        values: list[str] = [] if self.credential is Missing else [self.credential.value]
+        values.extend(
+            self.environment[name]
+            for name in _SENSITIVE_ENV
+            if self.environment.get(name)  # empty is not worth redacting
+        )
+        return tuple(values)
 
 
 def claude_settings(
@@ -201,7 +151,7 @@ def claude_settings(
         "enabledPlugins": dict.fromkeys(_BUILTIN_PLUGINS, False),
         "autoMemoryEnabled": False,
     }
-    if not config.auto_compact:
+    if isinstance(config.compaction, ClaudeCodeNoCompaction):
         settings["autoCompactEnabled"] = False
 
     settings.update(config.settings)
@@ -221,12 +171,12 @@ def _json_value(
     raise TypeError(f"Unsupported setting value: {type(value).__name__}")
 
 
-def claude_arguments(  # noqa: C901, PLR0912
+def claude_arguments(
     config: ClaudeCodeConfig,
     /,
     *,
     instructions: str = "",
-    session: ClaudeCodeSession = ClaudeCodeSession(),  # noqa: B008
+    session: ClaudeCodeSession = _NO_SESSION,
 ) -> Sequence[str]:
     """Prepare the arguments running Claude Code headless within the given configuration.
 
@@ -265,59 +215,11 @@ def claude_arguments(  # noqa: C901, PLR0912
         config.model,
         "--tools",
         ",".join(config.tools),
+        *_plugin_arguments(config),
+        *_permission_arguments(config),
+        *_extension_arguments(config),
+        *_session_arguments(session),
     ]
-    if not config.plugin_directories:
-        arguments.append("--disable-slash-commands")
-
-    for plugin in config.plugin_directories:
-        arguments.extend(("--plugin-dir", plugin))
-
-    allowed: Sequence[str] = (
-        _scoped_tools(config) if config.allowed_tools is Missing else config.allowed_tools
-    )
-    if allowed:
-        arguments.extend(("--allowedTools", ",".join(allowed)))
-
-    if config.disallowed_tools:
-        arguments.extend(("--disallowedTools", ",".join(config.disallowed_tools)))
-
-    if config.mcp_servers:
-        arguments.extend(
-            (
-                "--mcp-config",
-                json.dumps(
-                    {"mcpServers": config.mcp_servers},
-                    separators=(",", ":"),
-                    default=_json_value,
-                ),
-            )
-        )
-
-    if config.subagents:
-        arguments.extend(
-            (
-                "--agents",
-                json.dumps(config.subagents, separators=(",", ":"), default=_json_value),
-            )
-        )
-
-    for directory in config.additional_directories:
-        arguments.extend(("--add-dir", directory))
-
-    match session.mode:
-        case "ephemeral":
-            arguments.append("--no-session-persistence")
-
-        case "new":
-            arguments.extend(("--session-id", _session_identifier(session)))
-
-        case "resume":
-            # a resumed session keeps the system prompt of its first request, which makes it
-            # ignore instructions which changed since
-            arguments.extend(
-                ("--resume", _session_identifier(session), "--system-prompt-snapshot", "off")
-            )
-
     if instructions:
         flag: str = (
             "--system-prompt" if config.system_prompt == "replace" else "--append-system-prompt"
@@ -339,11 +241,78 @@ def claude_arguments(  # noqa: C901, PLR0912
     return tuple(arguments)
 
 
-# tools working with paths, allowed within the directories of the run only - their bare names would
-# allow them to work with any path the process can reach, i.e. to read the keys of the user
-_READ_TOOLS: Final[Sequence[str]] = ("Read", "Grep", "Glob")
-# permission rules of every tool changing files are the ones of `Edit`, `Write(path)` never matches
-_EDIT_TOOLS: Final[Sequence[str]] = ("Edit", "Write", "MultiEdit", "NotebookEdit")
+def _plugin_arguments(
+    config: ClaudeCodeConfig,
+    /,
+) -> Sequence[str]:
+    if not config.plugin_directories:
+        return ("--disable-slash-commands",)  # plugins bring their own
+
+    return tuple(
+        argument for plugin in config.plugin_directories for argument in ("--plugin-dir", plugin)
+    )
+
+
+def _permission_arguments(
+    config: ClaudeCodeConfig,
+    /,
+) -> Sequence[str]:
+    allowed: Sequence[str] = (
+        _scoped_tools(config) if config.allowed_tools is Missing else config.allowed_tools
+    )
+    arguments: list[str] = []
+    if allowed:
+        arguments.extend(("--allowedTools", ",".join(allowed)))
+
+    if config.disallowed_tools:
+        arguments.extend(("--disallowedTools", ",".join(config.disallowed_tools)))
+
+    return tuple(arguments)
+
+
+def _extension_arguments(
+    config: ClaudeCodeConfig,
+    /,
+) -> Sequence[str]:
+    arguments: list[str] = []
+    if config.mcp_servers:
+        arguments.extend(
+            (
+                "--mcp-config",
+                json.dumps(
+                    {"mcpServers": config.mcp_servers},
+                    separators=(",", ":"),
+                    default=_json_value,
+                ),
+            )
+        )
+
+    if config.subagents:
+        arguments.extend(
+            ("--agents", json.dumps(config.subagents, separators=(",", ":"), default=_json_value))
+        )
+
+    for directory in config.additional_directories:
+        arguments.extend(("--add-dir", directory))
+
+    return tuple(arguments)
+
+
+def _session_arguments(
+    session: ClaudeCodeSession,
+    /,
+) -> Sequence[str]:
+    match session:
+        case ClaudeCodeNoSession():
+            return ("--no-session-persistence",)
+
+        case ClaudeCodeNewSession(identifier=identifier):
+            return ("--session-id", identifier)
+
+        case ClaudeCodeResumedSession(identifier=identifier):
+            # a resumed session keeps the system prompt of its first request, which makes it
+            # ignore instructions which changed since
+            return ("--resume", identifier, "--system-prompt-snapshot", "off")
 
 
 def _scoped_tools(
@@ -379,41 +348,25 @@ def _directory_pattern(
     return f"//{escaped.lstrip('/')}/**"
 
 
-def _session_identifier(
-    session: ClaudeCodeSession,
-    /,
-) -> str:
-    if not session.identifier:
-        raise ValueError(f"Claude Code session mode '{session.mode}' requires an identifier")
-
-    return session.identifier
-
-
 def claude_environment(
     config: ClaudeCodeConfig,
     /,
     *,
-    home: str,
-    config_directory: str,
-    temporary_directory: str,
+    workspace: ClaudeCodeWorkspace,
     base_url: str | None = None,
     trace_context: Mapping[str, str] | None = None,
     resource_attributes: Mapping[str, str] | None = None,
     parent: Mapping[str, str] | None = None,
 ) -> Mapping[str, str]:
-    """Prepare the whole environment of the process, nothing is taken from the parent besides
-    a few connectivity variables.
+    """Prepare the environment of the process, nothing is taken from the parent besides a few
+    connectivity variables.
 
     Parameters
     ----------
     config
         Configuration of the run.
-    home
-        Private home directory of the process.
-    config_directory
-        Directory of the Claude Code configuration, it holds sessions of resumable runs.
-    temporary_directory
-        Directory of temporary files.
+    workspace
+        Directories of the run, the process gets its private ones.
     base_url
         Custom API endpoint, i.e. a gateway.
     trace_context
@@ -426,7 +379,7 @@ def claude_environment(
     Returns
     -------
     Mapping[str, str]
-        Environment of the process.
+        Environment of the process, without the credential descriptor and the marker.
     """
     source: Mapping[str, str] = os.environ if parent is None else parent
     environment: dict[str, str] = {
@@ -434,34 +387,34 @@ def claude_environment(
     }
     environment.update(
         {
-            "HOME": home,
-            "TMPDIR": temporary_directory,
-            "CLAUDE_CONFIG_DIR": config_directory,
-            "CLAUDE_CODE_TMPDIR": temporary_directory,
+            "HOME": workspace.home,
+            "TMPDIR": workspace.temporary_directory,
+            "CLAUDE_CONFIG_DIR": workspace.config_directory,
+            "CLAUDE_CODE_TMPDIR": workspace.temporary_directory,
             "DISABLE_AUTOUPDATER": "1",
             "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
             "CLAUDE_CODE_DISABLE_BUNDLED_SKILLS": "1",
             "CLAUDE_AGENT_SDK_DISABLE_BUILTIN_AGENTS": "1",
         }
     )
-
     if base_url:
         environment["ANTHROPIC_BASE_URL"] = base_url
 
-    if config.auto_compact_percent is not Missing:
-        environment["CLAUDE_AUTOCOMPACT_PCT_OVERRIDE"] = str(config.auto_compact_percent)
+    match config.compaction:
+        case ClaudeCodeAutoCompaction(percent=percent, window=window):
+            if percent is not Missing:
+                environment["CLAUDE_AUTOCOMPACT_PCT_OVERRIDE"] = str(percent)
 
-    if config.auto_compact_window is not Missing:
-        environment["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = str(config.auto_compact_window)
+            if window is not Missing:
+                environment["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = str(window)
+
+        case ClaudeCodeNoCompaction():
+            pass  # disabled by the settings
 
     if config.telemetry is not Missing:
-        environment.update(_telemetry_environment(config.telemetry, resource_attributes))
-        if config.telemetry.propagate_trace and trace_context:
-            if traceparent := trace_context.get("traceparent"):
-                environment["TRACEPARENT"] = traceparent
-
-            if tracestate := trace_context.get("tracestate"):
-                environment["TRACESTATE"] = tracestate
+        environment.update(
+            _telemetry_environment(config.telemetry, trace_context, resource_attributes)
+        )
 
     environment.update(config.env)
     return environment
@@ -469,19 +422,21 @@ def claude_environment(
 
 def _telemetry_environment(
     telemetry: ClaudeCodeTelemetry,
+    trace_context: Mapping[str, str] | None,
     resource_attributes: Mapping[str, str] | None,
     /,
 ) -> Mapping[str, str]:
+    interval: str = str(telemetry.export_interval_ms)
     environment: dict[str, str] = {
         "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
-        "OTEL_METRICS_EXPORTER": "otlp" if telemetry.metrics else "none",
-        "OTEL_LOGS_EXPORTER": "otlp" if telemetry.logs else "none",
+        "OTEL_METRICS_EXPORTER": "otlp" if "metrics" in telemetry.signals else "none",
+        "OTEL_LOGS_EXPORTER": "otlp" if "logs" in telemetry.signals else "none",
         "OTEL_EXPORTER_OTLP_PROTOCOL": telemetry.protocol,
-        "OTEL_METRIC_EXPORT_INTERVAL": str(telemetry.metrics_interval_ms),
-        "OTEL_LOGS_EXPORT_INTERVAL": str(telemetry.logs_interval_ms),
-        "OTEL_TRACES_EXPORT_INTERVAL": str(telemetry.traces_interval_ms),
+        "OTEL_METRIC_EXPORT_INTERVAL": interval,
+        "OTEL_LOGS_EXPORT_INTERVAL": interval,
+        "OTEL_TRACES_EXPORT_INTERVAL": interval,
     }
-    if telemetry.traces:
+    if "traces" in telemetry.signals:
         environment["OTEL_TRACES_EXPORTER"] = "otlp"
         environment["CLAUDE_CODE_ENHANCED_TELEMETRY_BETA"] = "1"
 
@@ -491,8 +446,8 @@ def _telemetry_environment(
     if telemetry.headers is not Missing:
         environment["OTEL_EXPORTER_OTLP_HEADERS"] = telemetry.headers
 
-    attributes: dict[str, str] = {
-        "service.name": telemetry.service_name,
+    attributes: Mapping[str, str] = {
+        "service.name": "claude-code",
         **telemetry.resource_attributes,
         **(resource_attributes or {}),
     }
@@ -509,23 +464,26 @@ def _telemetry_environment(
     if telemetry.log_tool_content:
         environment["OTEL_LOG_TOOL_CONTENT"] = "1"
 
+    if telemetry.propagate_trace and trace_context:
+        if traceparent := trace_context.get("traceparent"):
+            environment["TRACEPARENT"] = traceparent
+
+        if tracestate := trace_context.get("tracestate"):
+            environment["TRACESTATE"] = tracestate
+
     return environment
 
 
-def build_launch(  # noqa: PLR0913
+def build_launch(
     config: ClaudeCodeConfig,
     /,
     *,
     binary: str,
     prompt: Sequence[Mapping[str, Any]],
-    directory: str,
-    home: str,
-    config_directory: str,
-    temporary_directory: str,
+    workspace: ClaudeCodeWorkspace,
     instructions: str = "",
-    session: ClaudeCodeSession = ClaudeCodeSession(),  # noqa: B008
-    credential: str | None = None,
-    credential_kind: Literal["api_key", "oauth_token"] = "api_key",
+    session: ClaudeCodeSession = _NO_SESSION,
+    credential: ClaudeCodeCredential | Missing = Missing,
     base_url: str | None = None,
     trace_context: Mapping[str, str] | None = None,
     resource_attributes: Mapping[str, str] | None = None,
@@ -540,22 +498,14 @@ def build_launch(  # noqa: PLR0913
         Absolute path of the executable.
     prompt
         Content blocks of the user message.
-    directory
-        Working directory of the process.
-    home
-        Private home directory of the process.
-    config_directory
-        Directory of the Claude Code configuration.
-    temporary_directory
-        Directory of temporary files.
+    workspace
+        Directories of the run.
     instructions
         Instructions of the agent.
     session
         Persistence of the run within Claude Code sessions.
     credential
-        API key or OAuth token.
-    credential_kind
-        Kind of the credential.
+        The only credential of the run.
     base_url
         Custom API endpoint.
     trace_context
@@ -567,49 +517,24 @@ def build_launch(  # noqa: PLR0913
     -------
     ClaudeCodeLaunch
         Launch ready to be run.
-
-    Raises
-    ------
-    ValueError
-        When the configuration is invalid.
     """
-    validate_config(config)
-    variable: str = (
-        "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR"
-        if credential_kind == "oauth_token"
-        else "CLAUDE_CODE_API_KEY_FILE_DESCRIPTOR"
-    )
-    secrets: list[str] = [credential] if credential else []
-    if (
-        config.telemetry is not Missing
-        and config.telemetry.headers is not Missing
-        and config.telemetry.headers
-    ):
-        secrets.append(config.telemetry.headers)
-
-    marker: str = uuid4().hex
-    environment: Mapping[str, str] = claude_environment(
-        config,
-        home=home,
-        config_directory=config_directory,
-        temporary_directory=temporary_directory,
-        base_url=base_url,
-        trace_context=trace_context,
-        resource_attributes=resource_attributes,
-    )
     return ClaudeCodeLaunch(
         binary=binary,
         arguments=claude_arguments(config, instructions=instructions, session=session),
-        environment={**environment, RUN_MARKER_VARIABLE: marker},
-        directory=directory,
+        environment=claude_environment(
+            config,
+            workspace=workspace,
+            base_url=base_url,
+            trace_context=trace_context,
+            resource_attributes=resource_attributes,
+        ),
+        directory=workspace.directory,
         prompt=json.dumps(
             {"type": "user", "message": {"role": "user", "content": list(prompt)}},
             separators=(",", ":"),
         ),
-        credential=credential if credential else Missing,
-        credential_variable=variable,
-        marker=marker,
-        secrets=tuple(secrets),
+        credential=credential,
+        marker=uuid4().hex,
         timeout=config.timeout,
         grace=config.stop_grace,
     )

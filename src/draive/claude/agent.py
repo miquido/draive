@@ -1,35 +1,43 @@
 import json
 from collections.abc import AsyncGenerator, Sequence
-from typing import Final
+from typing import Final, final
 from urllib.parse import quote
 
-from haiway import Meta, MetaValues, Missing, ctx
+from haiway import Meta, MetaValues, Missing, State, ctx
 
 from draive.agents import Agent, AgentIdentity, AgentMemory, AgentMessage, AgentThread
 from draive.claude.config import ClaudeCodeConfig
 from draive.claude.events import (
     ClaudeCodeDelta,
+    ClaudeCodeEvent,
+    ClaudeCodeFailure,
     ClaudeCodeResult,
     ClaudeCodeStarted,
+    ClaudeCodeSuccess,
     ClaudeCodeText,
     ClaudeCodeToolResult,
     ClaudeCodeToolUse,
 )
-from draive.claude.launch import ClaudeCodeSession, build_launch, validate_config
+from draive.claude.launch import build_launch
+from draive.claude.sessions import (
+    ClaudeCodeNewSession,
+    ClaudeCodeNoSession,
+    ClaudeCodeResumedSession,
+    ClaudeCodeSession,
+    ClaudeCodeSessions,
+    session_exists,
+    session_identifier,
+)
 from draive.claude.transcript import prompt_blocks, render_transcript
 from draive.claude.types import (
+    ClaudeCodeEnded,
+    ClaudeCodeErrored,
     ClaudeCodeException,
-    ClaudeCodeFailed,
     ClaudeCodeRunner,
     ClaudeCodeUnavailable,
 )
-from draive.claude.workspace import claude_workspace, session_exists, session_identifier
-from draive.models import (
-    ModelContext,
-    ModelInput,
-    ModelOutput,
-    record_usage_metrics,
-)
+from draive.claude.workspace import ClaudeCodeWorkspace, claude_workspace
+from draive.models import ModelContext, ModelInput, ModelOutput, record_usage_metrics
 from draive.multimodal import (
     MultimodalContent,
     MultimodalContentPart,
@@ -45,13 +53,40 @@ _PROVIDER: Final[str] = "claude_code"
 # built-in plugins which an organization enforces for its accounts, no setting disables them
 _ENFORCED_PLUGINS: Final[Sequence[str]] = ("cc-plugin-sec-default",)
 
+type _Chunk = MultimodalContentPart | ProcessingEvent
 
-def claude_code_agent(  # noqa: C901, PLR0915
+
+@final
+class _Continuity(State):
+    """How a run continues the conversation, the only source of its session and its history."""
+
+    session: ClaudeCodeSession
+    recalled: ModelContext = ()
+
+
+@final
+class _Streamed(State):
+    """What was streamed of a run so far, the only source of its answer and its result."""
+
+    previewed: str = ""  # streamed text which its complete block is not to repeat
+    answer: Sequence[str] = ()
+    result: ClaudeCodeResult | None = None
+
+    def echoes(
+        self,
+        text: str,
+        /,
+    ) -> bool:
+        """Whether the complete block only repeats what was streamed of it already."""
+        return self.previewed.startswith(text)
+
+
+def claude_code_agent(
     agent: AgentIdentity | str,
     *,
     description: str = "",
     instructions: Template | str = "",
-    memory: AgentMemory = AgentMemory.disabled,
+    memory: AgentMemory | ClaudeCodeSessions = AgentMemory.disabled,
     config: ClaudeCodeConfig | None = None,
     meta: Meta | MetaValues | None = None,
 ) -> Agent:
@@ -62,11 +97,13 @@ def claude_code_agent(  # noqa: C901, PLR0915
     agent is streamed as text parts, its tool use and results as ``ProcessingEvent``s named
     ``claude_code.tool_use``, ``claude_code.tool_result`` and ``claude_code.result``.
 
-    Memory of the conversation is either managed by draive or by Claude Code. With
-    ``memory`` the recalled history is handed to a fresh session and the turn remembered
-    afterwards, which works with any memory backend. With the ``resumable`` persistence of
-    the configuration Claude Code keeps the sessions of threads and resumes them - the memory
-    is not used then. Nothing is kept by default.
+    The memory of the conversation is either managed by draive or by Claude Code. With
+    ``AgentMemory`` the recalled history is handed to a fresh session and the turn remembered
+    afterwards, which works with any memory backend. With ``ClaudeCodeSessions`` Claude Code
+    keeps the session of each thread and resumes it, with the whole context it had. Nothing is
+    kept by default.
+
+    The call is an async generator, close it when it is left early, i.e. with ``ctx.closing``.
 
     Parameters
     ----------
@@ -80,7 +117,7 @@ def claude_code_agent(  # noqa: C901, PLR0915
         Instructions of the agent, appended to the system prompt of Claude Code, or replacing
         it according to the configuration.
     memory
-        Memory of the conversation managed by draive, disabled by default.
+        Memory of the conversation, disabled by default.
     config
         Configuration of the runs, ``ClaudeCodeConfig`` of the scope when not set.
     meta
@@ -98,10 +135,10 @@ def claude_code_agent(  # noqa: C901, PLR0915
     ClaudeCodeFailed
         When the run failed, timed out or reported an error.
     ValueError
-        When the configuration or the message is not supported.
+        When the message or the working directory is not supported.
     """
     identity: AgentIdentity = (
-        # stable, as the sessions of resumable runs are found by it after a restart
+        # stable, as the sessions are found by it after a restart
         AgentIdentity.of(
             f"agent://claude-code/{quote(agent, safe='')}",
             name=agent,
@@ -112,196 +149,222 @@ def claude_code_agent(  # noqa: C901, PLR0915
         else agent
     )
 
-    async def executing(  # noqa: C901, PLR0912, PLR0915
+    async def executing(
         message: AgentMessage,
-    ) -> AsyncGenerator[MultimodalContentPart | ProcessingEvent]:
+    ) -> AsyncGenerator[_Chunk]:
         async with ctx.scope("agent.claude_code"):
-            if not ctx.contains_state(AgentThread):
-                raise ClaudeCodeException("AgentThread not specified")
-
-            thread: AgentThread = ctx.state(AgentThread)
+            thread: AgentThread = _current_thread()
             resolved: ClaudeCodeConfig = config or ctx.state(ClaudeCodeConfig)
-            validate_config(resolved)
             runner: ClaudeCodeRunner = ctx.state(ClaudeCodeRunner)
-            resumable: bool = resolved.persistence == "resumable"
-            if resumable and memory is not AgentMemory.disabled:
-                raise ValueError(
-                    "Resumable Claude Code sessions are the memory of the agent,"
-                    " use either them or AgentMemory"
+            text: str = await _resolved(instructions)
+            async with claude_workspace(
+                resolved,
+                memory if isinstance(memory, ClaudeCodeSessions) else None,
+            ) as workspace:
+                continuity: _Continuity = await _continuity(
+                    memory,
+                    identity=identity,
+                    thread=thread,
+                    workspace=workspace,
+                    instructions=text,
                 )
-
-            resolved_instructions: str = (
-                await TemplatesRepository.resolve_str(instructions)
-                if isinstance(instructions, Template)
-                else instructions
-            )
-            recalled: ModelContext = ()
-            if not resumable:
-                await memory.prepare(thread=thread, instructions=resolved_instructions)
-                recalled = await memory.recall(thread=thread, context=())
-
-            blocks = prompt_blocks(
-                message.content,
-                history=render_transcript(recalled) if recalled else None,
-            )
-            async with claude_workspace(resolved) as workspace:
-                session: ClaudeCodeSession = ClaudeCodeSession()
-                if resumable:
-                    # also a session which did not finish is stored, and can not be started again
-                    identifier: str = session_identifier(identity.uri, thread.identifier)
-                    session = ClaudeCodeSession(
-                        mode=(
-                            "resume"
-                            if await session_exists(workspace.config_directory, identifier)
-                            else "new"
+                streamed: _Streamed = _Streamed()
+                stream = runner.running(
+                    build_launch(
+                        resolved,
+                        binary=runner.binary,
+                        prompt=prompt_blocks(
+                            message.content,
+                            history=render_transcript(continuity.recalled)
+                            if continuity.recalled
+                            else None,
                         ),
-                        identifier=identifier,
+                        workspace=workspace,
+                        instructions=text,
+                        session=continuity.session,
+                        credential=runner.credential,
+                        base_url=None if runner.base_url is Missing else runner.base_url,
+                        # inside of the scope of the agent, so the run continues its trace
+                        trace_context=ctx.trace_context(),
+                        resource_attributes={
+                            "draive.agent": identity.name,
+                            "draive.agent.uri": identity.uri,
+                            "draive.thread": str(thread.identifier),
+                        },
                     )
-
-                launch = build_launch(
-                    resolved,
-                    binary=runner.binary,
-                    prompt=blocks,
-                    directory=workspace.directory,
-                    home=workspace.home,
-                    config_directory=workspace.config_directory,
-                    temporary_directory=workspace.temporary_directory,
-                    instructions=resolved_instructions,
-                    session=session,
-                    credential=_present(runner.credential),
-                    credential_kind=runner.credential_kind,
-                    base_url=_present(runner.base_url),
-                    # inside of the scope of the agent, so the run continues its trace
-                    trace_context=ctx.trace_context(),
-                    resource_attributes={
-                        "draive.agent": identity.name,
-                        "draive.agent.uri": identity.uri,
-                        "draive.thread": str(thread.identifier),
-                    },
                 )
-
-                answer: list[str] = []
-                previewed: str = ""  # streamed text the complete block is not repeated for
-                result: ClaudeCodeResult | None = None
-                stream = runner.running(launch)
                 try:
                     async for event in stream:
                         if isinstance(event, ClaudeCodeStarted):
                             _verify_authentication(event, runner)
-                            ctx.record_info(
-                                attributes={
-                                    "claude_code.session": event.session_id,
-                                    "claude_code.model": event.model,
-                                    "claude_code.version": event.version,
-                                    "claude_code.permission_mode": event.permission_mode,
-                                    "claude_code.tools": list(event.tools),
-                                    "claude_code.mcp_servers": list(event.mcp_servers),
-                                    "claude_code.mcp_failed": list(event.mcp_failed),
-                                }
-                            )
-                            if event.mcp_failed:
-                                ctx.log_warning(
-                                    "Claude Code could not connect MCP servers:"
-                                    f" {', '.join(event.mcp_failed)}"
-                                )
+                            _report_started(event)
 
-                            if leaked := [
-                                name
-                                for name in event.plugins
-                                if name.startswith("cc-plugin-") and name not in _ENFORCED_PLUGINS
-                            ]:
-                                ctx.log_warning(
-                                    "Claude Code loaded built-in plugins which are not disabled:"
-                                    f" {', '.join(leaked)}"
-                                )
+                        for chunk in _chunks(event, streamed):
+                            yield chunk
 
-                        elif isinstance(event, ClaudeCodeDelta):
-                            previewed += event.text
-                            answer.append(event.text)
-                            yield TextContent.of(event.text)
-
-                        elif isinstance(event, ClaudeCodeText):
-                            if event.parent is not None:
-                                yield ProcessingEvent.of(
-                                    "claude_code.subagent_text",
-                                    event.text,
-                                    meta={"parent": event.parent},
-                                )
-
-                            elif previewed.startswith(event.text):
-                                previewed = previewed[len(event.text) :]  # already streamed
-
-                            else:
-                                answer.append(event.text)
-                                yield TextContent.of(event.text)
-
-                        elif isinstance(event, ClaudeCodeToolUse):
-                            yield ProcessingEvent.of(
-                                "claude_code.tool_use",
-                                meta={
-                                    "tool": event.tool,
-                                    "identifier": event.identifier,
-                                    "arguments": json.dumps(event.arguments, default=str),
-                                    **({"parent": event.parent} if event.parent else {}),
-                                },
-                            )
-
-                        elif isinstance(event, ClaudeCodeToolResult):
-                            yield ProcessingEvent.of(
-                                "claude_code.tool_result",
-                                event.content,
-                                meta={
-                                    "identifier": event.identifier,
-                                    "failed": event.failed,
-                                    **({"parent": event.parent} if event.parent else {}),
-                                },
-                            )
-
-                        else:
-                            result = event
+                        streamed = _accumulated(event, streamed)
 
                 finally:
                     await stream.aclose()
 
-                if result is None:  # a runner without a result would be a broken one
-                    raise ClaudeCodeFailed("the run ended without a result")
+                result: ClaudeCodeResult = _concluded(streamed)
+                match result.outcome:
+                    case ClaudeCodeFailure() as failure:
+                        raise ClaudeCodeErrored(failure=failure, session_id=result.session_id)
 
-                _record_result(result)
-                if result.failed:
-                    raise ClaudeCodeFailed(
-                        result.text or result.subtype or "the run failed",
-                        session_id=result.session_id,
-                        api_error_status=result.api_error_status,
-                        terminal_reason=result.terminal_reason,
-                    )
+                    case ClaudeCodeSuccess(text=answer):
+                        if not streamed.answer and answer:
+                            yield TextContent.of(answer)  # nothing else carried the text
 
-                if not answer and result.text:
-                    answer.append(result.text)  # nothing was streamed, the result is the text
-                    yield TextContent.of(result.text)
+                        if isinstance(memory, AgentMemory):
+                            await memory.remember(
+                                thread=thread,
+                                context=(
+                                    *continuity.recalled,
+                                    ModelInput.of(message.content, meta=message.meta),
+                                    ModelOutput.of(
+                                        MultimodalContent.of("".join(streamed.answer) or answer)
+                                    ),
+                                ),
+                            )
 
-                final: str = "".join(answer)
-                if not resumable:
-                    await memory.remember(
-                        thread=thread,
-                        context=(
-                            *recalled,
-                            ModelInput.of(message.content, meta=message.meta),
-                            ModelOutput.of(MultimodalContent.of(final)),
-                        ),
-                    )
-
-                yield ProcessingEvent.of(
-                    "claude_code.result",
-                    meta={
-                        "session": result.session_id,
-                        "turns": result.turns,
-                        "duration_ms": result.duration_ms,
-                        "cost_usd": result.cost_usd,
-                        "permission_denials": result.permission_denials,
-                    },
-                )
+                        yield _summary(result)
 
     return Agent(identity, executing)
+
+
+def _current_thread() -> AgentThread:
+    if not ctx.contains_state(AgentThread):
+        raise ClaudeCodeException("AgentThread not specified")
+
+    return ctx.state(AgentThread)
+
+
+async def _resolved(
+    instructions: Template | str,
+    /,
+) -> str:
+    if isinstance(instructions, Template):
+        return await TemplatesRepository.resolve_str(instructions)
+
+    return instructions
+
+
+async def _continuity(
+    memory: AgentMemory | ClaudeCodeSessions,
+    /,
+    *,
+    identity: AgentIdentity,
+    thread: AgentThread,
+    workspace: ClaudeCodeWorkspace,
+    instructions: str,
+) -> _Continuity:
+    match memory:
+        case ClaudeCodeSessions():
+            identifier: str = session_identifier(identity.uri, thread.identifier)
+            # also a session which did not finish is stored, and can not be started again
+            if await session_exists(workspace.config_directory, identifier):
+                return _Continuity(session=ClaudeCodeResumedSession(identifier=identifier))
+
+            return _Continuity(session=ClaudeCodeNewSession(identifier=identifier))
+
+        case AgentMemory():
+            await memory.prepare(thread=thread, instructions=instructions)
+            return _Continuity(
+                session=ClaudeCodeNoSession(),
+                recalled=await memory.recall(thread=thread, context=()),
+            )
+
+
+def _chunks(
+    event: ClaudeCodeEvent,
+    streamed: _Streamed,
+    /,
+) -> Sequence[_Chunk]:
+    match event:
+        case ClaudeCodeDelta(text=text):
+            return (TextContent.of(text),)
+
+        case ClaudeCodeText(text=text, parent=str() as parent):
+            return (ProcessingEvent.of("claude_code.subagent_text", text, meta={"parent": parent}),)
+
+        case ClaudeCodeText(text=text):
+            return () if streamed.echoes(text) else (TextContent.of(text),)
+
+        case ClaudeCodeToolUse():
+            return (_tool_use(event),)
+
+        case ClaudeCodeToolResult():
+            return (_tool_result(event),)
+
+        case _:
+            return ()
+
+
+def _accumulated(
+    event: ClaudeCodeEvent,
+    streamed: _Streamed,
+    /,
+) -> _Streamed:
+    match event:
+        case ClaudeCodeDelta(text=text):
+            return streamed.updating(
+                previewed=streamed.previewed + text,
+                answer=(*streamed.answer, text),
+            )
+
+        case ClaudeCodeText(text=text, parent=None):
+            if streamed.echoes(text):
+                return streamed.updating(previewed=streamed.previewed[len(text) :])
+
+            return streamed.updating(answer=(*streamed.answer, text))
+
+        case ClaudeCodeResult():
+            return streamed.updating(result=event)
+
+        case _:
+            return streamed
+
+
+def _tool_use(
+    event: ClaudeCodeToolUse,
+    /,
+) -> ProcessingEvent:
+    return ProcessingEvent.of(
+        "claude_code.tool_use",
+        meta={
+            "tool": event.tool,
+            "identifier": event.identifier,
+            "arguments": json.dumps(event.arguments, default=str),
+            **({"parent": event.parent} if event.parent else {}),
+        },
+    )
+
+
+def _tool_result(
+    event: ClaudeCodeToolResult,
+    /,
+) -> ProcessingEvent:
+    return ProcessingEvent.of(
+        "claude_code.tool_result",
+        event.content,
+        meta={
+            "identifier": event.identifier,
+            "failed": event.failed,
+            **({"parent": event.parent} if event.parent else {}),
+        },
+    )
+
+
+def _concluded(
+    streamed: _Streamed,
+    /,
+) -> ClaudeCodeResult:
+    if streamed.result is None:  # a runner without a result would be a broken one
+        raise ClaudeCodeEnded()
+
+    _record_result(streamed.result)
+    return streamed.result
 
 
 def _verify_authentication(
@@ -313,28 +376,41 @@ def _verify_authentication(
     if runner.credential is Missing:
         return
 
-    # an API key is reported by the variable it is taken from, an OAuth token is not an API key
-    # at all - Claude Code reports no key source for it
-    expected: str
-    label: str
-    if runner.credential_kind == "api_key":
-        expected, label = "ANTHROPIC_API_KEY", "API key"
-
-    else:
-        expected, label = "none", "OAuth token"
-
-    if started.api_key_source != expected:
+    if started.api_key_source != runner.credential.reported_source:
         raise ClaudeCodeUnavailable(
             f"Claude Code authenticates with '{started.api_key_source}'"
-            f" instead of the provided {label}"
+            f" instead of the provided {runner.credential.label}"
         )
 
 
-def _present(
-    value: str | Missing,
+def _report_started(
+    started: ClaudeCodeStarted,
     /,
-) -> str | None:
-    return None if value is Missing else value
+) -> None:
+    ctx.record_info(
+        attributes={
+            "claude_code.session": started.session_id,
+            "claude_code.model": started.model,
+            "claude_code.version": started.version,
+            "claude_code.permission_mode": started.permission_mode,
+            "claude_code.tools": list(started.tools),
+            "claude_code.mcp_servers": [server.name for server in started.mcp_servers],
+            "claude_code.mcp_failed": list(started.failed_mcp_servers),
+        },
+    )
+    if started.failed_mcp_servers:
+        ctx.log_warning(
+            f"Claude Code could not connect MCP servers: {', '.join(started.failed_mcp_servers)}"
+        )
+
+    if leaked := [
+        name
+        for name in started.plugins
+        if name.startswith("cc-plugin-") and name not in _ENFORCED_PLUGINS
+    ]:
+        ctx.log_warning(
+            f"Claude Code loaded built-in plugins which are not disabled: {', '.join(leaked)}"
+        )
 
 
 def _record_result(
@@ -350,13 +426,20 @@ def _record_result(
             output_tokens=usage.output_tokens,
         )
 
+    match result.outcome:
+        case ClaudeCodeFailure(terminal_reason=terminal_reason):
+            reason: str = terminal_reason or "failed"
+
+        case ClaudeCodeSuccess():
+            reason = "completed"
+
     if result.cost_usd is not None:
         ctx.record_info(
             metric="agent.claude_code.cost",
             value=result.cost_usd,
             unit="usd",
             kind="counter",
-            attributes={"claude_code.terminal_reason": result.terminal_reason or "completed"},
+            attributes={"claude_code.terminal_reason": reason},
         )
 
     ctx.record_info(
@@ -365,4 +448,20 @@ def _record_result(
             "claude_code.turns": result.turns,
             "claude_code.failed": result.failed,
         }
+    )
+
+
+def _summary(
+    result: ClaudeCodeResult,
+    /,
+) -> ProcessingEvent:
+    return ProcessingEvent.of(
+        "claude_code.result",
+        meta={
+            "session": result.session_id,
+            "turns": result.turns,
+            "duration_ms": result.duration_ms,
+            "cost_usd": result.cost_usd,
+            "permission_denials": result.permission_denials,
+        },
     )
