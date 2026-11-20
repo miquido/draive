@@ -37,7 +37,7 @@ Execution args: `run/process/stream(context=(), /, *artifacts, **keyed_artifacts
 Builders (classmethods): `Step.sequence(*steps)`, `Step.loop(*steps, condition=, max_iterations=32)`
 (condition is `async (state, iteration) -> bool`), `Step.concurrent(*steps, merge=)` (`merge` is
 `async (branches: Iterable[StepState]) -> StepState`), `Step.selection(async (state) -> Step)`,
-`Step.deciding(criteria, *steps, input=)` (the scope `DecisionModel` picks one step, offered by the
+`Step.route(criteria, *steps, input=)` (the scope `DecisionModel` picks one step, offered by the
 meta `name`/`description` set with `step.with_meta(name=, description=)`; no implicit fallback to
 completions - bind a backend; a missing/repeated name raises `ValueError` when built, an unknown
 answer raises `StepException`; wrapping `with_*` modifiers keep meta, `sequence`/`then` do not),

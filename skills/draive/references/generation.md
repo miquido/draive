@@ -311,7 +311,7 @@ async def test_weather() -> None:
   `async def fn(*, input, questions, **extra)` returning one answer per question in question order,
   with the decided option meta merged like real backends do, e.g.
   `(DecisionChoiceAnswer(identifier="route", choice=billing, meta=billing.meta),)` - the facade
-  passes them through unchanged. `Step.deciding` and any other `DecisionModel` consumer take the
+  passes them through unchanged. `Step.route` and any other `DecisionModel` consumer take the
   same function as `DecisionModel(generating=fn)`.
 - Fake templates with `TemplatesRepository.volatile(...)`.
 

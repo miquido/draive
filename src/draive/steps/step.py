@@ -1149,7 +1149,7 @@ class Step:
         return cls(step)
 
     @classmethod
-    def deciding(
+    def route(
         cls,
         criteria: str,
         /,
@@ -1195,11 +1195,11 @@ class Step:
         as they are.
         """
         if len(steps) < 2:  # noqa: PLR2004
-            raise ValueError("Deciding requires at least two steps")
+            raise ValueError("Route requires at least two steps")
 
         for index, candidate in enumerate(steps):
             if not candidate.meta.name:
-                raise ValueError(f"Deciding step at index {index} has no meta name")
+                raise ValueError(f"Route step at index {index} has no meta name")
 
         try:
             # the validation of options rejects repeated names
@@ -1216,7 +1216,7 @@ class Step:
             )
 
         except ValidationError as exc:
-            raise ValueError(f"Invalid deciding steps or criteria: {exc}") from exc
+            raise ValueError(f"Invalid route steps or criteria: {exc}") from exc
 
         options: Mapping[str, Self] = {
             option.identifier: candidate
@@ -1304,7 +1304,7 @@ class Step:
         Notes
         -----
         Rationale: names and descriptions identify steps for model driven selection,
-        see ``deciding``. Modifiers such as ``with_retry`` keep the metadata of the
+        see ``route``. Modifiers such as ``with_retry`` keep the metadata of the
         step they wrap, combining steps, i.e. ``sequence``, starts with empty one.
         """
         return self.__class__(

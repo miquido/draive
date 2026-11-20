@@ -11,7 +11,7 @@ the optional completion based implementation described below.
 
 `DecisionGeneration` is the high level facade (templates, `check`, `choose`, `select`, `rate`). It
 sits on `DecisionModel` from `draive.models`, the thin backend layer next to `GenerativeModel` which
-providers install and which `Step.deciding` uses directly. Without an explicit `DecisionGeneration`,
+providers install and which `Step.route` uses directly. Without an explicit `DecisionGeneration`,
 the facade uses the `DecisionModel` bound in the scope.
 
 Reach for decisions whenever the answer is one of a fixed set of outcomes rather than generated
@@ -281,13 +281,13 @@ mind the question limit of the server, i.e. 64 questions for Ollama.
 `generate_completion_decisions` is an optional backend answering every question with a separate
 structured `GenerativeModel` completion, without tools, using the model bound in the scope, up to 8
 of them running concurrently. It is never used implicitly - completions may be slow and costly, so
-it has to be assigned explicitly, to `DecisionGeneration` or to `DecisionModel` (for
-`Step.deciding`). A selection is answered with a single completion listing every option which
-applies. Answers outside of the given options or levels raise `GenerationOutputMissing`. The model
-reasoning behind each decision is reported in the answer meta under `reasoning`. Questions are
-answered concurrently, so several of them failing together raise an `ExceptionGroup` of the
-underlying failures - `GenerationOutputMissing` for invalid answers, or model errors such as
-`ModelRateLimit`. Handle the grouped case as well when calling `decide` with multiple questions.
+it has to be assigned explicitly, to `DecisionGeneration` or to `DecisionModel` (for `Step.route`).
+A selection is answered with a single completion listing every option which applies. Answers outside
+of the given options or levels raise `GenerationOutputMissing`. The model reasoning behind each
+decision is reported in the answer meta under `reasoning`. Questions are answered concurrently, so
+several of them failing together raise an `ExceptionGroup` of the underlying failures -
+`GenerationOutputMissing` for invalid answers, or model errors such as `ModelRateLimit`. Handle the
+grouped case as well when calling `decide` with multiple questions.
 
 ```python
 from draive import DecisionGeneration, DecisionOption, ctx, generate_completion_decisions

@@ -90,7 +90,7 @@ def _marking(value: str, *, name: str | None = None, description: str | None = N
 
 
 def _routing(**arguments: Any) -> Step:
-    return Step.deciding(
+    return Step.route(
         "which one fits",
         _marking("A", name="alpha"),
         _marking("B", name="beta"),
@@ -111,7 +111,7 @@ async def test_executes_only_the_chosen_step(chosen: str) -> None:
         executed.append("beta")
         return state
 
-    routing = Step.deciding(
+    routing = Step.route(
         "c",
         step(alpha).with_meta(name="alpha"),
         step(beta).with_meta(name="beta"),
@@ -139,7 +139,7 @@ async def test_decides_on_every_execution() -> None:
 @pytest.mark.asyncio
 async def test_question_carries_criteria_and_step_names_and_descriptions() -> None:
     calls = Calls()
-    routing = Step.deciding(
+    routing = Step.route(
         "which one fits",
         _marking("A", name="alpha"),
         _marking("B", name="beta", description="when beta fits"),
@@ -206,7 +206,7 @@ async def test_chosen_step_runs_with_the_state_of_the_decision() -> None:
     async def seen(state: StepState) -> StepState:
         return state.updating_artifacts(Seen(value=state.get(Marker, required=True).value))
 
-    routing = Step.deciding(
+    routing = Step.route(
         "c",
         step(seen).with_meta(name="alpha"),
         _marking("B", name="beta"),
@@ -219,7 +219,7 @@ async def test_chosen_step_runs_with_the_state_of_the_decision() -> None:
 
 @pytest.mark.asyncio
 async def test_output_of_the_chosen_step_is_forwarded() -> None:
-    routing = Step.deciding(
+    routing = Step.route(
         "c",
         Step.appending_output("from alpha", emitting=True).with_meta(name="alpha"),
         Step.appending_output("from beta", emitting=True).with_meta(name="beta"),
@@ -263,8 +263,8 @@ async def test_composes_in_sequences_and_loops() -> None:
 
 @pytest.mark.asyncio
 async def test_nested_decisions_decide_independently() -> None:
-    inner = Step.deciding("inner", _marking("X", name="x"), _marking("Y", name="y"))
-    outer = Step.deciding(
+    inner = Step.route("inner", _marking("X", name="x"), _marking("Y", name="y"))
+    outer = Step.route(
         "outer",
         inner.with_meta(name="deep"),
         _marking("flat", name="flat"),
@@ -350,40 +350,40 @@ async def _never(
     raise AssertionError("must not be used")
 
 
-def test_deciding_requires_at_least_two_steps() -> None:
+def test_route_requires_at_least_two_steps() -> None:
     with pytest.raises(ValueError, match="at least two"):
-        Step.deciding("c")
+        Step.route("c")
 
     with pytest.raises(ValueError, match="at least two"):
-        Step.deciding("c", _marking("A", name="alpha"))
+        Step.route("c", _marking("A", name="alpha"))
 
 
 @pytest.mark.parametrize("name", [None, "", " padded"])
-def test_deciding_requires_a_valid_name_of_every_step(name: str | None) -> None:
+def test_route_requires_a_valid_name_of_every_step(name: str | None) -> None:
     unnamed = _marking("B") if name is None else _marking("B").with_meta(name=name)
 
     with pytest.raises(ValueError):
-        Step.deciding("c", _marking("A", name="alpha"), unnamed)
+        Step.route("c", _marking("A", name="alpha"), unnamed)
 
 
-def test_deciding_reports_the_index_of_the_unnamed_step() -> None:
+def test_route_reports_the_index_of_the_unnamed_step() -> None:
     with pytest.raises(ValueError, match="index 1"):
-        Step.deciding("c", _marking("A", name="alpha"), _marking("B"))
+        Step.route("c", _marking("A", name="alpha"), _marking("B"))
 
 
-def test_deciding_requires_unique_names() -> None:
+def test_route_requires_unique_names() -> None:
     with pytest.raises(ValueError, match="unique"):
-        Step.deciding("c", _marking("A", name="alpha"), _marking("B", name="alpha"))
+        Step.route("c", _marking("A", name="alpha"), _marking("B", name="alpha"))
 
 
-def test_deciding_requires_criteria() -> None:
+def test_route_requires_criteria() -> None:
     with pytest.raises(ValueError, match="criteria"):
-        Step.deciding("", _marking("A", name="alpha"), _marking("B", name="beta"))
+        Step.route("", _marking("A", name="alpha"), _marking("B", name="beta"))
 
 
 @pytest.mark.asyncio
-async def test_step_modifiers_keep_the_name_used_for_deciding() -> None:
-    routing = Step.deciding(
+async def test_step_modifiers_keep_the_name_used_for_route() -> None:
+    routing = Step.route(
         "c",
         _marking("A", name="alpha").with_retry(limit=2).with_timeout(5),
         _marking("B", name="beta").with_fallback(_marking("F")).with_volatile_tools(),
@@ -478,12 +478,12 @@ def test_combining_steps_starts_with_empty_meta() -> None:
 
     assert not Step.sequence(described, described).meta
     assert not described.then(described).meta
-    assert not Step.deciding("c", described, _marking("B", name="beta")).meta
+    assert not Step.route("c", described, _marking("B", name="beta")).meta
 
 
-def test_deciding_does_not_drop_a_step_sharing_a_name() -> None:
+def test_route_does_not_drop_a_step_sharing_a_name() -> None:
     with pytest.raises(ValueError, match="unique"):
-        Step.deciding(
+        Step.route(
             "c",
             _marking("A", name="alpha"),
             _marking("B", name="beta"),

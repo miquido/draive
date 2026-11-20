@@ -71,8 +71,8 @@ to garbage collection finalizes it within an unrelated context and breaks scoped
     `Step.looping_completion` stop with a `StepException` after `max_iterations` (32 by default,
     `None` disables the limit).
 - `Step.concurrent(..., merge=...)` for fan-out/fan-in branches.
-- `Step.selection(...)` for choosing the next step from the current state.
-- `Step.deciding(criteria, *steps)` for letting `DecisionModel` pick which of the given steps runs,
+- `Step.selection(...)` for choosing the next step from the current state in your own code.
+- `Step.route(criteria, *steps)` for letting `DecisionModel` pick which of the given steps runs,
     steps are described by their `with_meta(name=..., description=...)` (see below).
 - `Step.generating_completion(...)` for one model completion stage.
 - `Step.looping_completion(...)` for model + tool iterative loops.
@@ -107,8 +107,8 @@ should not be passed further.
 
 Any step can be wrapped without breaking composition:
 
-- `step.with_meta(name=..., description=...)` for describing a step, i.e. for `Step.deciding(...)`.
-    The other modifiers keep the meta of the step they wrap.
+- `step.with_meta(name=..., description=...)` for describing a step, i.e. for `Step.route(...)`. The
+    other modifiers keep the meta of the step they wrap.
 - `step.with_ctx(...)` for scoped state and disposables.
 - `step.with_retry(...)` and `step.with_fallback(...)` for failure handling. Every attempt (and the
     fallback) starts from the original input state, partial state of a failed attempt is discarded.
@@ -158,11 +158,11 @@ from draive import StepExecuting, StepMerging, StepProcessing, StepSelecting
 `StepProcessing` describes state-only functions accepted by the `@step` decorator. The remaining
 protocols describe the callbacks accepted by composition and modifier methods.
 
-## Deciding The Next Step
+## Routing To A Step
 
-`Step.deciding(criteria, *steps)` asks `DecisionModel` to choose exactly one of the given steps for
-the current state and executes it. It requires a `DecisionModel` in the scope, for example installed
-by `Gemini()` or `Ollama()`. Nothing falls back to model completions on its own - `Gemini()` using
+`Step.route(criteria, *steps)` asks `DecisionModel` to choose exactly one of the given steps for the
+current state and executes it. It requires a `DecisionModel` in the scope, for example installed by
+`Gemini()` or `Ollama()`. Nothing falls back to model completions on its own - `Gemini()` using
 Vertex AI does not install it by default, and a scope without any decision backend fails with a
 missing `DecisionModel`. Bind `DecisionModel(generating=generate_completion_decisions)` there, see
 below.
@@ -185,10 +185,10 @@ sales = Step.generating_completion(instructions="Answer the sales question.").wi
     name="sales",
 )
 
-route = Step.deciding("What is the user asking about?", support, sales)
+router = Step.route("What is the user asking about?", support, sales)
 
 async with ctx.scope("routing", disposables=(Gemini(),)):
-    result = await route.run((ModelInput.of(MultimodalContent.of("My device stopped working")),))
+    result = await router.run((ModelInput.of(MultimodalContent.of("My device stopped working")),))
 ```
 
 By default the whole context is the decision input: content blocks are wrapped in `user` and

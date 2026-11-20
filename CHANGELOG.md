@@ -44,7 +44,7 @@
 - `docs/guides/Resources.md`.
 - `GenerationOutputMissing` raised by image and audio generation instead of a bare
   `ValueError`; `AWSInvalidArgument`.
-- `Step.deciding(criteria, *steps, input=)` lets `DecisionModel` pick the step to execute from the
+- `Step.route(criteria, *steps, input=)` lets `DecisionModel` pick the step to execute from the
   context (or a custom `StepDecisionInputPreparing`), steps are offered by the `name` and
   `description` of their meta.
 - `Step.meta` and `Step.with_meta(...)`, wrapping modifiers (`with_retry`, `with_timeout`,
