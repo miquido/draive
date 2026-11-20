@@ -161,6 +161,16 @@ Ollama, gateways such as OpenRouter, or self-hosted OpenJev.
 pip install 'draive[systemone]'
 ```
 
+- Claude Code:
+
+Run the `claude` executable as a fully managed agent - authenticated by your API key or token only,
+isolated from the local session, with its telemetry in the same system as yours. It needs no extra,
+only Claude Code installed.
+
+```python
+from draive.claude import ClaudeCode, ClaudeCodeConfig, claude_code_agent
+```
+
 - VLLM:
 
 Use VLLM services through OpenAI client.

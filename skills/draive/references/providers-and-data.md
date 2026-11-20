@@ -1,4 +1,4 @@
-# Providers, MCP, embeddings, datastores, AWS, evaluation
+# Providers, Claude Code, MCP, embeddings, datastores, AWS, evaluation
 
 Install what you use: `pip install draive[<extra>]`; importing `draive.<pkg>` without its extra
 raises an `ImportError` naming it. Extras: `openai` (+`openai_realtime`), `anthropic`
@@ -63,6 +63,49 @@ schema (debug log "OpenAI strict output is unavailable"). So: a field that may b
 recursive models and `Mapping[str, Any]`/`Meta` fields in outputs. Tool parameters are strict only
 with `strict_parameters` set to true in the tool's `meta`; a free-form mapping argument leaves
 that schema unenforced.
+
+## Claude Code agent - `draive.claude`
+
+Needs no extra, only the `claude` executable. It runs Claude Code as a fully managed process and
+exposes it as an `Agent`.
+
+```python
+from draive.claude import ClaudeCode, ClaudeCodeConfig, ClaudeCodeTelemetry, claude_code_agent
+
+async with ctx.scope(
+    "app",
+    ClaudeCodeConfig(model="sonnet", tools=("Read", "Grep", "Edit"), max_turns=20,
+                     telemetry=ClaudeCodeTelemetry.from_env(traces=True)),
+    disposables=(ClaudeCode(api_key=...),),        # or oauth_token=, ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN
+):
+    coder = claude_code_agent("coder", instructions="Fix bugs.", memory=AgentMemory.volatile())
+    async for chunk in coder.call(input="Fix the failing test"): ...   # text + ProcessingEvents
+```
+
+- Authentication is only the given key/token (handed over through a file descriptor, kept out of
+  arguments, environment and reprs). Nothing of the user's login is reachable: private home, an
+  environment built from scratch, and the run is stopped if Claude Code reports another
+  authentication source. No credential means entering the scope fails.
+- File tools (`Read`, `Grep`, `Glob`, `Edit`, `Write`) are confined to the working and additional
+  directories by default (no symlink or `..` escape), `Bash` is not confined - disposable environments only.
+- Isolated and deny-by-default: no user/project settings (nor the working directory `CLAUDE.md`,
+  `setting_sources=("project",)` opts in), no plugins/skills/auto memory, no MCP
+  except `mcp_servers`, tools `Read`, `Grep`, `Glob`, `permission_mode="dontAsk"`. `Bash` and
+  `bypassPermissions` only in a disposable environment.
+- Output: text parts + `ProcessingEvent`s (`claude_code.tool_use`, `.tool_result`, `.subagent_text`,
+  `.result`). Failures raise `ClaudeCodeFailed` (reason, `api_error_status`, `session_id`, redacted
+  `stderr`), a missing binary/credential `ClaudeCodeUnavailable`. Limits: `max_turns`,
+  `max_budget_usd`, `timeout` (terminated gracefully so Claude Code stops its own commands, killed
+  after `stop_grace`; on Linux anything the agent detached is stopped too), `stop_grace`.
+- Memory is either `AgentMemory` (history replayed into a fresh session, any backend) or
+  `persistence="resumable"` + `state_directory` (Claude Code resumes the session of each thread,
+  full context) - not both. Default is stateless. Context injection and usage reading are not
+  possible with Claude Code; compaction is tuned by `auto_compact*`.
+- Telemetry: `ClaudeCodeTelemetry` exports Claude Code's OTLP metrics/events (traces are beta) and
+  continues the trace of the calling agent (`TRACEPARENT`); draive also records `model.*` usage
+  (provider `claude_code`) and `agent.claude_code.cost`.
+- Fake it with `ClaudeCodeRunner(binary="/fake", running=fn)` where `fn(launch)` yields
+  `ClaudeCodeText`/`ClaudeCodeToolUse`/... and a final `ClaudeCodeResult`.
 
 ## MCP - `draive.mcp`
 

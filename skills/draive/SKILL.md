@@ -92,7 +92,7 @@ scope, called through their `@statemethod`s, replaceable by fakes in tests.
 
 - Pick the facade by the job: text/structured/image/audio generation, `DecisionGeneration` for
   classifying, routing, moderating or scoring against fixed options (`Step.route` to pick the next
-  step; both need a decision backend bound, `DecisionModel` from the provider), a `Step` pipeline, an `Agent`,
+  step; both need a decision backend bound, `DecisionModel` from the provider), a `Step` pipeline, an `Agent` (`claude_code_agent` runs Claude Code, `draive.claude`),
   a conversation, an evaluator. Do not call a provider SDK directly - go through the provider
   adapter (`draive.openai`, `draive.anthropic`, ...) installed as a disposable of the scope.
 - Structured output is a `State` type (its schema is generated from the type); give it field

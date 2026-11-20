@@ -46,6 +46,7 @@ uv sync --all-groups --all-extras --frozen
     LLMs.
 - `draive[bedrock]`, `draive[aws]` for AWS model/runtime integrations.
 - `draive[ollama]`, `draive[vllm]` for local or self-hosted deployments.
+- `draive.claude` runs the Claude Code executable as an agent, it needs no extra.
 - `draive[systemone]` for System One API decision models (`/v1/systemone`) - hosted TypeSafe Jev,
     local Ollama, gateways such as OpenRouter, or self-hosted OpenJev. Gemini and Ollama decisions
     come with their own extras.

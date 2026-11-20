@@ -23,6 +23,8 @@ hidden global state.
 - First-class evaluation and guardrails integrated in the same context/state model.
 - Provider adapters for OpenAI, Anthropic, Gemini, Mistral, Cohere, Bedrock, Ollama, and vLLM, plus
     System One API decision servers (TypeSafe Jev, Ollama, gateways, OpenJev).
+- A Claude Code agent (`draive.claude`) running the `claude` executable as a fully managed, isolated
+    process, authenticated by your key or token only.
 - Storage and infrastructure integrations for Postgres, Qdrant, SurrealDB, MCP, AWS, RabbitMQ, and
     OpenTelemetry.
 
