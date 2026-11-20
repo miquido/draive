@@ -327,7 +327,7 @@ app = application(context, routers=(router,), exception_handler=handle_500)
 - `application(context, /, *, routers=, middleware=, exception_handler=, **extra)` takes the
   unhandled-error handler as `exception_handler` (`(Request, Exception)` callable returning a
   `Response`; there is no `ExceptionHandling` type). The Starlette variant takes `routes=`. Also
-  exported: `StreamResponse`, `ContextMiddleware`, `request_trace_context`,
+  exported: `StreamResponse`, `StateResponse`, `ContextMiddleware`, `request_trace_context`,
   `ObservabilityPreparing`.
 - Adapters in the context's `disposables` are entered once at startup, inherited by every request.
   `HTTPXClient(base_url=, headers=, timeout=5)` from `draive.httpx`;
