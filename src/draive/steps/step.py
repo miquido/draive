@@ -1,3 +1,4 @@
+import json
 from asyncio import Timeout, sleep, timeout
 from collections.abc import (
     AsyncGenerator,
@@ -1170,8 +1171,9 @@ class Step:
             is optional.
         input : StepDecisionInputPreparing | None
             Prepares the content the decision is made about from the current state.
-            By default the whole context is used, each element wrapped in a tag named
-            after its role (``user`` or ``assistant``).
+            By default the whole context is used, each content block wrapped in a tag named
+            after its role (``user`` or ``assistant``), tool requests and responses in
+            ``tool_request`` and ``tool_response`` tags carrying the tool name.
 
         Returns
         -------
@@ -1221,7 +1223,9 @@ class Step:
             for option, candidate in zip(question.options, steps, strict=True)
         }
 
-        preparing_input: StepDecisionInputPreparing = input or _context_decision_input
+        preparing_input: StepDecisionInputPreparing = (
+            input if input is not None else _context_decision_input
+        )
 
         async def selecting(
             state: StepState,
@@ -2406,15 +2410,46 @@ async def _noop(
 async def _context_decision_input(
     state: StepState,
 ) -> MultimodalContent:
-    return MultimodalContent.of(
-        *(
-            MultimodalTag.of(
-                *element.content.parts,
-                name="user" if isinstance(element, ModelInput) else "assistant",
-            )
-            for element in state.context
-        )
-    )
+    tags: list[MultimodalTag] = []
+    for element in state.context:
+        if isinstance(element, ModelInput):
+            for input_block in element.input:
+                if isinstance(input_block, ModelToolResponse):
+                    tags.append(
+                        MultimodalTag.of(
+                            *input_block.content.parts,
+                            name="tool_response",
+                            meta={
+                                "tool": input_block.tool,
+                                "identifier": input_block.identifier,
+                                "status": input_block.status,
+                            },
+                        )
+                    )
+
+                else:
+                    tags.append(MultimodalTag.of(*input_block.parts, name="user"))
+
+        else:
+            for output_block in element.output:
+                if isinstance(output_block, ModelToolRequest):
+                    tags.append(
+                        MultimodalTag.of(
+                            json.dumps(output_block.arguments, default=str),
+                            name="tool_request",
+                            meta={
+                                "tool": output_block.tool,
+                                "identifier": output_block.identifier,
+                            },
+                        )
+                    )
+
+                elif isinstance(output_block, MultimodalContent):
+                    tags.append(MultimodalTag.of(*output_block.parts, name="assistant"))
+
+                # reasoning is not a part of the conversation
+
+    return MultimodalContent.of(*tags)
 
 
 @runtime_checkable

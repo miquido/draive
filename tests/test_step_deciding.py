@@ -16,6 +16,9 @@ from draive import (
     GenerativeModel,
     ModelInput,
     ModelOutput,
+    ModelReasoning,
+    ModelToolRequest,
+    ModelToolResponse,
     Multimodal,
     Step,
     StepException,
@@ -486,3 +489,76 @@ def test_deciding_does_not_drop_a_step_sharing_a_name() -> None:
             _marking("B", name="beta"),
             _marking("C", name="alpha"),
         )
+
+
+@pytest.mark.asyncio
+async def test_default_input_carries_tool_requests_and_responses() -> None:
+    suspended = Calls()
+    active = Calls()
+
+    def context(result: str) -> tuple[ModelInput | ModelOutput, ...]:
+        return (
+            ModelInput.of(MultimodalContent.of("check my account")),
+            ModelOutput.of(
+                ModelToolRequest.of("call-1", tool="account_status", arguments={"user": "u1"}),
+            ),
+            ModelInput.of(
+                ModelToolResponse.of(
+                    "call-1",
+                    tool="account_status",
+                    content=MultimodalContent.of(result),
+                ),
+            ),
+        )
+
+    async with ctx.scope("test", _decider("alpha", calls=suspended)):
+        await _routing().process(context("account suspended"))
+
+    async with ctx.scope("test", _decider("alpha", calls=active)):
+        await _routing().process(context("account active"))
+
+    first = suspended.inputs[0].to_str()
+    assert "account suspended" in first
+    assert "account active" not in first
+    assert "account_status" in first  # both the request and the response name the tool
+    assert '"user": "u1"' in first
+    assert first.index("check my account") < first.index("account_status")
+    assert first != active.inputs[0].to_str()
+
+
+@pytest.mark.asyncio
+async def test_default_input_skips_reasoning() -> None:
+    calls = Calls()
+    context = (
+        ModelOutput.of(
+            ModelReasoning.of(MultimodalContent.of("secret thoughts")),
+            MultimodalContent.of("visible answer"),
+        ),
+    )
+
+    async with ctx.scope("test", _decider("alpha", calls=calls)):
+        await _routing().process(context)
+
+    rendered = calls.inputs[0].to_str()
+    assert "visible answer" in rendered
+    assert "secret thoughts" not in rendered
+
+
+class _FalsyPreparer:
+    def __bool__(self) -> bool:
+        return False
+
+    async def __call__(self, state: StepState) -> str:
+        return "prepared"
+
+
+@pytest.mark.asyncio
+async def test_explicit_input_is_used_regardless_of_its_truthiness() -> None:
+    calls = Calls()
+
+    async with ctx.scope("test", _decider("alpha", calls=calls)):
+        await _routing(input=_FalsyPreparer()).process(
+            (ModelInput.of(MultimodalContent.of("context")),),
+        )
+
+    assert calls.inputs == ["prepared"]

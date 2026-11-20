@@ -140,7 +140,7 @@ class OllamaDecisions(OllamaAPI):
             record_decision_metrics(
                 provider="ollama",
                 model=config.model,
-                questions=len(questions),
+                questions=len(request_questions),
                 requests=1,
             )
             record_usage_metrics(

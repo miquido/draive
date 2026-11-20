@@ -162,7 +162,10 @@ protocols describe the callbacks accepted by composition and modifier methods.
 
 `Step.deciding(criteria, *steps)` asks `DecisionModel` to choose exactly one of the given steps for
 the current state and executes it. It requires a `DecisionModel` in the scope, for example installed
-by `Gemini()` or `Ollama()`. Nothing falls back to model completions on its own.
+by `Gemini()` or `Ollama()`. Nothing falls back to model completions on its own - `Gemini()` using
+Vertex AI does not install it by default, and a scope without any decision backend fails with a
+missing `DecisionModel`. Bind `DecisionModel(generating=generate_completion_decisions)` there, see
+below.
 
 Steps are offered to the model by the `name` and optional `description` of their meta, set with
 `with_meta(...)`. At least two steps are required, a missing or repeated `name` raises a
@@ -188,11 +191,12 @@ async with ctx.scope("routing", disposables=(Gemini(),)):
     result = await route.run((ModelInput.of(MultimodalContent.of("My device stopped working")),))
 ```
 
-By default the whole context is the decision input, each element wrapped in a tag named after its
-role. Pass `input=` (an async callable receiving the `StepState` and returning the content to decide
-about) to decide from something else. A backend answering with an unknown step fails the step with a
-`StepException`, backend failures are raised as they are, so `with_fallback(...)` can recover from
-them.
+By default the whole context is the decision input: content blocks are wrapped in `user` and
+`assistant` tags, tool requests and responses in `tool_request` and `tool_response` tags carrying
+the tool name, so routing can depend on tool results. Reasoning is left out. Pass `input=` (an async
+callable receiving the `StepState` and returning the content to decide about) to decide from
+something else. A backend answering with an unknown step fails the step with a `StepException`,
+backend failures are raised as they are, so `with_fallback(...)` can recover from them.
 
 To decide with plain model completions bind
 `DecisionModel(generating=generate_completion_decisions)` explicitly, it is never used implicitly.

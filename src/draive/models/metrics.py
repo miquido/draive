@@ -289,7 +289,8 @@ def record_decision_metrics(
     model : str | None, default=None
         Provider model identifier, when the backend uses a model.
     questions : int | None, default=None
-        Number of questions sent to the backend.
+        Number of questions sent to the backend, a selection counts every option
+        it is resolved into.
     requests : int | None, default=None
         Number of requests the questions were sent within, i.e. one completion per
         question for completion based decisions.

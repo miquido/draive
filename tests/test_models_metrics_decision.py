@@ -26,6 +26,16 @@ from draive.multimodal import TextContent
 _OPTIONS = (DecisionOption(identifier="a"), DecisionOption(identifier="b"))
 
 
+def _counters(records: list[dict[str, Any]]) -> dict[str, int]:
+    totals: dict[str, int] = {}
+    for record in records:
+        metric: str = record.get("metric", "")
+        if metric.startswith("decision."):
+            totals[metric] = totals.get(metric, 0) + record["value"]
+
+    return totals
+
+
 @pytest.fixture
 def records(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     recorded: list[dict[str, Any]] = []
@@ -137,12 +147,7 @@ async def test_completion_decisions_record_a_request_for_each_question(
     assert invocation["decision.provider"] == "completion"
     assert invocation["decision.model"] is None
     assert invocation["decision.questions"] == ["one", "two"]
-    counters = {
-        record["metric"]: record["value"]
-        for record in records
-        if record.get("metric", "").startswith("decision.")
-    }
-    assert counters == {"decision.questions": 2, "decision.requests": 2}
+    assert _counters(records) == {"decision.questions": 2, "decision.requests": 2}
 
 
 @pytest.mark.asyncio
@@ -161,3 +166,34 @@ async def test_completion_decisions_do_not_count_failed_batches(
             )
 
     assert not [record for record in records if record.get("metric", "").startswith("decision.")]
+
+
+@pytest.mark.asyncio
+async def test_completion_decisions_keep_counters_of_requests_completed_before_a_failure(
+    records: list[dict[str, Any]],
+) -> None:
+    async def generating(
+        *,
+        instructions: str,
+        tools: ModelTools,
+        context: ModelContext,
+        output: Any,
+        **extra: Any,
+    ) -> AsyncGenerator[ModelOutputChunk]:
+        if "fail" in instructions:
+            yield TextContent.of("not a json")
+
+        else:
+            yield TextContent.of(json.dumps({"reasoning": "-", "value": True}))
+
+    async with ctx.scope("test", GenerativeModel(generating=generating)):
+        with pytest.raises(Exception):  # noqa: B017
+            await generate_completion_decisions(
+                input="text",
+                questions=(
+                    DecisionCheck(identifier="good", criteria="fine"),
+                    DecisionCheck(identifier="bad", criteria="fail"),
+                ),
+            )
+
+    assert _counters(records) == {"decision.questions": 1, "decision.requests": 1}

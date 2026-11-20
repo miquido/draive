@@ -141,7 +141,7 @@ class SystemOneDecisions(SystemOneAPI):
             record_decision_metrics(
                 provider="systemone",
                 model=config.model,
-                questions=len(questions),
+                questions=len(request["questions"]),
                 requests=1,
             )
             try:

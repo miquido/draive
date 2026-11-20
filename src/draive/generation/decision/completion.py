@@ -42,7 +42,7 @@ async def generate_completion_decisions(
         questions=questions,
     )
     # each question is answered in isolation, same as dedicated decision models do
-    answers: Sequence[DecisionAnswer] = await concurrently(
+    return await concurrently(
         (
             _decide(
                 question,
@@ -53,15 +53,30 @@ async def generate_completion_decisions(
         ),
         concurrent_tasks=_CONCURRENT_QUESTIONS,
     )
-    record_decision_metrics(
-        provider="completion",
-        questions=len(questions),
-        requests=len(questions),  # a completion for each of the questions
-    )
-    return answers
 
 
 async def _decide(
+    question: DecisionQuestion,
+    /,
+    *,
+    input: Multimodal,  # noqa: A002
+    **extra: Any,
+) -> DecisionAnswer:
+    answer: DecisionAnswer = await _answer(
+        question,
+        input=input,
+        **extra,
+    )
+    # counted when the request completes, so work of a failed batch is not lost
+    record_decision_metrics(
+        provider="completion",
+        questions=1,
+        requests=1,  # a completion for each of the questions
+    )
+    return answer
+
+
+async def _answer(
     question: DecisionQuestion,
     /,
     *,

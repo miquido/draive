@@ -468,3 +468,38 @@ async def test_decide_records_decision_invocation_and_metrics(
         if record.get("metric", "").startswith("decision.")
     }
     assert counters == {"decision.questions": 1, "decision.requests": 1}
+
+
+@pytest.mark.asyncio
+async def test_decide_counts_questions_sent_to_the_backend(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    records: list[dict[str, Any]] = []
+    monkeypatch.setattr(ctx, "record_info", lambda **kwargs: records.append(kwargs))
+    topics = DecisionSelection(
+        identifier="topics",
+        criteria="Which topics?",
+        options=(DecisionOption(identifier="a"), DecisionOption(identifier="b")),
+    )
+    decisions = _decisions(
+        {
+            "answers": {
+                "q0": {"type": "noul", "noul": 0.3},
+                "q1_0": {"type": "noul", "noul": 0.9},
+                "q1_1": {"type": "noul", "noul": 0.1},
+            }
+        }
+    )
+
+    async with ctx.scope("test", GeminiDecisionConfig(model="gemini-decision-1")):
+        await decisions.decide(
+            input="text",
+            questions=(DecisionCheck(identifier="angry", criteria="Is it?"), topics),
+        )
+
+    counters = {
+        record["metric"]: record["value"]
+        for record in records
+        if record.get("metric", "").startswith("decision.")
+    }
+    assert counters == {"decision.questions": 3, "decision.requests": 1}  # selection per option
