@@ -62,27 +62,6 @@ async def _decide(
     input: Multimodal,  # noqa: A002
     **extra: Any,
 ) -> DecisionAnswer:
-    answer: DecisionAnswer = await _answer(
-        question,
-        input=input,
-        **extra,
-    )
-    # counted when the request completes, so work of a failed batch is not lost
-    record_decision_metrics(
-        provider="completion",
-        questions=1,
-        requests=1,  # a completion for each of the questions
-    )
-    return answer
-
-
-async def _answer(
-    question: DecisionQuestion,
-    /,
-    *,
-    input: Multimodal,  # noqa: A002
-    **extra: Any,
-) -> DecisionAnswer:
     match question:
         case DecisionCheck():
             return await _check(
@@ -296,6 +275,14 @@ async def _generate[Result: State](
 
     finally:
         await completion_stream.aclose()
+
+    # counted when the completion ends, before its answer is decoded - a completed request is
+    # work done even when the answer is unusable, and it is not lost when other questions fail
+    record_decision_metrics(
+        provider="completion",
+        questions=1,
+        requests=1,  # a completion for each of the questions
+    )
 
     try:
         return decode_content(MultimodalContent.of(*parts), result)

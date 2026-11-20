@@ -11,6 +11,7 @@ from draive import (
     DecisionOption,
     DecisionRating,
     DecisionSelection,
+    GenerationOutputMissing,
     GenerativeModel,
     generate_completion_decisions,
 )
@@ -169,7 +170,7 @@ async def test_completion_decisions_do_not_count_failed_batches(
 
 
 @pytest.mark.asyncio
-async def test_completion_decisions_keep_counters_of_requests_completed_before_a_failure(
+async def test_completion_decisions_count_completed_requests_with_unusable_answers(
     records: list[dict[str, Any]],
 ) -> None:
     async def generating(
@@ -187,7 +188,7 @@ async def test_completion_decisions_keep_counters_of_requests_completed_before_a
             yield TextContent.of(json.dumps({"reasoning": "-", "value": True}))
 
     async with ctx.scope("test", GenerativeModel(generating=generating)):
-        with pytest.raises(Exception):  # noqa: B017
+        with pytest.raises(GenerationOutputMissing):
             await generate_completion_decisions(
                 input="text",
                 questions=(
@@ -196,4 +197,30 @@ async def test_completion_decisions_keep_counters_of_requests_completed_before_a
                 ),
             )
 
-    assert _counters(records) == {"decision.questions": 1, "decision.requests": 1}
+    # both completions ended, the malformed answer is still backend work
+    assert _counters(records) == {"decision.questions": 2, "decision.requests": 2}
+
+
+@pytest.mark.asyncio
+async def test_completion_decisions_do_not_count_interrupted_completions(
+    records: list[dict[str, Any]],
+) -> None:
+    async def generating(
+        *,
+        instructions: str,
+        tools: ModelTools,
+        context: ModelContext,
+        output: Any,
+        **extra: Any,
+    ) -> AsyncGenerator[ModelOutputChunk]:
+        yield TextContent.of('{"reasoning"')
+        raise RuntimeError("stream broke")
+
+    async with ctx.scope("test", GenerativeModel(generating=generating)):
+        with pytest.raises(RuntimeError, match="stream broke"):
+            await generate_completion_decisions(
+                input="text",
+                questions=(DecisionCheck(identifier="one", criteria="x"),),
+            )
+
+    assert _counters(records) == {}
