@@ -31,6 +31,18 @@ state.get(Counter, required=True)           # also key="name"; default=...
 async for chunk in pipeline.stream(): ...   # output chunks only (no state)
 ```
 
+Model driven branching - describe the steps with meta, the scope `DecisionModel` picks one:
+
+```python
+support = Step.generating_completion(instructions="Help.").with_meta(
+    name="support", description="Problems with an existing product"
+)
+sales = Step.generating_completion(instructions="Answer.").with_meta(name="sales")
+router = Step.route("What is the user asking about?", support, sales)   # input= overrides the context
+# needs a DecisionModel in scope (Gemini()/Ollama()/SystemOne()) or
+# DecisionModel(generating=generate_completion_decisions); fakes: DecisionModel(generating=fn)
+```
+
 Execution args: `run/process/stream(context=(), /, *artifacts, **keyed_artifacts)` or a ready
 `StepState`. Artifacts given in one call must have unique keys (`ValueError`).
 
@@ -60,7 +72,7 @@ Failures carry the state they happened with (`exc.state`):
 
 | Exception | When |
 | --- | --- |
-| `StepException` | loop / `looping_completion` exceeds `max_iterations`, decoding fails, evaluation fails with `raise_on_failure` |
+| `StepException` | loop / `looping_completion` exceeds `max_iterations`, decoding fails, evaluation fails with `raise_on_failure`, `Step.route` answered with an unknown step |
 | `StepTimeout` | `with_timeout` exceeded (`exc.timeout`); time the consumer spends between chunks is not counted |
 | `StepRetriesExhausted` | retried step still failing (`exc.attempts`; last error is `__cause__`) |
 

@@ -127,11 +127,11 @@ Any step can be wrapped without breaking composition:
 
 Step failures carry the `StepState` they happened with (`exception.state`):
 
-| Exception              | Raised when                                                                                         |
-| ---------------------- | --------------------------------------------------------------------------------------------------- |
-| `StepException`        | evaluation fails with `raise_on_failure`, decoding fails, or a loop exceeds `max_iterations`        |
-| `StepTimeout`          | `with_timeout(...)` limit is exceeded (`exception.timeout`)                                         |
-| `StepRetriesExhausted` | `with_retry(...)` failed after at least one retry (`exception.attempts`, last error as `__cause__`) |
+| Exception              | Raised when                                                                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `StepException`        | evaluation fails with `raise_on_failure`, decoding fails, a loop exceeds `max_iterations`, or `Step.route(...)` is answered with an unknown step |
+| `StepTimeout`          | `with_timeout(...)` limit is exceeded (`exception.timeout`)                                                                                      |
+| `StepRetriesExhausted` | `with_retry(...)` failed after at least one retry (`exception.attempts`, last error as `__cause__`)                                              |
 
 Errors that are not matched by `catching`, or that happen with `limit=0`, are raised unchanged.
 
