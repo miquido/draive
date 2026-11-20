@@ -3,7 +3,8 @@
 `draive.claude` runs [Claude Code](https://code.claude.com) as a draive `Agent`. Every call starts
 the `claude` executable as a managed process, streams its work as agent output and stops it whatever
 way the call ends. Nothing of the Claude Code SDK is imported - the protocol is spoken directly, so
-there is no extra to install, only the `claude` executable itself.
+there is no extra to install, only the `claude` executable itself. It requires a POSIX platform -
+Linux, macOS, or WSL on Windows. Native Windows is not supported.
 
 ```python
 from draive import ctx
@@ -11,7 +12,11 @@ from draive.claude import ClaudeCode, ClaudeCodeConfig, claude_code_agent
 
 async with ctx.scope(
     "coding",
-    ClaudeCodeConfig(model="sonnet", tools=("Read", "Grep", "Glob", "Edit")),
+    ClaudeCodeConfig(
+        model="sonnet",
+        tools=("Read", "Grep", "Glob", "Edit"),
+        directory="/path/to/project",  # the project, a temporary empty directory when not set
+    ),
     disposables=(ClaudeCode(),),  # ANTHROPIC_API_KEY, or oauth_token= / CLAUDE_CODE_OAUTH_TOKEN
 ):
     coder = claude_code_agent(
@@ -19,8 +24,10 @@ async with ctx.scope(
         description="Fixes bugs in the project",
         instructions="Fix the bug, change as little as possible.",
     )
-    async for chunk in coder.call(input="The parser fails on empty input, fix it."):
-        print(chunk)
+    # the call is closed with the block - also when the loop is left early or fails
+    async with ctx.closing(coder.call(input="The parser fails on empty input, fix it.")) as stream:
+        async for chunk in stream:
+            print(chunk)
 ```
 
 ## Authentication
@@ -84,11 +91,17 @@ group is killed with it. The output is read until the result: children of the pr
 output open do not hold the call back, and the output of a process which exited is complete a second
 later.
 
+The call is an async generator, and the run is released when it is closed. Leaving the loop early,
+or failing within it, does not close it - the process would run on until the generator is finalized.
+Close it explicitly, `ctx.closing(...)` or `contextlib.aclosing(...)` do, as the example above does.
+Cancelling the consuming task while it waits for the next chunk stops the run on its own.
+
 Every run also marks the environment of the process and of everything it starts. On Linux, where the
-environment of processes can be listed, whatever a tool left running - a `nohup` or a `setsid`
-command of the agent - is stopped with the run. Some platforms, i.e. recent macOS, do not list it,
-and commands which the agent deliberately detaches from the run can outlive it there. Run agents
-which have `Bash` within a container or a disposable environment.
+environment of a process can be read exactly, whatever a tool left running with that environment - a
+`nohup` or a `setsid` command of the agent - is stopped with the run. A command started with a
+cleared environment is not found, and other platforms, i.e. macOS, have no reliable way of finding
+the processes of a run: commands which the agent deliberately detaches from the run can outlive it
+there. Run agents which have `Bash` within a container or a disposable environment.
 
 ## Output
 

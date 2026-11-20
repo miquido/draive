@@ -89,6 +89,46 @@ def test_file_tools_are_scoped_to_the_directories_of_the_run_by_default() -> Non
     ]
 
 
+def test_tools_changing_files_are_allowed_by_edit_rules() -> None:
+    # `Write(path)` rules never match, permissions of every tool changing files are `Edit` ones
+    arguments = claude_arguments(
+        ClaudeCodeConfig(tools=("Write", "Edit", "NotebookEdit", "Grep", "Glob"))
+    )
+
+    assert _value(arguments, "--allowedTools").split(",") == [
+        "Edit(./**)",
+        "Grep(./**)",
+        "Glob(./**)",
+    ]
+
+
+def test_additional_directories_are_escaped_within_rules() -> None:
+    arguments = claude_arguments(
+        ClaudeCodeConfig(
+            tools=("Read",),
+            additional_directories=("/data/project[12]", "/data/a*b?c", "/data/back\\slash"),
+        )
+    )
+
+    assert _value(arguments, "--allowedTools").split(",") == [
+        "Read(./**)",
+        "Read(//data/project\\[12\\]/**)",
+        "Read(//data/a\\*b\\?c/**)",
+        "Read(//data/back\\\\slash/**)",
+    ]
+
+
+def test_resumed_sessions_do_not_keep_the_instructions_of_their_first_request() -> None:
+    resumed = claude_arguments(
+        ClaudeCodeConfig(), session=ClaudeCodeSession(mode="resume", identifier="abc")
+    )
+
+    assert _value(resumed, "--system-prompt-snapshot") == "off"
+    for session in (ClaudeCodeSession(), ClaudeCodeSession(mode="new", identifier="abc")):
+        arguments = claude_arguments(ClaudeCodeConfig(), session=session)
+        assert "--system-prompt-snapshot" not in arguments
+
+
 def test_explicit_allowed_tools_are_used_as_they_are() -> None:
     arguments = claude_arguments(
         ClaudeCodeConfig(tools=("Read", "Bash"), allowed_tools=("Read", "Bash(ls:*)"))

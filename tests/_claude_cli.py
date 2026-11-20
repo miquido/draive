@@ -1,4 +1,5 @@
 import os
+import shlex
 import stat
 import subprocess
 import sys
@@ -33,6 +34,11 @@ def after(flag):
 
 
 session = after("--session-id") or after("--resume") or str(uuid.uuid4())
+if "--no-session-persistence" not in arguments and os.environ.get("CLAUDE_CONFIG_DIR"):
+    # the transcript is written while the session runs, a finished one or not
+    project = os.path.join(os.environ["CLAUDE_CONFIG_DIR"], "projects", "fake-project")
+    os.makedirs(project, exist_ok=True)
+    open(os.path.join(project, session + ".jsonl"), "a").close()
 prompt = json.loads(line)["message"]["content"] if line.strip() else []
 text = "\\n".join(block["text"] for block in prompt if block.get("type") == "text")
 if record:
@@ -186,6 +192,30 @@ elif scenario == "garbage":
     assistant({{"type": "text", "text": "after garbage"}})
     result(result="after garbage")
 
+elif scenario == "init_then_exit":
+    sys.stderr.write("crashed after init" + chr(10))
+    sys.exit(4)
+
+elif scenario == "split_secret":
+    sys.stderr.write("E" * 9000 + key[:10])
+    sys.stderr.flush()
+    time.sleep(0.4)
+    sys.stderr.write(key[10:] + chr(10))
+    sys.stderr.flush()
+    sys.exit(3)
+
+elif scenario == "late_output":
+    code = (
+        "import sys, time; time.sleep(2.5); "
+        "sys.stdout.write('late'); sys.stdout.flush(); "
+        "sys.stderr.write('late'); sys.stderr.flush()"
+    )
+    child = subprocess.Popen([sys.executable, "-c", code], start_new_session=True)
+    with open(os.environ["FAKE_CLAUDE_CHILD"], "w") as file:
+        file.write(str(child.pid))
+    assistant({{"type": "text", "text": "done"}})
+    result(result="done")
+
 elif scenario == "noresult":
     sys.stderr.write("fatal: bad credentials " + (key or "") + "\\n")
     sys.exit(3)
@@ -216,8 +246,12 @@ def write_fake_claude(
     plugins: str = "[]",
 ) -> str:
     """Write the fake executable, returns its path."""
+    script: Path = directory / "claude.py"
+    script.write_text(_SCRIPT.format(python="/usr/bin/env python3", plugins=plugins))
+    # a shebang can not take an interpreter path containing spaces, the launcher can
     path: Path = directory / "claude"
-    path.write_text(_SCRIPT.format(python=sys.executable, plugins=plugins))
+    command: str = f"exec {shlex.quote(sys.executable)} {shlex.quote(str(script))}"
+    path.write_text(f'#!/bin/sh\n{command} "$@"\n')
     path.chmod(path.stat().st_mode | stat.S_IXUSR)
     return str(path)
 
@@ -281,11 +315,18 @@ def alive(
     pid: int,
     /,
 ) -> bool:
-    """Whether the process exists."""
+    """Whether the process is running."""
     try:
         os.kill(pid, 0)
 
     except ProcessLookupError:
         return False
 
-    return True
+    # a stopped child which nobody reaped - i.e. within a container - still has its identifier
+    state: str = subprocess.run(
+        ["ps", "-o", "stat=", "-p", str(pid)],
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout.strip()
+    return bool(state) and not state.startswith("Z")

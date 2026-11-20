@@ -312,7 +312,11 @@ def claude_arguments(  # noqa: C901, PLR0912
             arguments.extend(("--session-id", _session_identifier(session)))
 
         case "resume":
-            arguments.extend(("--resume", _session_identifier(session)))
+            # a resumed session keeps the system prompt of its first request, which makes it
+            # ignore instructions which changed since
+            arguments.extend(
+                ("--resume", _session_identifier(session), "--system-prompt-snapshot", "off")
+            )
 
     if instructions:
         flag: str = (
@@ -337,15 +341,9 @@ def claude_arguments(  # noqa: C901, PLR0912
 
 # tools working with paths, allowed within the directories of the run only - their bare names would
 # allow them to work with any path the process can reach, i.e. to read the keys of the user
-_PATH_TOOLS: Final[Sequence[str]] = (
-    "Read",
-    "Grep",
-    "Glob",
-    "Edit",
-    "Write",
-    "MultiEdit",
-    "NotebookEdit",
-)
+_READ_TOOLS: Final[Sequence[str]] = ("Read", "Grep", "Glob")
+# permission rules of every tool changing files are the ones of `Edit`, `Write(path)` never matches
+_EDIT_TOOLS: Final[Sequence[str]] = ("Edit", "Write", "MultiEdit", "NotebookEdit")
 
 
 def _scoped_tools(
@@ -354,17 +352,31 @@ def _scoped_tools(
 ) -> Sequence[str]:
     rules: list[str] = []
     for tool in config.tools:
-        if tool not in _PATH_TOOLS:
+        if tool in _READ_TOOLS:
+            scope: str = tool
+
+        elif tool in _EDIT_TOOLS:
+            scope = "Edit"
+
+        else:
             rules.append(tool)
             continue
 
-        rules.append(f"{tool}(./**)")  # the working directory
-        # absolute paths are written with a double slash within the rules
-        rules.extend(
-            f"{tool}(//{directory.lstrip('/')}/**)" for directory in config.additional_directories
-        )
+        for path in ("./**", *(_directory_pattern(path) for path in config.additional_directories)):
+            if (rule := f"{scope}({path})") not in rules:
+                rules.append(rule)
 
     return tuple(rules)
+
+
+def _directory_pattern(
+    directory: str,
+    /,
+) -> str:
+    # rules are gitignore patterns, characters special within them would match other directories
+    escaped: str = "".join(f"\\{char}" if char in "\\*?[]" else char for char in directory)
+    # absolute paths are written with a double slash within the rules
+    return f"//{escaped.lstrip('/')}/**"
 
 
 def _session_identifier(

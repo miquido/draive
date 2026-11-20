@@ -1,6 +1,4 @@
 import asyncio
-import hashlib
-import os
 import shutil
 import tempfile
 from collections.abc import AsyncGenerator
@@ -16,9 +14,8 @@ from draive.claude.config import ClaudeCodeConfig
 __all__ = (
     "ClaudeCodeWorkspace",
     "claude_workspace",
+    "session_exists",
     "session_identifier",
-    "store_session",
-    "stored_session",
 )
 
 
@@ -106,7 +103,7 @@ async def claude_workspace(
         assert config.state_directory is not Missing  # nosec: B101
         yield await asyncio.to_thread(
             _prepared,
-            Path(config.state_directory),
+            Path(config.state_directory).resolve(),  # the process changes its working directory
             config.directory,
         )
         return
@@ -144,89 +141,35 @@ def session_identifier(
     return str(uuid5(NAMESPACE_URL, f"{agent_uri}#{thread}"))
 
 
-def _marker(
-    state_directory: str,
-    agent_uri: str,
-    thread: UUID,
-    /,
-) -> Path:
-    return (
-        Path(state_directory)
-        / "threads"
-        / hashlib.sha256(agent_uri.encode()).hexdigest()[:16]
-        / str(thread)
-    )
-
-
-def _read_marker(
-    path: Path,
-    /,
-) -> str | None:
-    try:
-        return path.read_text().strip() or None
-
-    except OSError:
-        return None
-
-
-def _write_marker(
-    path: Path,
+def _transcript_exists(
+    config_directory: str,
     session_id: str,
     /,
-) -> None:
-    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    temporary: Path = path.with_suffix(".tmp")
-    temporary.write_text(session_id)
-    os.replace(temporary, path)
+) -> bool:
+    # sessions are stored by Claude Code as `projects/<project>/<session id>.jsonl`
+    return any(Path(config_directory, "projects").glob(f"*/{session_id}.jsonl"))
 
 
-async def stored_session(
-    state_directory: str,
-    agent_uri: str,
-    thread: UUID,
+async def session_exists(
+    config_directory: str,
+    session_id: str,
     /,
-) -> str | None:
-    """Find the Claude Code session of an agent thread.
+) -> bool:
+    """Check if Claude Code stored a session, whether it finished or not.
+
+    The transcript of a session is written while it runs, so also a run which was interrupted
+    or failed leaves a session which has to be resumed - it can not be started again.
 
     Parameters
     ----------
-    state_directory
-        State directory of resumable runs.
-    agent_uri
-        URI of the agent.
-    thread
-        Identifier of the thread.
+    config_directory
+        Configuration directory of the runs.
+    session_id
+        Identifier of the session.
 
     Returns
     -------
-    str | None
-        Identifier of the stored session, ``None`` for a thread without one.
+    bool
+        Whether the session has a stored transcript.
     """
-    return await asyncio.to_thread(_read_marker, _marker(state_directory, agent_uri, thread))
-
-
-async def store_session(
-    state_directory: str,
-    agent_uri: str,
-    thread: UUID,
-    session_id: str,
-    /,
-) -> None:
-    """Remember the Claude Code session of an agent thread, to be resumed by its next run.
-
-    Parameters
-    ----------
-    state_directory
-        State directory of resumable runs.
-    agent_uri
-        URI of the agent.
-    thread
-        Identifier of the thread.
-    session_id
-        Identifier of the Claude Code session.
-    """
-    await asyncio.to_thread(
-        _write_marker,
-        _marker(state_directory, agent_uri, thread),
-        session_id,
-    )
+    return await asyncio.to_thread(_transcript_exists, config_directory, session_id)

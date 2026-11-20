@@ -6,7 +6,7 @@ from typing import Final, Literal, final
 
 from haiway import Missing, State, getenv_str
 
-from draive.claude.process import run_process
+from draive.claude.process import MAX_CREDENTIAL_BYTES, run_process
 from draive.claude.types import ClaudeCodeRunner, ClaudeCodeUnavailable
 
 __all__ = ("ClaudeCode",)
@@ -104,6 +104,11 @@ class ClaudeCode:
             raise ClaudeCodeUnavailable(
                 "no credentials, provide an API key or an OAuth token or set"
                 " ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN"
+            )
+
+        if len(credential.encode()) > MAX_CREDENTIAL_BYTES:
+            raise ClaudeCodeUnavailable(
+                f"the credential is larger than {MAX_CREDENTIAL_BYTES} bytes"
             )
 
         return (

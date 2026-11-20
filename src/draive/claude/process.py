@@ -1,7 +1,6 @@
 import asyncio
 import os
 import signal
-import subprocess  # nosec: B404
 import sys
 from collections.abc import AsyncGenerator, Sequence
 from pathlib import Path
@@ -9,11 +8,20 @@ from typing import Final
 
 from haiway import Missing
 
-from draive.claude.events import ClaudeCodeEvent, ClaudeCodeResult, parse_events
+from draive.claude.events import (
+    ClaudeCodeEvent,
+    ClaudeCodeResult,
+    ClaudeCodeStarted,
+    parse_events,
+)
 from draive.claude.launch import RUN_MARKER_VARIABLE, ClaudeCodeLaunch
 from draive.claude.types import ClaudeCodeFailed, ClaudeCodeUnavailable
 
-__all__ = ("run_process",)
+__all__ = (
+    "MAX_CREDENTIAL_BYTES",
+    "marked_processes",
+    "run_process",
+)
 
 # tool results are reported within a single output line, `StreamReader` would refuse
 # lines above its limit - 64 KiB by default
@@ -21,6 +29,31 @@ _LINE_LIMIT: Final[int] = 64 * 1024 * 1024
 _STDERR_TAIL: Final[int] = 8 * 1024
 # the output of a process which exited is complete after this time, whoever else holds its pipe
 _OUTPUT_DRAIN: Final[float] = 1.0
+# the credential is written to the pipe before its reader exists, it has to fit within the
+# capacity of a pipe - which POSIX requires to be larger than that - or the write would block
+MAX_CREDENTIAL_BYTES: Final[int] = 4096
+
+
+def _credential_pipe(
+    credential: str,
+    /,
+) -> int:
+    data: bytes = credential.encode()
+    if len(data) > MAX_CREDENTIAL_BYTES:
+        raise ClaudeCodeUnavailable(f"the credential is larger than {MAX_CREDENTIAL_BYTES} bytes")
+
+    read_fd, write_fd = os.pipe()
+    try:
+        os.write(write_fd, data)
+
+    except BaseException:
+        os.close(read_fd)  # the descriptor would not be closed by dropping its number
+        raise
+
+    finally:
+        os.close(write_fd)
+
+    return read_fd
 
 
 async def run_process(  # noqa: C901, PLR0912, PLR0915
@@ -58,16 +91,9 @@ async def run_process(  # noqa: C901, PLR0912, PLR0915
     pass_fds: tuple[int, ...] = ()
     credential_fd: int | None = None
     if launch.credential is not Missing:
-        read_fd, write_fd = os.pipe()
-        try:
-            os.write(write_fd, launch.credential.encode())
-
-        finally:
-            os.close(write_fd)
-
-        credential_fd = read_fd
-        pass_fds = (read_fd,)
-        environment[launch.credential_variable] = str(read_fd)
+        credential_fd = _credential_pipe(launch.credential)
+        pass_fds = (credential_fd,)
+        environment[launch.credential_variable] = str(credential_fd)
 
     try:
         process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
@@ -92,22 +118,25 @@ async def run_process(  # noqa: C901, PLR0912, PLR0915
         if credential_fd is not None:
             os.close(credential_fd)
 
+    loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
     stderr_tail: bytearray = bytearray()
-    stderr_task: asyncio.Task[None] = asyncio.create_task(_drain(process, stderr_tail))
+    stderr_task: asyncio.Task[None] = asyncio.create_task(
+        _drain(process, stderr_tail, launch.secrets)
+    )
     exit_task: asyncio.Task[None] = asyncio.create_task(_end_output_after_exit(process))
     timed_out: bool = False
+    escalation: asyncio.TimerHandle | None = None
 
     def deadline() -> None:
-        nonlocal timed_out
+        nonlocal timed_out, escalation
         timed_out = True
         # terminated first, Claude Code stops the commands of its tools then - which a kill leaves
         # running - and killed only when it does not exit in time
         _signal_group(process, signal.SIGTERM)
-        asyncio.get_running_loop().call_later(launch.grace, _signal_group, process, signal.SIGKILL)
+        escalation = loop.call_later(launch.grace, _signal_group, process, signal.SIGKILL)
 
-    deadline_handle: asyncio.TimerHandle = asyncio.get_running_loop().call_later(
-        launch.timeout, deadline
-    )
+    deadline_handle: asyncio.TimerHandle = loop.call_later(launch.timeout, deadline)
+    session_id: str | None = None
     result: ClaudeCodeResult | None = None
     try:
         assert process.stdin is not None  # nosec: B101
@@ -128,15 +157,21 @@ async def run_process(  # noqa: C901, PLR0912, PLR0915
             except ValueError as exc:  # a line above the limit
                 raise ClaudeCodeFailed(
                     "the output line is too large",
-                    session_id=result.session_id if result else None,
+                    session_id=session_id,
                 ) from exc
 
             if not line:
                 break
 
             for event in parse_events(line):
-                if isinstance(event, ClaudeCodeResult):
+                if isinstance(event, ClaudeCodeStarted):
+                    session_id = event.session_id
+
+                elif isinstance(event, ClaudeCodeResult):
                     result = event
+                    # the work is done, a consumer taking its time must not be failed by the
+                    # deadline which passes while it holds the result
+                    deadline_handle.cancel()
 
                 yield event
 
@@ -149,10 +184,10 @@ async def run_process(  # noqa: C901, PLR0912, PLR0915
         except TimeoutError:
             exit_code = None  # the cleanup kills it
 
-        if timed_out:
+        if result is None and timed_out:
             raise ClaudeCodeFailed(
                 f"timed out after {launch.timeout:g} seconds",
-                session_id=result.session_id if result else None,
+                session_id=session_id,
                 exit_code=exit_code,
                 stderr=_redacted(stderr_tail, launch.secrets),
             )
@@ -161,24 +196,35 @@ async def run_process(  # noqa: C901, PLR0912, PLR0915
             await _settle(stderr_task)
             raise ClaudeCodeFailed(
                 "the process ended without a result",
+                session_id=session_id,
                 exit_code=exit_code,
                 stderr=_redacted(stderr_tail, launch.secrets),
             )
 
     finally:
         deadline_handle.cancel()
+        if escalation is not None:
+            escalation.cancel()  # the cleanup takes over, a late kill could hit a reused group
+
         await _finish(process, stderr_task, exit_task, launch.grace, launch.marker)
 
 
 async def _drain(
     process: asyncio.subprocess.Process,
     tail: bytearray,
+    secrets: Sequence[str],
     /,
 ) -> None:
     # an unread error output fills its pipe and blocks the process, only the tail is kept
     assert process.stderr is not None  # nosec: B101
+    hidden: Sequence[bytes] = tuple(secret.encode() for secret in secrets if secret)
     while chunk := await process.stderr.read(4096):
         tail.extend(chunk)
+        # redacted before the tail is cut, which could leave a part of a secret behind
+        for secret in hidden:
+            if secret in tail:
+                tail[:] = bytes(tail).replace(secret, b"***")
+
         if len(tail) > _STDERR_TAIL:
             del tail[: len(tail) - _STDERR_TAIL]
 
@@ -191,8 +237,22 @@ async def _end_output_after_exit(
     # the reader would wait for it - and for the deadline of the run - without an end
     await process.wait()
     await asyncio.sleep(_OUTPUT_DRAIN)
-    assert process.stdout is not None  # nosec: B101
-    process.stdout.feed_eof()
+    _close_output(process)
+
+
+def _close_output(
+    process: asyncio.subprocess.Process,
+    /,
+) -> None:
+    # closing the pipes ends the readers, whatever is written to them later reaches nobody
+    transport: asyncio.SubprocessTransport | None = getattr(process, "_transport", None)
+    if transport is None:
+        return
+
+    for fd in (1, 2):
+        pipe = transport.get_pipe_transport(fd)
+        if pipe is not None:
+            pipe.close()
 
 
 async def _settle(
@@ -203,8 +263,8 @@ async def _settle(
     try:
         await asyncio.wait_for(asyncio.shield(stderr_task), 1.0)
 
-    except TimeoutError, asyncio.CancelledError:
-        pass
+    except TimeoutError:
+        pass  # held open by a child, what was read is what there is
 
 
 def _redacted(
@@ -226,8 +286,9 @@ def marked_processes(
 ) -> list[int]:
     """Find processes carrying the marker of a run within their environment.
 
-    Reads ``/proc`` where there is one and falls back to the environments listed by ``ps``,
-    which some platforms do not show - there is nothing to find on them.
+    Reads ``/proc``, where the environment of a process is exact. Platforms without it have no
+    reliable source - a match within the command line of an unrelated process is not a reason to
+    stop it - and nothing is found there.
 
     Parameters
     ----------
@@ -239,19 +300,13 @@ def marked_processes(
     list[int]
         Identifiers of the processes, this one excluded.
     """
+    proc: Path = Path("/proc")
+    if not (proc / "self" / "environ").exists():
+        return []
+
     needle: bytes = f"{RUN_MARKER_VARIABLE}={marker}".encode()
-    if (Path("/proc") / "self" / "environ").exists():
-        return _marked_in_proc(needle)
-
-    return _marked_in_ps(needle)
-
-
-def _marked_in_proc(
-    needle: bytes,
-    /,
-) -> list[int]:
     found: list[int] = []
-    for entry in Path("/proc").iterdir():
+    for entry in proc.iterdir():
         if not entry.name.isdigit() or int(entry.name) == os.getpid():
             continue
 
@@ -261,38 +316,6 @@ def _marked_in_proc(
 
         except OSError:
             continue  # gone or not ours
-
-    return found
-
-
-def _marked_in_ps(
-    needle: bytes,
-    /,
-) -> list[int]:
-    try:
-        output: bytes = subprocess.run(  # nosec: B603, B607
-            ["ps", "-axeww", "-o", "pid=,command="],
-            capture_output=True,
-            timeout=10,
-            check=False,
-        ).stdout
-
-    except OSError, subprocess.SubprocessError:
-        return []
-
-    found: list[int] = []
-    for line in output.splitlines():
-        if needle not in line:
-            continue
-
-        try:
-            pid: int = int(line.split(None, 1)[0])
-
-        except ValueError, IndexError:
-            continue
-
-        if pid != os.getpid():
-            found.append(pid)
 
     return found
 
@@ -374,6 +397,7 @@ async def _dispose(
     if process.stdin is not None and not process.stdin.is_closing():
         process.stdin.close()
 
+    _close_output(process)
     stderr_task.cancel()
     exit_task.cancel()
     await asyncio.gather(stderr_task, exit_task, return_exceptions=True)

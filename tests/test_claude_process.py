@@ -3,6 +3,7 @@ import json
 import os
 import subprocess
 import time
+from contextlib import aclosing
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -18,6 +19,7 @@ from draive.claude import (
     ClaudeCodeToolUse,
     ClaudeCodeUnavailable,
 )
+from draive.claude import process as process_module
 from draive.claude.launch import ClaudeCodeSession
 from draive.claude.process import marked_processes, run_process
 from tests._claude_cli import (
@@ -319,24 +321,31 @@ async def test_a_process_ignoring_termination_is_killed_after_the_grace(tmp_path
         started = time.monotonic()
         await stream.aclose()
 
-    assert time.monotonic() - started < 10
+    elapsed = time.monotonic() - started
+    assert 0.4 <= elapsed < 10  # killed after the grace, not right away
     child = int((tmp_path / "child.pid").read_text().split()[0])
     assert await _eventually(lambda: not alive(child))
 
 
 @pytest.mark.asyncio
 async def test_a_consumer_failure_stops_the_process(tmp_path: Path) -> None:
+    # a failure within the loop does not close the stream, its owner does
     with pytest.raises(RuntimeError, match="consumer"):
-        async for event in run_process(launch_for(write_fake_claude(tmp_path), tmp_path, "hang")):
-            if isinstance(event, ClaudeCodeText):
-                raise RuntimeError("consumer failed")
+        async with aclosing(
+            run_process(launch_for(write_fake_claude(tmp_path), tmp_path, "hang"))
+        ) as stream:
+            async for event in stream:
+                if isinstance(event, ClaudeCodeText):
+                    raise RuntimeError("consumer failed")
 
-    child = int((tmp_path / "child.pid").read_text().split()[0])
+    (child,) = _children(tmp_path)
     assert await _eventually(lambda: not alive(child))
 
 
 def _children(tmp_path: Path) -> list[int]:
-    return [int(pid) for pid in (tmp_path / "child.pid").read_text().split()]
+    path = tmp_path / "child.pid"
+    # not written when the fake failed before, which is what a test should report
+    return [int(pid) for pid in path.read_text().split()] if path.exists() else []
 
 
 @listing_required
@@ -459,7 +468,7 @@ async def test_the_deadline_kills_a_process_which_does_not_terminate(tmp_path: P
     with pytest.raises(ClaudeCodeFailed, match="timed out"):
         await _events(launch)
 
-    assert time.monotonic() - started < 6
+    assert 1.4 <= time.monotonic() - started < 6  # the deadline and then the grace
     (child,) = _children(tmp_path)
     assert await _eventually(lambda: not alive(child))
 
@@ -479,3 +488,128 @@ def test_processes_are_found_by_the_marker_of_their_run() -> None:
     finally:
         child.kill()
         child.wait()
+
+
+@pytest.mark.asyncio
+async def test_a_consumer_holding_the_result_past_the_deadline_is_not_failed(
+    tmp_path: Path,
+) -> None:
+    launch = launch_for(write_fake_claude(tmp_path), tmp_path, "echo", timeout=0.8)
+    events = []
+
+    async for event in run_process(launch):
+        events.append(event)
+        if isinstance(event, ClaudeCodeResult):
+            await asyncio.sleep(1.5)  # the deadline passes while the consumer holds the result
+
+    assert isinstance(events[-1], ClaudeCodeResult)
+
+
+@pytest.mark.asyncio
+async def test_the_kill_of_the_deadline_is_not_sent_after_the_process_is_gone(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    signals: list[int] = []
+    original = process_module._signal_group
+
+    def recording(process: Any, signum: int) -> None:
+        signals.append(signum)
+        original(process, signum)
+
+    monkeypatch.setattr(process_module, "_signal_group", recording)
+    launch = launch_for(
+        write_fake_claude(tmp_path),
+        tmp_path,
+        "hang",
+        timeout=0.5,
+        grace=1.0,
+        env={"FAKE_CLAUDE_GRACEFUL": str(tmp_path / "terminated.flag")},
+    )
+
+    with pytest.raises(ClaudeCodeFailed, match="timed out"):
+        await _events(launch)
+
+    sent = len(signals)
+    await asyncio.sleep(1.5)  # the grace passes, a group identifier could be someone else's now
+    assert len(signals) == sent
+
+
+@pytest.mark.asyncio
+async def test_the_session_reported_before_a_crash_is_kept_in_the_failure(tmp_path: Path) -> None:
+    launch = launch_for(
+        write_fake_claude(tmp_path),
+        tmp_path,
+        "init_then_exit",
+        session=ClaudeCodeSession(mode="new", identifier="reported-session"),
+    )
+
+    with pytest.raises(ClaudeCodeFailed, match="without a result") as raised:
+        await _events(launch)
+
+    assert raised.value.session_id == "reported-session"
+    assert raised.value.exit_code == 4
+
+
+@pytest.mark.asyncio
+async def test_credentials_are_redacted_across_the_boundaries_of_the_error_output(
+    tmp_path: Path,
+) -> None:
+    launch = launch_for(write_fake_claude(tmp_path), tmp_path, "split_secret")
+
+    with pytest.raises(ClaudeCodeFailed) as raised:
+        await _events(launch)
+
+    stderr = raised.value.stderr
+    # written in two parts with the output cut to its tail between them
+    assert SECRET[:10] not in stderr
+    assert SECRET[10:] not in stderr
+    assert "***" in stderr
+    assert len(stderr) < 9000  # bounded
+
+
+@pytest.mark.asyncio
+async def test_waiting_for_the_error_output_does_not_swallow_cancellation() -> None:
+    never = asyncio.create_task(asyncio.sleep(60))
+    waiting = asyncio.create_task(process_module._settle(never))
+    await asyncio.sleep(0.1)
+
+    waiting.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await waiting
+
+    never.cancel()
+
+
+@pytest.mark.asyncio
+async def test_output_written_after_the_run_reaches_nobody(tmp_path: Path) -> None:
+    problems: list[dict[str, Any]] = []
+    loop = asyncio.get_running_loop()
+    loop.set_exception_handler(lambda _loop, context: problems.append(context))
+    try:
+        events = await _events(launch_for(write_fake_claude(tmp_path), tmp_path, "late_output"))
+        assert isinstance(events[-1], ClaudeCodeResult)
+
+        await asyncio.sleep(3.5)  # a child which held the output writes now, the run is long over
+
+    finally:
+        loop.set_exception_handler(None)
+        for child in _children(tmp_path):
+            try:
+                os.kill(child, 9)
+
+            except ProcessLookupError:
+                pass
+
+    assert problems == []
+
+
+@pytest.mark.asyncio
+async def test_oversized_credentials_are_refused_before_anything_starts(tmp_path: Path) -> None:
+    launch = launch_for(write_fake_claude(tmp_path), tmp_path, credential="k" * 5000)
+
+    with pytest.raises(ClaudeCodeUnavailable, match="larger than"):
+        await _events(launch)
+
+    assert not (tmp_path / "record.json").exists()

@@ -96,7 +96,8 @@ async with ctx.scope(
   `.result`). Failures raise `ClaudeCodeFailed` (reason, `api_error_status`, `session_id`, redacted
   `stderr`), a missing binary/credential `ClaudeCodeUnavailable`. Limits: `max_turns`,
   `max_budget_usd`, `timeout` (terminated gracefully so Claude Code stops its own commands, killed
-  after `stop_grace`; on Linux anything the agent detached is stopped too), `stop_grace`.
+  after `stop_grace`; on Linux detached commands which keep the run marker of their environment are
+  stopped too, elsewhere they can outlive the run), `stop_grace`.
 - Memory is either `AgentMemory` (history replayed into a fresh session, any backend) or
   `persistence="resumable"` + `state_directory` (Claude Code resumes the session of each thread,
   full context) - not both. Default is stateless. Context injection and usage reading are not

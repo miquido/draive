@@ -23,11 +23,13 @@ from draive.claude import (
     ClaudeCode,
     ClaudeCodeConfig,
     ClaudeCodeFailed,
+    ClaudeCodeResult,
+    ClaudeCodeRunner,
     ClaudeCodeTelemetry,
     ClaudeCodeUnavailable,
     claude_code_agent,
 )
-from draive.claude.workspace import session_identifier
+from draive.claude.workspace import session_exists, session_identifier
 from draive.multimodal import ArtifactContent, MultimodalContent
 from draive.utils import ProcessingEvent
 from tests._claude_cli import alive, write_fake_claude
@@ -778,3 +780,131 @@ def test_agents_made_of_a_name_have_a_stable_identity() -> None:
     assert claude_code_agent("a b/c").identity.uri == claude_code_agent("a b/c").identity.uri
     assert claude_code_agent("a b/c").identity.uri == "agent://claude-code/a%20b%2Fc"
     assert claude_code_agent("one").identity.uri != claude_code_agent("two").identity.uri
+
+
+@pytest.mark.asyncio
+async def test_a_session_which_did_not_finish_is_resumed_not_started_again(
+    tmp_path: Path,
+) -> None:
+    state = tmp_path / "state"
+    setup = _Setup(
+        tmp_path,
+        scenario="hang",
+        persistence="resumable",
+        state_directory=str(state),
+    )
+    agent = claude_code_agent("coder")
+    thread = uuid4()
+
+    async with setup.scope():
+        stream = agent.call(input="hello", thread=thread)
+        try:
+            async for chunk in stream:
+                if isinstance(chunk, TextContent):
+                    break  # abandoned, the session exists but its run never reported a result
+
+        finally:
+            await stream.aclose()
+
+    first = setup.recorded()["arguments"]
+    assert "--session-id" in first
+
+    setup.config = setup.config.updating(env={**setup.config.env, "FAKE_CLAUDE_SCENARIO": "echo"})
+    async with setup.scope():
+        await _call(agent, "again", thread)
+
+    second = setup.recorded()["arguments"]
+    assert "--session-id" not in second  # Claude Code refuses to start a session which exists
+    assert second[second.index("--resume") + 1] == first[first.index("--session-id") + 1]
+    assert second[second.index("--system-prompt-snapshot") + 1] == "off"
+
+
+@pytest.mark.asyncio
+async def test_a_session_is_started_until_claude_code_stored_it(tmp_path: Path) -> None:
+    state = tmp_path / "state"
+    setup = _Setup(
+        tmp_path,
+        scenario="noresult",
+        persistence="resumable",
+        state_directory=str(state),
+    )
+    agent = claude_code_agent("coder")
+    thread = uuid4()
+
+    async with setup.scope():
+        with pytest.raises(ClaudeCodeFailed):
+            await _call(agent, "hello", thread)
+
+        for transcript in (state / "claude").rglob("*.jsonl"):
+            transcript.unlink()  # nothing was stored by the run
+
+        with pytest.raises(ClaudeCodeFailed):
+            await _call(agent, "again", thread)
+
+    assert "--session-id" in setup.recorded()["arguments"]
+    assert "--resume" not in setup.recorded()["arguments"]
+
+
+@pytest.mark.asyncio
+async def test_the_text_of_the_result_is_streamed_when_nothing_else_was(tmp_path: Path) -> None:
+    async def running(launch: Any) -> Any:
+        yield ClaudeCodeResult(session_id="s", text="only the result says it", turns=1)
+
+    memory = AgentMemory.volatile()
+    agent = claude_code_agent("coder", memory=memory)
+    thread = uuid4()
+
+    async with ctx.scope(
+        "test",
+        ClaudeCodeConfig(),
+        ClaudeCodeRunner(binary="/fake", running=running),
+    ):
+        chunks = await _call(agent, "hello", thread)
+        from draive.agents import AgentThread
+
+        recalled = await memory.recall(
+            thread=AgentThread.of(thread, agent_uri=agent.identity.uri),
+            context=(),
+        )
+
+    assert _texts(chunks) == ["only the result says it"]
+    assert recalled[-1].content.to_str() == "only the result says it"
+
+
+@pytest.mark.asyncio
+async def test_a_relative_state_directory_is_resolved_for_the_process(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (tmp_path / "work").mkdir()
+    monkeypatch.chdir(tmp_path / "work")
+    setup = _Setup(tmp_path, persistence="resumable", state_directory="relative-state")
+
+    async with setup.scope():
+        await _call(claude_code_agent("coder"))
+
+    recorded = setup.recorded()
+    expected = (tmp_path / "work" / "relative-state").resolve()
+    assert recorded["directory"] == str(expected / "workspace")
+    assert recorded["environment"]["HOME"] == str(expected / "home")
+    assert recorded["environment"]["CLAUDE_CONFIG_DIR"] == str(expected / "claude")
+
+
+@pytest.mark.asyncio
+async def test_oversized_credentials_are_refused_when_entering_the_scope(tmp_path: Path) -> None:
+    binary = write_fake_claude(tmp_path)
+
+    with pytest.raises(ClaudeCodeUnavailable, match="larger than"):
+        async with ctx.scope("test", disposables=(ClaudeCode(binary=binary, api_key="k" * 5000),)):
+            pass
+
+
+@pytest.mark.asyncio
+async def test_stored_sessions_are_found_by_their_transcript(tmp_path: Path) -> None:
+    transcript = tmp_path / "projects" / "some-project" / "abc-123.jsonl"
+    transcript.parent.mkdir(parents=True)
+    transcript.write_text("{}")
+
+    assert await session_exists(str(tmp_path), "abc-123")
+    assert not await session_exists(str(tmp_path), "other")
+    assert not await session_exists(str(tmp_path / "missing"), "abc-123")

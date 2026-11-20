@@ -23,12 +23,7 @@ from draive.claude.types import (
     ClaudeCodeRunner,
     ClaudeCodeUnavailable,
 )
-from draive.claude.workspace import (
-    claude_workspace,
-    session_identifier,
-    store_session,
-    stored_session,
-)
+from draive.claude.workspace import claude_workspace, session_exists, session_identifier
 from draive.models import (
     ModelContext,
     ModelInput,
@@ -151,21 +146,16 @@ def claude_code_agent(  # noqa: C901, PLR0915
             )
             async with claude_workspace(resolved) as workspace:
                 session: ClaudeCodeSession = ClaudeCodeSession()
-                state_directory: str | None = None
-                if resumable and resolved.state_directory is not Missing:
-                    state_directory = resolved.state_directory
-                    stored: str | None = await stored_session(
-                        state_directory,
-                        identity.uri,
-                        thread.identifier,
-                    )
-                    session = (
-                        ClaudeCodeSession(mode="resume", identifier=stored)
-                        if stored
-                        else ClaudeCodeSession(
-                            mode="new",
-                            identifier=session_identifier(identity.uri, thread.identifier),
-                        )
+                if resumable:
+                    # also a session which did not finish is stored, and can not be started again
+                    identifier: str = session_identifier(identity.uri, thread.identifier)
+                    session = ClaudeCodeSession(
+                        mode=(
+                            "resume"
+                            if await session_exists(workspace.config_directory, identifier)
+                            else "new"
+                        ),
+                        identifier=identifier,
                     )
 
                 launch = build_launch(
@@ -276,15 +266,6 @@ def claude_code_agent(  # noqa: C901, PLR0915
                 if result is None:  # a runner without a result would be a broken one
                     raise ClaudeCodeFailed("the run ended without a result")
 
-                if state_directory is not None and result.session_id:
-                    # a session was created even by a failed turn, it is continued next time
-                    await store_session(
-                        state_directory,
-                        identity.uri,
-                        thread.identifier,
-                        result.session_id,
-                    )
-
                 _record_result(result)
                 if result.failed:
                     raise ClaudeCodeFailed(
@@ -294,7 +275,11 @@ def claude_code_agent(  # noqa: C901, PLR0915
                         terminal_reason=result.terminal_reason,
                     )
 
-                final: str = "".join(answer) or result.text
+                if not answer and result.text:
+                    answer.append(result.text)  # nothing was streamed, the result is the text
+                    yield TextContent.of(result.text)
+
+                final: str = "".join(answer)
                 if not resumable:
                     await memory.remember(
                         thread=thread,

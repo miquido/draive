@@ -43,9 +43,9 @@
       directory, sessions are found by the stable identity of the agent.
     - Exports Claude Code telemetry to the collector of draive with the trace of the calling agent
       continued (`ClaudeCodeTelemetry`), and records usage and cost in draive telemetry.
-    - A run is stopped with its consumer or deadline - terminated gracefully, killed after
-      `stop_grace` - and whatever it started is stopped on platforms listing the environments of
-      processes (Linux).
+    - A run is stopped with its closed stream, cancellation or deadline - terminated gracefully,
+      killed after `stop_grace` - and on Linux what it started with its environment marker is
+      stopped too, also a command detached from the process group. POSIX platforms only.
 - `State` types take a `description` class keyword (haiway 0.63.0), e.g.
   `class Answer(State, description="Final answer")`. It is written into the type's JSON schema, so
   structured output, tool arguments and MCP specifications carry it, and it survives `python -OO`.
