@@ -4,7 +4,7 @@
 
 ### Changed
 
-- Requires Python 3.15 and haiway 0.62.1.
+- Requires Python 3.15 and haiway 0.63.0.
 - `draive.utils.gather_all` is removed in favor of haiway `gather` (exported from `draive`).
   Several coroutines failing together now raise an `ExceptionGroup` instead of the first failure.
 - `draive.fastapi` no longer exports `ExceptionHandling` (removed in haiway 0.62.1), pass the
@@ -28,6 +28,9 @@
 
 ### Added
 
+- `State` types take a `description` class keyword (haiway 0.63.0), e.g.
+  `class Answer(State, description="Final answer")`. It is written into the type's JSON schema, so
+  structured output, tool arguments and MCP specifications carry it, and it survives `python -OO`.
 - `ToolArgumentsException` is exported from `draive` and `draive.tools`.
 - `skills/draive` - an Agent Skill for coding agents writing Draive code.
 - Telemetry: provider failure/rate-limit metrics, embedding token usage, tool invocations,

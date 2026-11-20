@@ -95,7 +95,7 @@ scope, called through their `@statemethod`s, replaceable by fakes in tests.
   a conversation, an evaluator. Do not call a provider SDK directly - go through the provider
   adapter (`draive.openai`, `draive.anthropic`, ...) installed as a disposable of the scope.
 - Structured output is a `State` type (its schema is generated from the type); give it field
-  `Description`s rather than prose in the prompt.
+  `Description`s and a `description=` class keyword rather than prose in the prompt.
 - Tools are typed functions (`@tool`) collected in a `Toolbox`. A tool failure reaches the model as
   an error result: invalid arguments show the model their message so it can correct the call, any
   other exception only as a generic "Tool execution failed" - details stay in the logs, so never
