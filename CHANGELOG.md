@@ -1,31 +1,15 @@
 # Changelog
 
-## 0.120.0
+## 0.121.0
 
 ### Changed
 
-- Requires Python 3.15 and haiway 0.64.0.
-- `draive.utils.gather_all` is removed in favor of haiway `gather` (exported from `draive`).
-  Several coroutines failing together now raise an `ExceptionGroup` instead of the first failure.
-- `draive.fastapi` no longer exports `ExceptionHandling` (removed in haiway 0.62.1), pass the
-  unhandled error handler to `application(..., exception_handler=...)` as a plain callable.
-- Resource templates use haiway `URITemplate` for expansion, matching and verification.
-  `ResourceReferenceTemplate.template_uri` is a `URITemplate` (serialized as
-  `{"template": "..."}`), `@resource(uri_template=...)` accepts a string or a `URITemplate`.
-  URIs carrying undeclared query parameters (for templates without a query) or encoded
-  separators within host variables are refused, a missing required variable fails the
-  expansion, aliased variables expand correctly.
-- Resource template variables always have to match declared function arguments, a variadic
-  `**kwargs` no longer makes the declaration accept an undeclared variable. It remains available
-  for extra arguments of `resolve(...)`.
-- Public re-exports from haiway now include `URITemplate`, `DefaultEnv`, `DefaultFactory`,
-  `Directory`, `PaginationToken`, `Paths`, `ScopeKind`, `gather` and `parse_bool`, and
-  `StateResponse` of `draive.starlette` and `draive.fastapi` (haiway 0.64.0), which answers with a
-  `State` or a sequence of them as the JSON body.
-- Mistral reads `MISTRAL_ENDPOINT` as an alias for `MISTRAL_SERVER_URL`.
-- SurrealDB 3.x or newer is required (verified with 3.2 and 4.0).
+- Requires haiway 0.64.0.
 - `Gemini()` and `Ollama()` provide `DecisionModel` within their default features.
 - Gemini requires google-genai 3.6.1, Ollama requires ollama 0.6.3.
+- Public re-exports from haiway now include `StateResponse` of `draive.starlette` and
+  `draive.fastapi` (haiway 0.64.0), which answers with a `State` or a sequence of them as the JSON
+  body.
 
 ### Added
 
@@ -48,42 +32,31 @@
     - A run is stopped with its closed stream, cancellation or deadline - terminated gracefully,
       killed after `stop_grace` - and on Linux what it started with its environment marker is
       stopped too, also a command detached from the process group. POSIX platforms only.
-- `State` types take a `description` class keyword (haiway 0.63.0), e.g.
-  `class Answer(State, description="Final answer")`. It is written into the type's JSON schema, so
-  structured output, tool arguments and MCP specifications carry it, and it survives `python -OO`.
-- `ToolArgumentsException` is exported from `draive` and `draive.tools`.
-- `skills/draive` - an Agent Skill for coding agents writing Draive code.
-- Telemetry: decision invocations (`record_decision_invocation`, attributes `decision.provider`,
-  `decision.model`, `decision.questions`, `decision.question_types`) and counters
-  (`record_decision_metrics`: `decision.questions`, `decision.requests`) recorded by the Gemini,
-  Ollama, System One and completion based decision backends, provider failure/rate-limit metrics,
-  embedding token usage, tool invocations,
-  guardrail verdicts, evaluator suite case errors and durations, Qdrant and SurrealDB
-  operation metrics, per-root AWS CloudWatch traces.
-- `ConversationException`; iteration limits raising typed exceptions: `max_iterations` for
-  agents and steps, a fixed limit of 32 for conversation completion.
-- `docs/guides/Resources.md`.
-- `GenerationOutputMissing` raised by image and audio generation instead of a bare
-  `ValueError`; `AWSInvalidArgument`.
 - `Step.route(criteria, *steps, input=)` lets `DecisionModel` pick the step to execute from the
   context (or a custom `StepDecisionInputPreparing`), steps are offered by the `name` and
   `description` of their meta.
 - `Step.meta` and `Step.with_meta(...)`, wrapping modifiers (`with_retry`, `with_timeout`,
   `with_fallback`, ...) keep the meta of the step.
-- `DecisionModel` (`draive.models`) - thin decision layer next to `GenerativeModel` holding the
-  decision question and answer types and the backend, `DecisionGeneration` is the high level
-  facade over it. Providers install `DecisionModel`.
 - Decision generation: `DecisionGeneration` with `decide`, `check`, `choose`, `select` and `rate`
   answering `DecisionCheck`, `DecisionChoice`, `DecisionSelection` and `DecisionRating` questions
   about a shared input. Options and levels are `DecisionOption`s carrying caller meta, answers
   carry the decided option with backend specific values (i.e. calibrated probabilities) in meta.
   A decision backend has to be bound; `generate_completion_decisions` is the optional
-  implementation answering with structured `GenerativeModel` completions (slow and costly,
-  never used implicitly).
+  implementation answering with structured `GenerativeModel` completions (slow and costly, never
+  used implicitly). See `docs/guides/BasicDecisionGeneration.md`.
+- `DecisionModel` (`draive.models`) - thin decision layer next to `GenerativeModel` holding the
+  decision question and answer types and the backend, `DecisionGeneration` is the high level
+  facade over it. Providers install `DecisionModel`.
 - Gemini Decisions API support (`GeminiDecisionConfig`), Ollama decision models support
   (`OllamaDecisionConfig`) and `draive.systemone` (`draive[systemone]`) for any System One API
   server - TypeSafe Jev, Ollama, gateways or self-hosted OpenJev.
-- `docs/guides/BasicDecisionGeneration.md`.
+- Decision telemetry: `record_decision_invocation` (attributes `decision.provider`,
+  `decision.model`, `decision.questions`, `decision.question_types`) and `record_decision_metrics`
+  (counters `decision.questions`, `decision.requests`), recorded by the Gemini, Ollama, System One
+  and completion based decision backends.
+- `State` types take a `description` class keyword (haiway 0.63.0), e.g.
+  `class Answer(State, description="Final answer")`. It is written into the type's JSON schema, so
+  structured output, tool arguments and MCP specifications carry it, and it survives `python -OO`.
 
 ### Fixed
 
@@ -92,6 +65,45 @@
   streams is up to ~35x faster (32k chunks: 131 ms to 3.7 ms).
 - Gemini requests with system instructions no longer fail on the Gemini Developer API, the client
   uses its `v1beta` API version unless a version or Vertex AI is selected explicitly.
+
+## 0.120.0
+
+### Changed
+
+- Requires Python 3.15 and haiway 0.62.1.
+- `draive.utils.gather_all` is removed in favor of haiway `gather` (exported from `draive`).
+  Several coroutines failing together now raise an `ExceptionGroup` instead of the first failure.
+- `draive.fastapi` no longer exports `ExceptionHandling` (removed in haiway 0.62.1), pass the
+  unhandled error handler to `application(..., exception_handler=...)` as a plain callable.
+- Resource templates use haiway `URITemplate` for expansion, matching and verification.
+  `ResourceReferenceTemplate.template_uri` is a `URITemplate` (serialized as
+  `{"template": "..."}`), `@resource(uri_template=...)` accepts a string or a `URITemplate`.
+  URIs carrying undeclared query parameters (for templates without a query) or encoded
+  separators within host variables are refused, a missing required variable fails the
+  expansion, aliased variables expand correctly.
+- Resource template variables always have to match declared function arguments, a variadic
+  `**kwargs` no longer makes the declaration accept an undeclared variable. It remains available
+  for extra arguments of `resolve(...)`.
+- Public re-exports from haiway now include `URITemplate`, `DefaultEnv`, `DefaultFactory`,
+  `Directory`, `PaginationToken`, `Paths`, `ScopeKind`, `gather` and `parse_bool`.
+- Mistral reads `MISTRAL_ENDPOINT` as an alias for `MISTRAL_SERVER_URL`.
+- SurrealDB 3.x or newer is required (verified with 3.2 and 4.0).
+
+### Added
+
+- `ToolArgumentsException` is exported from `draive` and `draive.tools`.
+- `skills/draive` - an Agent Skill for coding agents writing Draive code.
+- Telemetry: provider failure/rate-limit metrics, embedding token usage, tool invocations,
+  guardrail verdicts, evaluator suite case errors and durations, Qdrant and SurrealDB
+  operation metrics, per-root AWS CloudWatch traces.
+- `ConversationException`; iteration limits raising typed exceptions: `max_iterations` for
+  agents and steps, a fixed limit of 32 for conversation completion.
+- `docs/guides/Resources.md`.
+- `GenerationOutputMissing` raised by image and audio generation instead of a bare
+  `ValueError`; `AWSInvalidArgument`.
+
+### Fixed
+
 - MCP resource URIs survive the client identifier round trip: custom schemes without an
   authority (`notes:///docs/a`) keep their `//`, and dots within client identifiers are escaped
   (`my%2Eserver`) so listed URIs route back to the client which listed them unambiguously.
