@@ -106,6 +106,22 @@ class Customized(State, serializable=True):
 print(Customized.json_schema(indent=2))
 ```
 
+Describe the type itself with the `description` class keyword. It is written into the schema of the
+type, also when the type is nested in another `State` (structured generation, tool arguments), and
+it is kept under `python -OO`, unlike a docstring. A `Description` on the attribute holding the type
+takes precedence, and a specialization of a generic keeps the description of its origin.
+
+```python
+from draive import State
+
+
+class AssistantConfig(State, serializable=True, description="Settings of the assistant"):
+    model: str = "claude-sonnet-5-5"
+
+
+AssistantConfig.__DESCRIPTION__  # "Settings of the assistant"
+```
+
 ## Defaults And Factories
 
 ```python

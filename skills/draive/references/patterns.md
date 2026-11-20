@@ -58,6 +58,9 @@ class Invoice(State):
 - Serialize with `to_mapping()`/`to_json()`, read with `from_mapping()`/`from_json()`/`validate()`.
   An `Alias` is the name on the wire (`customer_id`) and is accepted by the constructor too;
   `Missing` values are left out of the output. `Sensitive` only redacts `repr`/`str`.
+- Describe a type for schemas (structured output, tool arguments) with the class keyword
+  `class Invoice(State, description="...")` - stored as `__DESCRIPTION__`, written into the schema
+  and kept under `python -OO`, unlike a docstring. A `Description` on the attribute holding it wins.
 - A `State` with attributes cannot be subclassed. Share attributes by holding an instance, type a
   variant with a generic (`class Page[T](State)`), share behavior with an attribute-less base.
 - States cannot be pickled and the class cannot be patched after creation.
