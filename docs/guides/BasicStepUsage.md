@@ -72,6 +72,8 @@ to garbage collection finalizes it within an unrelated context and breaks scoped
     `None` disables the limit).
 - `Step.concurrent(..., merge=...)` for fan-out/fan-in branches.
 - `Step.selection(...)` for choosing the next step from the current state.
+- `Step.deciding(criteria, *steps)` for letting `DecisionModel` pick which of the given steps runs,
+    steps are described by their `with_meta(name=..., description=...)` (see below).
 - `Step.generating_completion(...)` for one model completion stage.
 - `Step.looping_completion(...)` for model + tool iterative loops.
 - `Step.decoding_artifact(...)` for decoding structured model output into an artifact.
@@ -105,6 +107,8 @@ should not be passed further.
 
 Any step can be wrapped without breaking composition:
 
+- `step.with_meta(name=..., description=...)` for describing a step, i.e. for `Step.deciding(...)`.
+    The other modifiers keep the meta of the step they wrap.
 - `step.with_ctx(...)` for scoped state and disposables.
 - `step.with_retry(...)` and `step.with_fallback(...)` for failure handling. Every attempt (and the
     fallback) starts from the original input state, partial state of a failed attempt is discarded.
@@ -153,3 +157,42 @@ from draive import StepExecuting, StepMerging, StepProcessing, StepSelecting
 `StepExecuting` describes the low-level streaming interface accepted by `Step(...)`.
 `StepProcessing` describes state-only functions accepted by the `@step` decorator. The remaining
 protocols describe the callbacks accepted by composition and modifier methods.
+
+## Deciding The Next Step
+
+`Step.deciding(criteria, *steps)` asks `DecisionModel` to choose exactly one of the given steps for
+the current state and executes it. It requires a `DecisionModel` in the scope, for example installed
+by `Gemini()` or `Ollama()`. Nothing falls back to model completions on its own.
+
+Steps are offered to the model by the `name` and optional `description` of their meta, set with
+`with_meta(...)`. At least two steps are required, a missing or repeated `name` raises a
+`ValueError` when the step is built. Wrapping modifiers such as `with_retry(...)` or
+`with_timeout(...)` keep the meta of the step, combining steps, i.e. `Step.sequence(...)`, starts
+with an empty one - describe the result.
+
+```python
+from draive import ModelInput, MultimodalContent, Step, ctx
+from draive.gemini import Gemini
+
+support = Step.generating_completion(instructions="Help with the support request.").with_meta(
+    name="support",
+    description="Problems with an existing product",
+)
+sales = Step.generating_completion(instructions="Answer the sales question.").with_meta(
+    name="sales",
+)
+
+route = Step.deciding("What is the user asking about?", support, sales)
+
+async with ctx.scope("routing", disposables=(Gemini(),)):
+    result = await route.run((ModelInput.of(MultimodalContent.of("My device stopped working")),))
+```
+
+By default the whole context is the decision input, each element wrapped in a tag named after its
+role. Pass `input=` (an async callable receiving the `StepState` and returning the content to decide
+about) to decide from something else. A backend answering with an unknown step fails the step with a
+`StepException`, backend failures are raised as they are, so `with_fallback(...)` can recover from
+them.
+
+To decide with plain model completions bind
+`DecisionModel(generating=generate_completion_decisions)` explicitly, it is never used implicitly.

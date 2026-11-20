@@ -9,6 +9,11 @@ from typing import cast
 from haiway import Missing, ObservabilityAttribute, ctx, gather
 
 from draive.models.types import (
+    DecisionCheck,
+    DecisionChoice,
+    DecisionQuestion,
+    DecisionRating,
+    DecisionSelection,
     ModelException,
     ModelOutputFailed,
     ModelOutputSelection,
@@ -23,6 +28,8 @@ __all__ = (
     "provider_failure",
     "provider_gather",
     "provider_rate_limit",
+    "record_decision_invocation",
+    "record_decision_metrics",
     "record_embedding_invocation",
     "record_embedding_metrics",
     "record_guardrails_invocation",
@@ -215,6 +222,99 @@ def record_guardrails_invocation(
             **{f"guardrails.{key}": value for key, value in other.items()},
         }
     )
+
+
+def record_decision_invocation(
+    *,
+    provider: str,
+    model: str | None = None,
+    questions: Sequence[DecisionQuestion],
+    **other: ObservabilityAttribute,
+) -> None:
+    """Record attributes describing a decision invocation within the current scope.
+
+    Parameters
+    ----------
+    provider : str
+        Provider identifier used for the invocation.
+    model : str | None, default=None
+        Provider model identifier, when the backend uses a model.
+    questions : Sequence[DecisionQuestion]
+        Questions asked, recorded by identifier together with their kinds.
+    **other : ObservabilityAttribute
+        Additional attributes recorded with the ``decision.`` prefix.
+    """
+    ctx.record_info(
+        attributes={
+            "decision.provider": provider,
+            "decision.model": model,
+            "decision.questions": [question.identifier for question in questions],
+            "decision.question_types": [_question_type(question) for question in questions],
+            **{f"decision.{key}": value for key, value in other.items()},
+        }
+    )
+
+
+def _question_type(
+    question: DecisionQuestion,
+    /,
+) -> str:
+    match question:
+        case DecisionCheck():
+            return "check"
+
+        case DecisionChoice():
+            return "choice"
+
+        case DecisionSelection():
+            return "selection"
+
+        case DecisionRating():
+            return "rating"
+
+
+def record_decision_metrics(
+    *,
+    provider: str,
+    model: str | None = None,
+    questions: int | None = None,
+    requests: int | None = None,
+) -> None:
+    """Record counters describing the work done by a decision backend.
+
+    Parameters
+    ----------
+    provider : str
+        Provider identifier used for the request.
+    model : str | None, default=None
+        Provider model identifier, when the backend uses a model.
+    questions : int | None, default=None
+        Number of questions sent to the backend.
+    requests : int | None, default=None
+        Number of requests the questions were sent within, i.e. one completion per
+        question for completion based decisions.
+    """
+    attributes: dict[str, str] = {"decision.provider": provider}
+    if model is not None:
+        attributes["decision.model"] = model
+
+    if questions is not None:
+        ctx.record_info(
+            metric="decision.questions",
+            value=questions,
+            unit="count",
+            kind="counter",
+            attributes=attributes,
+        )
+
+    if requests is not None:
+        ctx.record_info(
+            metric="decision.requests",
+            value=requests,
+            unit="count",
+            kind="counter",
+            attributes=attributes,
+        )
 
 
 def record_embedding_invocation(

@@ -34,7 +34,7 @@ async with ctx.scope(
 - Each client takes `features=` - the set of state types it installs - and reads credentials from
   the environment (`api_key=` overrides, where the provider has one). `Anthropic()` installs only
   `GenerativeModel`; `OpenAI()` also installs realtime, embedding, image generation and moderation;
-  `Gemini()` and `Ollama()` also install `DecisionGeneration`. The full table is in
+  `Gemini()` and `Ollama()` also install `DecisionModel`. The full table is in
   `providers-and-data.md`.
 - Change config for a block: `with
   ctx.updating(ctx.state(OpenAIResponsesConfig).updating(model=...)):`. For one call pass `config=`
@@ -82,11 +82,13 @@ image = await ImageGeneration.generate(input="a red cat")    # ResourceContent |
 
 ## Decisions
 
-`DecisionGeneration` answers typed questions about one shared input - classification, routing,
+`DecisionGeneration` (a facade over the `DecisionModel` backend layer) answers typed questions about one shared input - classification, routing,
 moderation, rubric scoring - instead of generating content. Dedicated decision models (Gemini
 Decisions API, System One models through `SystemOne` or `Ollama()`) answer with calibrated
-probabilities you can threshold; without one bound, each question becomes a structured
-`GenerativeModel` completion of the scope model (no probabilities, `reasoning` in meta).
+probabilities you can threshold. A backend always has to be bound: providers install `DecisionModel`
+(`Gemini()`, `Ollama()`, `SystemOne()`), nothing falls back to the scope model on its own. The
+optional `generate_completion_decisions` answers each question with a structured `GenerativeModel`
+completion (no probabilities, `reasoning` in meta) - slow and costly, so bind it explicitly.
 
 ```python
 from draive import (
@@ -124,20 +126,21 @@ answer = await DecisionGeneration.choose(input=ticket, criteria="Which team?", o
 - `decide` returns answers in question order, each carrying its question `identifier`. The decided
   value is all every backend guarantees; everything else lives in answer `meta`: calibrated
   `probability` (check), `probabilities` keyed by option identifier, `confidence` (probability of
-  the decided outcome), normalized 0-1 `score` (rating), or `reasoning` from the model fallback.
+  the decided outcome), normalized 0-1 `score` (rating), or `reasoning` from the completion based backend.
   Choice and rating answers merge the decided option meta in, selected options keep their own.
 - Prefer it over `ModelGeneration` with an enum field when the job is picking among fixed options,
-  especially when thresholds matter - but only threshold with a calibrated backend bound: the model
-  fallback reports no estimates, and option meta merged into the answer could carry a
+  especially when thresholds matter - but only threshold with a calibrated backend bound: the completion
+  based backend reports no estimates, and option meta merged into the answer could carry a
   `confidence` key of its own, so know which backend the scope binds.
-- The model fallback answers questions concurrently: several failing together raise an
+- `generate_completion_decisions` (GenerativeModel completions) is optional and never implicit, bind
+  it with `DecisionGeneration(generating=generate_completion_decisions)` or
+  `DecisionModel(generating=...)`. It answers questions concurrently: several failing together raise an
   `ExceptionGroup` of the underlying failures (`GenerationOutputMissing` for invalid answers, model
   errors such as `ModelRateLimit`), a single one raises directly.
 - Bind a backend like any provider: `Gemini()` (`GeminiDecisionConfig`, model set explicitly, on by default), `Ollama()`
   (`OllamaDecisionConfig`, model set explicitly, needs a pulled decision model such as `tev1`, text only) or
   `SystemOne(server_url=..., images=...)` for TypeSafe Jev, Ollama with images, gateways.
-  `Gemini(features=...)` / `Ollama(features=...)` without `DecisionGeneration` keeps the model
-  fallback. Guide: `docs/guides/BasicDecisionGeneration.md`.
+  Guide: `docs/guides/BasicDecisionGeneration.md`.
 
 ## Content: `MultimodalContent`
 
@@ -308,7 +311,8 @@ async def test_weather() -> None:
   `async def fn(*, input, questions, **extra)` returning one answer per question in question order,
   with the decided option meta merged like real backends do, e.g.
   `(DecisionChoiceAnswer(identifier="route", choice=billing, meta=billing.meta),)` - the facade
-  passes them through unchanged.
+  passes them through unchanged. `Step.deciding` and any other `DecisionModel` consumer take the
+  same function as `DecisionModel(generating=fn)`.
 - Fake templates with `TemplatesRepository.volatile(...)`.
 
 ## Gotchas

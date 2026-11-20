@@ -37,6 +37,10 @@ Execution args: `run/process/stream(context=(), /, *artifacts, **keyed_artifacts
 Builders (classmethods): `Step.sequence(*steps)`, `Step.loop(*steps, condition=, max_iterations=32)`
 (condition is `async (state, iteration) -> bool`), `Step.concurrent(*steps, merge=)` (`merge` is
 `async (branches: Iterable[StepState]) -> StepState`), `Step.selection(async (state) -> Step)`,
+`Step.deciding(criteria, *steps, input=)` (the scope `DecisionModel` picks one step, offered by the
+meta `name`/`description` set with `step.with_meta(name=, description=)`; no implicit fallback to
+completions - bind a backend; a missing/repeated name raises `ValueError` when built, an unknown
+answer raises `StepException`; wrapping `with_*` modifiers keep meta, `sequence`/`then` do not),
 `Step.emitting(...)`, `Step.updating_artifacts/removing_artifacts`, `Step.appending_input/output`,
 `Step.appending_context/replacing_context/mutating_context`,
 `Step.preserving_state/restoring_state`, `Step.generating_completion(instructions=, tools=, input=,
@@ -45,7 +49,8 @@ max_iterations=32)` (model + tool loop), `Step.handling_tools(tools)`,
 `Step.decoding_artifact(Report)` (decode structured output into an artifact; request it with
 `output=Report` on the completion).
 
-Modifiers (instance methods, all return a `Step`): `with_ctx(*state, disposables=)`,
+Modifiers (instance methods, all return a `Step`; all but `with_meta` keep the step meta):
+`with_meta(name=, description=)` (describes the step, `Step.meta`), `with_ctx(*state, disposables=)`,
 `with_retry(limit=1, delay=, catching=)`, `with_fallback(step, catching=)`, `with_timeout(seconds)`,
 `with_condition(bool | async pred, alternative=step)`, `with_isolated_context`,
 `with_volatile_context()`, `with_volatile_tools()`, `with_suppressed_output()`,
@@ -65,8 +70,8 @@ Gotchas:
   already emitted cannot be retracted. Errors not matched by `catching` are raised unchanged.
 - Close a stream you stop consuming early (`ctx.closing`); leaving it to the GC finalizes it in
   the wrong context.
-- Type custom callbacks with `StepExecuting`, `StepMerging`, `StepSelecting`, `StepProcessing`
-  (exported from `draive`/`draive.steps`).
+- Type custom callbacks with `StepExecuting`, `StepMerging`, `StepSelecting`, `StepProcessing`,
+  `StepDecisionInputPreparing` (exported from `draive`/`draive.steps`).
 
 ## Agents - `Agent`, `AgentsGroup`, `AgentMemory`
 

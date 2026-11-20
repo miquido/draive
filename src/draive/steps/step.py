@@ -16,11 +16,13 @@ from time import monotonic
 from typing import Any, ClassVar, NoReturn, Protocol, Self, cast, final, overload, runtime_checkable
 
 from haiway import (
+    BasicValue,
     Disposable,
     Disposables,
     Meta,
     MetaValues,
     State,
+    ValidationError,
     ctx,
     stream_concurrently,
 )
@@ -33,6 +35,11 @@ from draive.evaluation import (
     PreparedEvaluatorScenario,
 )
 from draive.models import (
+    DecisionAnswer,
+    DecisionChoice,
+    DecisionChoiceAnswer,
+    DecisionModel,
+    DecisionOption,
     GenerativeModel,
     ModelContext,
     ModelContextElement,
@@ -54,6 +61,7 @@ from draive.multimodal import (
     Multimodal,
     MultimodalContent,
     MultimodalContentPart,
+    MultimodalTag,
     Template,
     TemplatesRepository,
 )
@@ -62,6 +70,7 @@ from draive.steps.state import StepState, artifacts_mapping
 from draive.steps.types import (
     StepConditionVerifying,
     StepContextMutating,
+    StepDecisionInputPreparing,
     StepException,
     StepExecuting,
     StepLoopConditionVerifying,
@@ -1127,23 +1136,123 @@ class Step:
             state: StepState,
         ) -> StepStream:
             selection: Step = await selecting(state=state)
+            selected_stream: StepStream = selection._executing(state)
 
-            selection_stream = selection._executing(state)
             try:
-                async for chunk in selection_stream:
+                async for chunk in selected_stream:
                     yield chunk
 
             finally:
-                await selection_stream.aclose()
+                await selected_stream.aclose()
 
         return cls(step)
 
-    __slots__ = ("_executing",)
+    @classmethod
+    def deciding(
+        cls,
+        criteria: str,
+        /,
+        *steps: Self,
+        input: StepDecisionInputPreparing | None = None,  # noqa: A002
+    ) -> Self:
+        """Create a step that decides which of the given steps to execute.
+
+        Decides with ``DecisionModel`` which single step applies and executes it with
+        the current state. Steps are offered to the model by the ``name`` and
+        ``description`` of their meta, see ``with_meta``.
+
+        Parameters
+        ----------
+        criteria : str
+            Criteria the decision is made by, evaluated against the decision input.
+        *steps : Self
+            At least two steps with unique meta ``name``, the meta ``description``
+            is optional.
+        input : StepDecisionInputPreparing | None
+            Prepares the content the decision is made about from the current state.
+            By default the whole context is used, each element wrapped in a tag named
+            after its role (``user`` or ``assistant``).
+
+        Returns
+        -------
+        Self
+            A step executing the step chosen for the current state.
+
+        Raises
+        ------
+        ValueError
+            When there are fewer than two steps, a step has no meta ``name`` or names
+            repeat.
+        StepException
+            When executed and the backend answered with an unknown step.
+
+        Notes
+        -----
+        Rationale: model driven branching which stays a regular composable ``Step``.
+        Requires ``DecisionModel`` available in the scope, backend failures are raised
+        as they are.
+        """
+        if len(steps) < 2:  # noqa: PLR2004
+            raise ValueError("Deciding requires at least two steps")
+
+        for index, candidate in enumerate(steps):
+            if not candidate.meta.name:
+                raise ValueError(f"Deciding step at index {index} has no meta name")
+
+        try:
+            # the validation of options rejects repeated names
+            question = DecisionChoice(
+                identifier="choice",
+                criteria=criteria,
+                options=tuple(
+                    DecisionOption(
+                        identifier=candidate.meta.name or "",
+                        description=candidate.meta.description,
+                    )
+                    for candidate in steps
+                ),
+            )
+
+        except ValidationError as exc:
+            raise ValueError(f"Invalid deciding steps or criteria: {exc}") from exc
+
+        options: Mapping[str, Self] = {
+            option.identifier: candidate
+            for option, candidate in zip(question.options, steps, strict=True)
+        }
+
+        preparing_input: StepDecisionInputPreparing = input or _context_decision_input
+
+        async def selecting(
+            state: StepState,
+        ) -> Self:
+            answers: Sequence[DecisionAnswer] = await DecisionModel.decide(
+                input=await preparing_input(state),
+                questions=(question,),
+            )
+            assert isinstance(answers[0], DecisionChoiceAnswer)  # nosec: B101
+            if selected := options.get(answers[0].choice.identifier):
+                return selected
+
+            else:
+                raise StepException(
+                    f"Decision selected an unknown step: {answers[0].choice.identifier}",
+                    state=state,
+                )
+
+        return cls.selection(selecting)
+
+    __slots__ = (
+        "_executing",
+        "meta",
+    )
 
     def __init__(
         self,
         executing: StepExecuting,
         /,
+        *,
+        meta: Meta | MetaValues | None = None,
     ) -> None:
         """Initialize ``Step`` with a low-level execution coroutine.
 
@@ -1152,12 +1261,51 @@ class Step:
         executing : StepExecuting
             Async callable receiving ``StepState`` and yielding state updates
             and/or output chunks.
+        meta : Meta | MetaValues | None
+            Metadata describing the step, i.e. its ``name`` and ``description``.
         """
         self._executing: StepExecuting
         object.__setattr__(
             self,
             "_executing",
             executing,
+        )
+        self.meta: Meta
+        object.__setattr__(
+            self,
+            "meta",
+            Meta.of(meta),
+        )
+
+    def with_meta(
+        self,
+        meta: Meta | MetaValues | None = None,
+        /,
+        **values: BasicValue,
+    ) -> Self:
+        """Describe the step with additional metadata.
+
+        Parameters
+        ----------
+        meta : Meta | MetaValues | None
+            Metadata merged into the current one, later values win.
+        **values : BasicValue
+            Metadata values given instead of ``meta``, i.e. ``name`` and ``description``.
+
+        Returns
+        -------
+        Self
+            A step with the merged metadata, executing the same way.
+
+        Notes
+        -----
+        Rationale: names and descriptions identify steps for model driven selection,
+        see ``deciding``. Modifiers such as ``with_retry`` keep the metadata of the
+        step they wrap, combining steps, i.e. ``sequence``, starts with empty one.
+        """
+        return self.__class__(
+            self._executing,
+            meta=self.meta.merged_with(Meta.of(meta, **values)),
         )
 
     def with_ctx(
@@ -1234,7 +1382,7 @@ class Step:
         else:
             return self  # nothing to change...
 
-        return self.__class__(step)
+        return self.__class__(step, meta=self.meta)
 
     def with_retry(  # noqa: C901
         self,
@@ -1327,7 +1475,7 @@ class Step:
                 else:
                     return  # end the loop
 
-        return self.__class__(step)
+        return self.__class__(step, meta=self.meta)
 
     def with_timeout(
         self,
@@ -1395,7 +1543,7 @@ class Step:
             finally:
                 await execution_stream.aclose()
 
-        return self.__class__(step)
+        return self.__class__(step, meta=self.meta)
 
     def then(
         self,
@@ -1491,7 +1639,7 @@ class Step:
                 else:
                     raise  # reraise original
 
-        return self.__class__(step)
+        return self.__class__(step, meta=self.meta)
 
     def with_isolated_context(
         self,
@@ -1552,7 +1700,7 @@ class Step:
                 finally:
                     await execution_stream.aclose()
 
-        return self.__class__(step)
+        return self.__class__(step, meta=self.meta)
 
     def with_volatile_context(self) -> Self:
         """Discard context changes produced by this step.
@@ -1584,7 +1732,7 @@ class Step:
             finally:
                 await execution_stream.aclose()
 
-        return self.__class__(step)
+        return self.__class__(step, meta=self.meta)
 
     def with_volatile_tools(self) -> Self:
         """Discard tool-bearing context elements produced by this step.
@@ -1646,7 +1794,7 @@ class Step:
             finally:
                 await execution_stream.aclose()
 
-        return self.__class__(step)
+        return self.__class__(step, meta=self.meta)
 
     def with_condition(  # noqa: C901
         self,
@@ -1738,7 +1886,7 @@ class Step:
                     finally:
                         await alternative_stream.aclose()
 
-        return self.__class__(step)
+        return self.__class__(step, meta=self.meta)
 
     def with_suppressed_output(self) -> Self:
         """Suppress all emitted output from this step.
@@ -1768,7 +1916,7 @@ class Step:
             finally:
                 await execution_stream.aclose()
 
-        return self.__class__(step)
+        return self.__class__(step, meta=self.meta)
 
     def with_context_evaluation(
         self,
@@ -1829,7 +1977,7 @@ class Step:
             finally:
                 await execution_stream.aclose()
 
-        return self.__class__(step)
+        return self.__class__(step, meta=self.meta)
 
     def with_output_evaluation(
         self,
@@ -1901,7 +2049,7 @@ class Step:
                         },
                     )
 
-        return self.__class__(step)
+        return self.__class__(step, meta=self.meta)
 
     @overload
     async def run(
@@ -2253,6 +2401,20 @@ async def _noop(
 ) -> StepStream:
     return  # do not emit anything
     yield  # converts to AsyncGenerator
+
+
+async def _context_decision_input(
+    state: StepState,
+) -> MultimodalContent:
+    return MultimodalContent.of(
+        *(
+            MultimodalTag.of(
+                *element.content.parts,
+                name="user" if isinstance(element, ModelInput) else "assistant",
+            )
+            for element in state.context
+        )
+    )
 
 
 @runtime_checkable

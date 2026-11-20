@@ -10,14 +10,13 @@ from google.genai._interactions import APIStatusError
 from google.genai.decisions import CreateDecisionRequest, CreateDecisionResponse
 from haiway import ctx
 
-from draive.gemini import Gemini, GeminiDecisionConfig
-from draive.gemini.decisions import GeminiDecisions
-from draive.generation import (
+from draive import (
     DecisionCheck,
     DecisionCheckAnswer,
     DecisionChoice,
     DecisionChoiceAnswer,
     DecisionGeneration,
+    DecisionModel,
     DecisionOption,
     DecisionQuestion,
     DecisionRating,
@@ -25,6 +24,8 @@ from draive.generation import (
     DecisionSelection,
     DecisionSelectionAnswer,
 )
+from draive.gemini import Gemini, GeminiDecisionConfig
+from draive.gemini.decisions import GeminiDecisions
 from draive.models import ModelInputInvalid, ModelOutputFailed, ModelQuotaLimit, ModelRateLimit
 from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
 from draive.resources import ResourceContent, ResourceReference
@@ -417,7 +418,7 @@ async def test_decide_counts_selection_options_against_question_limit() -> None:
     [
         (False, None, True),
         (True, None, False),
-        (True, (DecisionGeneration,), True),
+        (True, (DecisionModel,), True),
     ],
 )
 async def test_client_provides_decisions_unless_defaulted_on_vertexai(
@@ -434,4 +435,36 @@ async def test_client_provides_decisions_unless_defaulted_on_vertexai(
     async with ctx.scope("test"):
         state = await client.__aenter__()
 
-    assert any(isinstance(element, DecisionGeneration) for element in state) is expected
+    assert any(isinstance(element, DecisionModel) for element in state) is expected
+
+
+@pytest.mark.asyncio
+async def test_decide_records_decision_invocation_and_metrics(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    records: list[dict[str, Any]] = []
+    monkeypatch.setattr(ctx, "record_info", lambda **kwargs: records.append(kwargs))
+    decisions = _decisions({"answers": {"q0": {"type": "noul", "noul": 0.7}}})
+
+    async with ctx.scope("test", GeminiDecisionConfig(model="gemini-decision-1")):
+        await decisions.decide(input="text", questions=_CHECK)
+
+    invocations = [
+        record["attributes"]
+        for record in records
+        if "metric" not in record and "decision.provider" in record.get("attributes", {})
+    ]
+    assert invocations == [
+        {
+            "decision.provider": "gemini",
+            "decision.model": "gemini-decision-1",
+            "decision.questions": ["angry"],
+            "decision.question_types": ["check"],
+        }
+    ]
+    counters = {
+        record["metric"]: record["value"]
+        for record in records
+        if record.get("metric", "").startswith("decision.")
+    }
+    assert counters == {"decision.questions": 1, "decision.requests": 1}

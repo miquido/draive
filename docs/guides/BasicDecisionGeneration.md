@@ -6,8 +6,13 @@ choices, multi-select selections and ratings on ordered scales.
 Decisions follow the contract of dedicated decision models - one shared input is evaluated against a
 set of independent, named questions. A backend built for decisions, such as the Gemini Decisions
 API, Ollama decision models or any System One API server, additionally reports calibrated
-probabilities you can threshold. Without one, decisions fall back to the model bound in the active
-scope.
+probabilities you can threshold. A decision backend always has to be bound, either one of those or
+the optional completion based implementation described below.
+
+`DecisionGeneration` is the high level facade (templates, `check`, `choose`, `select`, `rate`). It
+sits on `DecisionModel` from `draive.models`, the thin backend layer next to `GenerativeModel` which
+providers install and which `Step.deciding` uses directly. Without an explicit `DecisionGeneration`,
+the facade uses the `DecisionModel` bound in the scope.
 
 Reach for decisions whenever the answer is one of a fixed set of outcomes rather than generated
 content: classifying or routing a ticket, moderating input, tagging topics, grading a draft against
@@ -168,14 +173,13 @@ if confidence is not None and confidence < 0.7:
     ...  # escalate to a human
 ```
 
-The default model based implementation has no calibrated estimates, it reports the model `reasoning`
+The completion based implementation has no calibrated estimates, it reports the model `reasoning`
 behind each decision instead. Thresholds therefore need a calibrated backend.
 
 ## 3. Bind Gemini Decisions
 
-`Gemini` prepares `DecisionGeneration` by default, alongside its other features. Pass `features`
-without it to keep the model based decisions instead. `GeminiDecisionConfig` selects the model, it
-has to be set explicitly.
+`Gemini` prepares `DecisionModel` by default, alongside its other features. Pass `features` without
+it to skip it. `GeminiDecisionConfig` selects the model, it has to be set explicitly.
 
 ```python
 from draive import DecisionGeneration, ctx
@@ -190,18 +194,17 @@ async with ctx.scope(
 ```
 
 The Gemini Decisions API is not available through Vertex AI, a `Gemini()` client using Vertex AI
-keeps the model based decisions unless `DecisionGeneration` is requested in `features` explicitly.
-Its limits are validated before sending a request: up to 1000 questions, up to 255 options or
-levels, and choice option identifiers up to 128 characters without control characters. The API has
-no multi-select question, each selection option is asked as a separate yes / no question within the
-same request and counts against the question limit. Supported input is text, images, audio, video
-and PDF documents.
+does not provide `DecisionModel` unless it is requested in `features` explicitly. Its limits are
+validated before sending a request: up to 1000 questions, up to 255 options or levels, and choice
+option identifiers up to 128 characters without control characters. The API has no multi-select
+question, each selection option is asked as a separate yes / no question within the same request and
+counts against the question limit. Supported input is text, images, audio, video and PDF documents.
 
 ## 4. Bind Ollama Decisions
 
-`Ollama()` provides `DecisionGeneration` out of the box, answered by a System One decision model
-served by Ollama (0.35 or newer). Decision models are separate from chat models and have to be
-pulled first, i.e. `ollama pull tev1`. `OllamaDecisionConfig` selects the model, it has to be set
+`Ollama()` provides `DecisionModel` out of the box, answered by a System One decision model served
+by Ollama (0.35 or newer). Decision models are separate from chat models and have to be pulled
+first, i.e. `ollama pull tev1`. `OllamaDecisionConfig` selects the model, it has to be set
 explicitly.
 
 ```python
@@ -220,8 +223,8 @@ async with ctx.scope(
 The Ollama client delivers text input only. To decide about images use `SystemOne` with
 `images="images"` against the same server, as described below. Selections count against the Ollama
 limit of 64 questions per request, each option as a separate question. Without a pulled decision
-model, use `Ollama(features=(GenerativeModel, TextEmbedding))` to keep the default model based
-decisions instead.
+model, use `Ollama(features=(GenerativeModel, TextEmbedding))` to skip `DecisionModel` and bind the
+completion based decisions instead.
 
 ## 5. Bind System One API Decisions
 
@@ -273,24 +276,27 @@ as the probability of the decided outcome instead of the concentration measure s
 themselves. Selections are resolved the same way as with Gemini, as a yes / no question per option -
 mind the question limit of the server, i.e. 64 questions for Ollama.
 
-## 6. Default Model Based Decisions
+## 6. Completion Based Decisions
 
-Without a dedicated backend, each question is answered by a separate structured `GenerativeModel`
-completion, without tools, using the model bound in the scope, up to 8 of them running concurrently.
-A selection is answered with a single completion listing every option which applies. Answers outside
-of the given options or levels raise `GenerationOutputMissing`. The model reasoning behind each
-decision is reported in the answer meta under `reasoning`. Questions are answered concurrently, so
-several of them failing together raise an `ExceptionGroup` of the underlying failures -
-`GenerationOutputMissing` for invalid answers, or model errors such as `ModelRateLimit`. Handle the
-grouped case as well when calling `decide` with multiple questions.
+`generate_completion_decisions` is an optional backend answering every question with a separate
+structured `GenerativeModel` completion, without tools, using the model bound in the scope, up to 8
+of them running concurrently. It is never used implicitly - completions may be slow and costly, so
+it has to be assigned explicitly, to `DecisionGeneration` or to `DecisionModel` (for
+`Step.deciding`). A selection is answered with a single completion listing every option which
+applies. Answers outside of the given options or levels raise `GenerationOutputMissing`. The model
+reasoning behind each decision is reported in the answer meta under `reasoning`. Questions are
+answered concurrently, so several of them failing together raise an `ExceptionGroup` of the
+underlying failures - `GenerationOutputMissing` for invalid answers, or model errors such as
+`ModelRateLimit`. Handle the grouped case as well when calling `decide` with multiple questions.
 
 ```python
-from draive import DecisionGeneration, DecisionOption, ctx
+from draive import DecisionGeneration, DecisionOption, ctx, generate_completion_decisions
 from draive.openai import OpenAI, OpenAIResponsesConfig
 
 async with ctx.scope(
     "decisions",
     OpenAIResponsesConfig(model="gpt-5.5"),
+    DecisionGeneration(generating=generate_completion_decisions),
     disposables=(OpenAI(),),
 ):
     route = await DecisionGeneration.choose(

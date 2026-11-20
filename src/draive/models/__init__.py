@@ -1,9 +1,13 @@
+from draive.models.decision import DecisionModel
 from draive.models.generative import GenerativeModel, RealtimeGenerativeModel
+from draive.models.helpers import model_output_blocks
 from draive.models.metrics import (
     model_rate_limit,
     provider_failure,
     provider_gather,
     provider_rate_limit,
+    record_decision_invocation,
+    record_decision_metrics,
     record_embedding_invocation,
     record_embedding_metrics,
     record_guardrails_invocation,
@@ -11,6 +15,18 @@ from draive.models.metrics import (
     record_usage_metrics,
 )
 from draive.models.types import (
+    DecisionAnswer,
+    DecisionCheck,
+    DecisionCheckAnswer,
+    DecisionChoice,
+    DecisionChoiceAnswer,
+    DecisionGenerating,
+    DecisionOption,
+    DecisionQuestion,
+    DecisionRating,
+    DecisionRatingAnswer,
+    DecisionSelection,
+    DecisionSelectionAnswer,
     ModelContext,
     ModelContextElement,
     ModelException,
@@ -56,10 +72,22 @@ from draive.models.types import (
     ModelToolSpecification,
     ModelToolsSelection,
     ModelToolStatus,
-    model_output_blocks,
 )
 
 __all__ = (
+    "DecisionAnswer",
+    "DecisionCheck",
+    "DecisionCheckAnswer",
+    "DecisionChoice",
+    "DecisionChoiceAnswer",
+    "DecisionGenerating",
+    "DecisionModel",
+    "DecisionOption",
+    "DecisionQuestion",
+    "DecisionRating",
+    "DecisionRatingAnswer",
+    "DecisionSelection",
+    "DecisionSelectionAnswer",
     "GenerativeModel",
     "ModelContext",
     "ModelContextElement",
@@ -112,6 +140,8 @@ __all__ = (
     "provider_failure",
     "provider_gather",
     "provider_rate_limit",
+    "record_decision_invocation",
+    "record_decision_metrics",
     "record_embedding_invocation",
     "record_embedding_metrics",
     "record_guardrails_invocation",

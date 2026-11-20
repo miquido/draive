@@ -9,13 +9,14 @@ from draive.models import (
     ModelToolRequest,
     ModelToolResponse,
 )
-from draive.multimodal import MultimodalContentPart
+from draive.multimodal import Multimodal, MultimodalContentPart
 from draive.steps.state import StepState
 from draive.utils import ProcessingEvent
 
 __all__ = (
     "StepConditionVerifying",
     "StepContextMutating",
+    "StepDecisionInputPreparing",
     "StepException",
     "StepExecuting",
     "StepLoopConditionVerifying",
@@ -163,6 +164,16 @@ class StepProcessing(Protocol):
         self,
         state: StepState,
     ) -> StepState: ...
+
+
+@runtime_checkable
+class StepDecisionInputPreparing(Protocol):
+    """Protocol preparing the content a step decision is made about."""
+
+    async def __call__(
+        self,
+        state: StepState,
+    ) -> Multimodal: ...
 
 
 @runtime_checkable

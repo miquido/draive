@@ -1297,7 +1297,9 @@ def _parts_from_elements(  # noqa: C901, PLR0912, PLR0915
     elements: Collection[Multimodal],
     /,
 ) -> Generator[MultimodalContentPart]:
+    # merged text is joined once when its run ends, instead of on every merge
     last_text: TextContent | None = None
+    tail: list[str] = []
     for element in elements:
         if isinstance(element, str):
             if last_text is None:
@@ -1307,13 +1309,10 @@ def _parts_from_elements(  # noqa: C901, PLR0912, PLR0915
                 )
 
             elif not last_text.meta:
-                last_text = TextContent(
-                    text=last_text.text + element,
-                    meta=Meta.empty,
-                )
+                tail.append(element)
 
             else:
-                yield last_text
+                yield _merged_text(last_text, tail)
                 last_text = TextContent(
                     text=element,
                     meta=Meta.empty,
@@ -1325,13 +1324,10 @@ def _parts_from_elements(  # noqa: C901, PLR0912, PLR0915
 
             elif last_text.meta == element.meta:
                 # Preserve metadata when merging text parts with identical meta
-                last_text = TextContent(
-                    text=last_text.text + element.text,
-                    meta=last_text.meta,
-                )
+                tail.append(element.text)
 
             else:
-                yield last_text
+                yield _merged_text(last_text, tail)
                 last_text = element
 
         elif isinstance(element, MultimodalContent):
@@ -1342,19 +1338,16 @@ def _parts_from_elements(  # noqa: C901, PLR0912, PLR0915
 
                     elif last_text.meta == part.meta:
                         # Preserve metadata when merging text parts with identical meta
-                        last_text = TextContent(
-                            text=last_text.text + part.text,
-                            meta=last_text.meta,
-                        )
+                        tail.append(part.text)
 
                     else:
-                        yield last_text
+                        yield _merged_text(last_text, tail)
                         last_text = part
 
                 else:
                     verified: MultimodalContentPart = _verified_part(part)
                     if last_text is not None:
-                        yield last_text
+                        yield _merged_text(last_text, tail)
                         last_text = None
 
                     yield verified
@@ -1367,13 +1360,10 @@ def _parts_from_elements(  # noqa: C901, PLR0912, PLR0915
 
                     elif last_text.meta == part.meta:
                         # Preserve metadata when merging text parts with identical meta
-                        last_text = TextContent(
-                            text=last_text.text + part.text,
-                            meta=last_text.meta,
-                        )
+                        tail.append(part.text)
 
                     else:
-                        yield last_text
+                        yield _merged_text(last_text, tail)
                         last_text = part
 
                 else:
@@ -1383,7 +1373,7 @@ def _parts_from_elements(  # noqa: C901, PLR0912, PLR0915
                     )
 
                     if last_text is not None:
-                        yield last_text
+                        yield _merged_text(last_text, tail)
                         last_text = None
 
                     yield part
@@ -1391,13 +1381,29 @@ def _parts_from_elements(  # noqa: C901, PLR0912, PLR0915
         else:
             verified_element: MultimodalContentPart = _verified_part(element)
             if last_text is not None:
-                yield last_text
+                yield _merged_text(last_text, tail)
                 last_text = None
 
             yield verified_element
 
     if last_text is not None:
-        yield last_text
+        yield _merged_text(last_text, tail)
+
+
+def _merged_text(
+    head: TextContent,
+    tail: list[str],
+    /,
+) -> TextContent:
+    if not tail:
+        return head
+
+    merged: TextContent = TextContent(
+        text=head.text + "".join(tail),
+        meta=head.meta,
+    )
+    tail.clear()
+    return merged
 
 
 def _verified_part(
