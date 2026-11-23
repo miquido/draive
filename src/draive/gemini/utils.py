@@ -122,7 +122,7 @@ def thinking_config(
             "thinking_level": _resolve_thinking_level(config.thinking_level),
         }
 
-    if config.thinking_budget is not Missing:
+    if config.thinking_budget is not Missing and config.thinking_budget != 0:
         return {
             "include_thoughts": True,
             "thinking_budget": config.thinking_budget,
