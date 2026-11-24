@@ -14,9 +14,12 @@
 
 ### Fixed
 
-- MCP tools carry the input schema declared by the server unchanged, closed for undeclared
-  arguments unless the server sets `additionalProperties` itself or declares its arguments under a
-  root `allOf`, `anyOf` or `oneOf`. Schemas with keywords outside of
+- MCP tool input schemas are translated into `ModelToolParametersSpecification`, they failed to
+  convert under haiway 0.65.0: references to `$defs` are inlined (recursive definitions anchored as
+  recursive States are), `oneOf` becomes `anyOf`, `const` a single value `enum`, a single element
+  `allOf` is merged, objects get an explicit `additionalProperties` and keywords the specification
+  does not declare (`title`, `default`, `minimum`...) are skipped at every level. A tool whose schema
+  still can not be translated is skipped with a warning instead of failing the whole tools fetch. Schemas with keywords outside of
   `ModelToolParametersSpecification` (`title`, `default`, `minimum`, `$defs` and `$ref`, `oneOf`...)
   failed to convert under haiway 0.65.0, and `$defs` were dropped before.
 - Gemini skips the thinking config when the thinking budget is zero (0.121.1).

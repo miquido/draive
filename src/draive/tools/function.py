@@ -7,7 +7,6 @@ from haiway import BasicValue, Function, Meta, MetaValues, TypeSpecification, Va
 from draive.models import (
     ModelToolFunctionSpecification,
     ModelToolHandling,
-    ModelToolParameters,
     ModelToolParametersSpecification,
     ModelToolSpecification,
 )
@@ -38,7 +37,7 @@ class _ToolFunction[**Args, Output](Function[Args, Output]):
         *,
         name: str,
         description: str | None,
-        parameters: ModelToolParameters | None,
+        parameters: ModelToolParametersSpecification | None,
         handling: ModelToolHandling,
         meta: Meta,
     ) -> None:
@@ -52,7 +51,7 @@ class _ToolFunction[**Args, Output](Function[Args, Output]):
             Public tool name exposed to model tool selection.
         description : str | None
             Optional human-readable tool description.
-        parameters : ModelToolParameters | None
+        parameters : ModelToolParametersSpecification | None
             Explicit JSON schema for arguments. When omitted, the schema is inferred
             from the wrapped function signature.
         handling : ModelToolHandling
@@ -72,8 +71,8 @@ class _ToolFunction[**Args, Output](Function[Args, Output]):
 
         self.name: str = name
         self.description: str | None = description
-        self._declared_parameters: ModelToolParameters | None = parameters
-        self.parameters: ModelToolParameters = (
+        self._declared_parameters: ModelToolParametersSpecification | None = parameters
+        self.parameters: ModelToolParametersSpecification = (
             parameters if parameters is not None else self._inferred_parameters()
         )
         self.specification: ModelToolSpecification = ModelToolFunctionSpecification(
@@ -133,7 +132,7 @@ class _ToolFunction[**Args, Output](Function[Args, Output]):
         name: str | None = None,
         description: str | None = None,
         function: Callable[Args, Output] | None = None,
-        parameters: ModelToolParameters | None = None,
+        parameters: ModelToolParametersSpecification | None = None,
         handling: ModelToolHandling | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
@@ -147,7 +146,7 @@ class _ToolFunction[**Args, Output](Function[Args, Output]):
             Replacement description. Passing ``None`` keeps the current value.
         function : Callable[Args, Output] | None, default=None
             Replacement callable. When omitted, the current callable is reused.
-        parameters : ModelToolParameters | None, default=None
+        parameters : ModelToolParametersSpecification | None, default=None
             Replacement parameter schema. When omitted, an explicitly declared schema
             is reused, otherwise the schema is inferred again from the callable.
         handling : ModelToolHandling | None, default=None
@@ -309,7 +308,7 @@ def tool(
     *,
     name: str | None = None,
     description: str | None = None,
-    parameters: ModelToolParameters | None = None,
+    parameters: ModelToolParametersSpecification | None = None,
     handling: ModelToolHandling = "response",
     meta: Meta | MetaValues | None = None,
 ) -> FunctionToolWrapper: ...
@@ -322,7 +321,7 @@ def tool[**Args, Result: Multimodal = MultimodalContent](
     *,
     name: str | None = None,
     description: str | None = None,
-    parameters: ModelToolParameters | None = None,
+    parameters: ModelToolParametersSpecification | None = None,
     handling: ModelToolHandling = "response",
     meta: Meta | MetaValues | None = None,
 ) -> FunctionToolWrapper | CoroutineTool[Args, Result] | GeneratorTool[Args]:
@@ -339,7 +338,7 @@ def tool[**Args, Result: Multimodal = MultimodalContent](
         Explicit tool name. Defaults to the wrapped function name.
     description : str | None, default=None
         Optional human-readable tool description.
-    parameters : ModelToolParameters | None, default=None
+    parameters : ModelToolParametersSpecification | None, default=None
         Explicit JSON schema for arguments. When omitted, the schema is inferred
         from the wrapped callable signature.
     handling : ModelToolHandling, default="response"

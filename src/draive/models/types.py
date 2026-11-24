@@ -323,16 +323,6 @@ class ModelToolParametersSpecification(TypedDict, total=False):
     additionalProperties: Required[Literal[False]]
 
 
-ModelToolParameters = ModelToolParametersSpecification | Mapping[str, BasicValue]
-"""Argument schema of a tool: typed for draive tools, a plain JSON schema for external ones.
-
-Tools defined in draive declare ``ModelToolParametersSpecification``. Tools coming from an
-external source, such as an MCP server, carry the JSON schema the source declared unchanged,
-so keywords outside of the typed specification (``title``, ``$defs``, ``minimum``...) reach
-the model as they were written.
-"""
-
-
 @final
 class ModelToolFunctionSpecification(State, serializable=True):
     """Serializable tool declaration exposed to a provider.
@@ -355,7 +345,7 @@ class ModelToolFunctionSpecification(State, serializable=True):
         *,
         name: str,
         description: str | None = None,
-        parameters: ModelToolParameters | None = None,
+        parameters: ModelToolParametersSpecification | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """Create a tool function specification with normalized metadata.
@@ -385,7 +375,7 @@ class ModelToolFunctionSpecification(State, serializable=True):
 
     name: str
     description: str | None = None
-    parameters: ModelToolParameters | None = None
+    parameters: ModelToolParametersSpecification | None = None
     meta: Meta = Meta.empty
 
 

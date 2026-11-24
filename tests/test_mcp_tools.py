@@ -7,6 +7,7 @@ from mcp.types import ResourceLink as MCPResourceLink
 from mcp.types import TextContent as MCPTextContent
 from mcp.types import Tool as MCPTool
 
+from draive import ctx
 from draive.mcp.client import MCPClient, _convert_tool  # pyright: ignore[reportPrivateUsage]
 from draive.tools import ToolException
 
@@ -175,41 +176,25 @@ async def _unused_tool_call(name: str, arguments: Mapping[str, Any]) -> Any:
     raise AssertionError(f"unexpected call of {name} with {arguments}")
 
 
-@pytest.mark.parametrize(
-    "schema",
-    [
-        {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]},
-        {
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "title": "Arguments",
-            "description": "Tool arguments",
-            "type": "object",
-            "properties": {
-                "query": {"type": "string", "title": "Query", "default": "x", "minLength": 1},
-                "item": {"$ref": "#/$defs/Item"},
-                "choice": {"oneOf": [{"const": "a"}, {"type": ["integer", "null"]}]},
-            },
-            "required": ["query"],
-            "$defs": {"Item": {"type": "object", "properties": {"id": {"type": "integer"}}}},
-        },
-    ],
-)
-def test_mcp_tool_parameters_keep_the_server_schema(schema: Mapping[str, Any]) -> None:
-    tool = _convert_tool(  # pyright: ignore[reportPrivateUsage]
-        MCPTool(name="tool", input_schema=schema),
-        tool_call=_unused_tool_call,
-        source="source",
-        tags=(),
-    )
-
-    assert _plain(tool.specification.parameters) == {**schema, "additionalProperties": False}
-
-
-def test_mcp_tool_parameters_keep_additional_properties_of_the_server() -> None:
+def test_mcp_tool_parameters_skip_undeclared_schema_keys() -> None:
     tool = _convert_tool(  # pyright: ignore[reportPrivateUsage]
         MCPTool(
             name="tool",
-            input_schema={"type": "object", "properties": {}, "additionalProperties": True},
+            input_schema={
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "title": "Arguments",
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "title": "Query", "minLength": 1},
+                    "limit": {
+                        "anyOf": [{"type": "integer", "minimum": 1}, {"type": "null"}],
+                        "default": None,
+                        "title": "Limit",
+                    },
+                },
+                "required": ["query"],
+                "additionalProperties": True,
+            },
         ),
         tool_call=_unused_tool_call,
         source="source",
@@ -218,28 +203,138 @@ def test_mcp_tool_parameters_keep_additional_properties_of_the_server() -> None:
 
     assert _plain(tool.specification.parameters) == {
         "type": "object",
-        "properties": {},
-        "additionalProperties": True,
+        "properties": {
+            "query": {"type": "string"},
+            "limit": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
+        },
+        "required": ["query"],
+        "additionalProperties": False,
     }
 
 
-@pytest.mark.parametrize("keyword", ["allOf", "anyOf", "oneOf"])
-def test_mcp_tool_parameters_stay_open_for_composed_arguments(keyword: str) -> None:
-    schema: Mapping[str, Any] = {
-        "type": "object",
-        keyword: [
-            {"properties": {"query": {"type": "string"}}, "required": ["query"]},
-            {"properties": {"id": {"type": "integer"}}, "required": ["id"]},
-        ],
-    }
-    tool = _convert_tool(  # pyright: ignore[reportPrivateUsage]
-        MCPTool(name="tool", input_schema=schema),
-        tool_call=_unused_tool_call,
-        source="source",
-        tags=(),
+def _converted_parameters(schema: Mapping[str, Any]) -> Any:
+    return _plain(
+        _convert_tool(  # pyright: ignore[reportPrivateUsage]
+            MCPTool(name="tool", input_schema=schema),
+            tool_call=_unused_tool_call,
+            source="source",
+            tags=(),
+        ).specification.parameters
     )
 
-    assert _plain(tool.specification.parameters) == schema
+
+def test_mcp_tool_parameters_inline_definitions() -> None:
+    assert _converted_parameters(
+        {
+            "type": "object",
+            "properties": {
+                "items": {"type": "array", "items": {"$ref": "#/$defs/Item"}, "title": "Items"},
+                "main": {"$ref": "#/definitions/Item", "description": "Main item"},
+            },
+            "required": ["items"],
+            "$defs": {
+                "Item": {
+                    "type": "object",
+                    "title": "Item",
+                    "properties": {"sku": {"type": "string"}},
+                    "required": ["sku"],
+                }
+            },
+            "definitions": {"Item": {"type": "string"}},
+        }
+    ) == {
+        "type": "object",
+        "properties": {
+            "items": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {"sku": {"type": "string"}},
+                    "required": ["sku"],
+                    "additionalProperties": False,
+                },
+            },
+            "main": {
+                "type": "object",
+                "properties": {"sku": {"type": "string"}},
+                "required": ["sku"],
+                "additionalProperties": False,
+                "description": "Main item",
+            },
+        },
+        "required": ["items"],
+        "additionalProperties": False,
+    }
+
+
+def test_mcp_tool_parameters_anchor_recursive_definitions() -> None:
+    assert _converted_parameters(
+        {
+            "type": "object",
+            "properties": {
+                "root": {"$ref": "#/$defs/Node"},
+                "other": {"$ref": "#/$defs/Node"},
+            },
+            "$defs": {
+                "Node": {
+                    "type": "object",
+                    "properties": {
+                        "children": {"type": "array", "items": {"$ref": "#/$defs/Node"}},
+                    },
+                }
+            },
+        }
+    ) == {
+        "type": "object",
+        "properties": {
+            "root": {
+                "type": "object",
+                "properties": {"children": {"type": "array", "items": {"$ref": "#Node"}}},
+                "additionalProperties": False,
+                "$anchor": "Node",
+            },
+            "other": {"$ref": "#Node"},
+        },
+        "additionalProperties": False,
+    }
+
+
+def test_mcp_tool_parameters_translate_composition_keywords() -> None:
+    assert _converted_parameters(
+        {
+            "type": "object",
+            "properties": {
+                "choice": {"oneOf": [{"const": "a"}, {"type": "integer"}]},
+                "wrapped": {"allOf": [{"type": "string"}], "description": "Wrapped"},
+            },
+        }
+    ) == {
+        "type": "object",
+        "properties": {
+            "choice": {"anyOf": [{"enum": ["a"]}, {"type": "integer"}]},
+            "wrapped": {"type": "string", "description": "Wrapped"},
+        },
+        "additionalProperties": False,
+    }
+
+
+@pytest.mark.asyncio
+async def test_mcp_tools_fetch_skips_tools_with_unsupported_schemas() -> None:
+    class Session(_DummySession):
+        async def list_tools(self, *, params: Any = None) -> Any:
+            _ = params
+            return ListToolsResult(
+                tools=[
+                    MCPTool(name="any", input_schema={"type": "object", "properties": {"x": {}}}),
+                    MCPTool(name="valid", input_schema={"type": "object", "properties": {}}),
+                ],
+                next_cursor=None,
+            )
+
+    async with ctx.scope("test"):
+        tools = await _mcp_client_with_session(Session()).tools_fetch()
+
+    assert [tool.name for tool in tools] == ["valid"]
 
 
 def _plain(value: Any) -> Any:

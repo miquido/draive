@@ -26,6 +26,7 @@ from haiway import (
     Paginated,
     Pagination,
     PaginationToken,
+    ValidationError,
     as_dict,
     as_list,
     as_tuple,
@@ -51,6 +52,7 @@ from mcp.types import Resource as MCPResource
 from mcp.types import ResourceLink as MCPResourceLink
 from mcp.types import TextContent as MCPTextContent
 
+from draive.models import ModelToolFunctionSpecification, ModelToolParametersSpecification
 from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
 from draive.resources import ResourceContent, ResourceReference, ResourcesRepository
 from draive.tools import CoroutineTool, Tool, ToolException, ToolsProvider
@@ -494,15 +496,26 @@ class MCPClient:
             cursor = result.next_cursor
             visited_cursors.add(cursor)
 
-        return tuple(
-            _convert_tool(
-                tool,
-                tool_call=self._tool_call,
-                source=self.identifier,
-                tags=self.tags,
-            )
-            for tool in mcp_tools
-        )
+        tools: list[Tool] = []
+        for mcp_tool in mcp_tools:
+            try:
+                tools.append(
+                    _convert_tool(
+                        mcp_tool,
+                        tool_call=self._tool_call,
+                        source=self.identifier,
+                        tags=self.tags,
+                    )
+                )
+
+            except ValidationError as exc:
+                # a single tool with an unsupported schema should not hide the others
+                ctx.log_warning(
+                    f"Skipping MCP tool {mcp_tool.name} of {self.identifier},"
+                    f" its input schema is not supported: {exc}"
+                )
+
+        return tuple(tools)
 
     async def _tool_call(
         self,
@@ -835,24 +848,167 @@ async def _convert_error_content(
         return MultimodalContent.of(f"<{content.type}/>")
 
 
-# root keywords which declare arguments outside of the root `properties`, closing the root
-# would refuse every argument declared by them
-_COMPOSITION_KEYWORDS: Final[frozenset[str]] = frozenset(("allOf", "anyOf", "oneOf"))
-
-
 def _tool_parameters(
+    name: str,
     input_schema: Mapping[str, Any],
     /,
-) -> Mapping[str, Any]:
-    # the schema declared by the server reaches the model unchanged, closed for arguments
-    # it does not declare unless the server decided otherwise or composes its arguments
-    if "additionalProperties" in input_schema or not _COMPOSITION_KEYWORDS.isdisjoint(input_schema):
-        return input_schema
+) -> ModelToolParametersSpecification | None:
+    # server schemas carry keywords the specification does not declare (`title`, `default`,
+    # `minimum`...), decoding skips them while validating the rest, arguments stay closed
+    return ModelToolFunctionSpecification.from_mapping(
+        {
+            "name": name,
+            "parameters": {
+                "properties": {},
+                **_SchemaTranslation(input_schema).translated(input_schema),
+                "additionalProperties": False,
+            },
+        },
+        ignore_extra=True,
+    ).parameters
 
-    return {
-        **input_schema,
-        "additionalProperties": False,
-    }
+
+_DEFINITIONS_PREFIXES: Final[tuple[str, ...]] = ("#/$defs/", "#/definitions/")
+# keywords holding a single schema, a sequence of schemas or a mapping of named schemas
+_SCHEMA_KEYWORDS: Final[frozenset[str]] = frozenset(("items", "additionalProperties", "not"))
+_SCHEMA_SEQUENCE_KEYWORDS: Final[frozenset[str]] = frozenset(("anyOf", "prefixItems"))
+_SCHEMA_MAPPING_KEYWORDS: Final[frozenset[str]] = frozenset(("properties",))
+
+
+@final
+class _SchemaTranslation:
+    """Translate JSON schema constructs into the form of a type specification.
+
+    References to `$defs` (or `definitions`) are inlined, a recursive definition is
+    anchored where it is inlined first and referenced as `#Name` afterwards, as a recursive
+    State is. `oneOf` becomes `anyOf`, `const` a single value `enum` and a single element
+    `allOf` is merged into its schema and titles are dropped. An object with properties is
+    closed, one without them is open unless it declares its values. Everything else is left
+    for decoding to validate.
+    """
+
+    __slots__ = (
+        "_active",
+        "_anchored",
+        "_definitions",
+        "_recursive",
+    )
+
+    def __init__(
+        self,
+        root: Mapping[str, Any],
+    ) -> None:
+        definitions: Any = root.get("$defs", root.get("definitions"))
+        self._definitions: Mapping[str, Any] = (
+            definitions if isinstance(definitions, Mapping) else {}
+        )
+        self._active: list[str] = []
+        self._recursive: set[str] = set()
+        self._anchored: set[str] = set()
+
+    def translated(  # noqa: C901, PLR0912
+        self,
+        schema: Any,
+    ) -> Any:
+        if not isinstance(schema, Mapping):
+            return schema  # booleans and malformed values are left for decoding
+
+        node: dict[str, Any] = dict(cast(Mapping[str, Any], schema))
+        node.pop("$defs", None)
+        node.pop("definitions", None)
+        # draive specifications carry no titles, strict modes refuse them
+        node.pop("title", None)
+
+        match node.pop("$ref", None):
+            case str() as reference if (name := _definition_name(reference)) is not None:
+                if name in self._definitions:
+                    return {**self._resolved(name), **node}
+
+                node["$ref"] = reference  # unknown definitions are left for decoding
+
+            case None:
+                pass
+
+            case reference:
+                node["$ref"] = reference
+
+        match node.pop("allOf", None):
+            case [single]:
+                node = {**self.translated(single), **node}
+
+            case None:
+                pass
+
+            case composed:
+                node["allOf"] = composed
+
+        if "oneOf" in node:
+            node["anyOf"] = node.pop("oneOf")
+
+        if "const" in node and "enum" not in node:
+            node["enum"] = [node.pop("const")]
+
+        if node.get("type") == "object":
+            if "properties" in node:
+                # declared properties close the object as the arguments are closed
+                node["additionalProperties"] = False
+
+            else:
+                # an object without properties is open unless it declares its values
+                node.setdefault("additionalProperties", True)
+
+        for keyword, value in node.items():
+            if keyword in _SCHEMA_KEYWORDS:
+                node[keyword] = self.translated(value)
+
+            elif keyword in _SCHEMA_SEQUENCE_KEYWORDS and isinstance(value, Sequence):
+                node[keyword] = [self.translated(element) for element in cast(Sequence[Any], value)]
+
+            elif keyword in _SCHEMA_MAPPING_KEYWORDS and isinstance(value, Mapping):
+                node[keyword] = {
+                    key: self.translated(element)
+                    for key, element in cast(Mapping[str, Any], value).items()
+                }
+
+        return node
+
+    def _resolved(
+        self,
+        name: str,
+    ) -> Mapping[str, Any]:
+        if name in self._active:
+            self._recursive.add(name)
+            return {"$ref": f"#{name}"}
+
+        if name in self._anchored:
+            return {"$ref": f"#{name}"}
+
+        self._active.append(name)
+        try:
+            resolved: Any = self.translated(self._definitions[name])
+
+        finally:
+            self._active.pop()
+
+        if not isinstance(resolved, Mapping):
+            return {}
+
+        if name in self._recursive:
+            self._anchored.add(name)
+            return {**cast(Mapping[str, Any], resolved), "$anchor": name}
+
+        return cast(Mapping[str, Any], resolved)
+
+
+def _definition_name(
+    reference: str,
+    /,
+) -> str | None:
+    for prefix in _DEFINITIONS_PREFIXES:
+        if reference.startswith(prefix):
+            return reference.removeprefix(prefix)
+
+    return None
 
 
 def _convert_tool(
@@ -874,7 +1030,7 @@ def _convert_tool(
     return CoroutineTool(
         name=name,
         description=mcp_tool.description,
-        parameters=_tool_parameters(mcp_tool.input_schema),
+        parameters=_tool_parameters(name, mcp_tool.input_schema),
         function=remote_call,
         handling="response",
         meta=Meta.of(
