@@ -23,6 +23,9 @@
   has a `resolving` (`ClaudeCodeResolving`) of the credential of each run. New exports:
   `ClaudeCodeAccessToken`, `ClaudeCodeResolvedCredential`, `ClaudeCodeResolving` and
   `ClaudeCodeConnectors`.
+- `ClaudeCodeMCPServer` keeps the `status` and `source` Claude Code reports, `connected` is derived
+  from the status. Account connectors which were never authenticated (`needs-auth`) are no longer
+  among `failed_mcp_servers` and raise no warning.
 
 ## 0.122.0
 

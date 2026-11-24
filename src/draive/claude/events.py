@@ -20,12 +20,43 @@ __all__ = (
 )
 
 
+# account connectors which the account has not authenticated are reported, and never connect
+_ACCOUNT_CONNECTOR_SOURCE: Final[str] = "claudeai"
+_NEEDS_AUTHENTICATION: Final[str] = "needs-auth"
+
+
 @final
 class ClaudeCodeMCPServer(State):
-    """MCP server reported by Claude Code, whether it was connected or not."""
+    """MCP server reported by Claude Code, with its status as reported.
+
+    Attributes
+    ----------
+    name
+        Name of the server, ``claude.ai <Name>`` for an account connector.
+    status
+        Status as reported, i.e. ``connected``, ``failed`` or ``needs-auth`` - versions which
+        report none connect the servers on start.
+    source
+        Where the server comes from, ``claudeai`` for an account connector.
+    """
 
     name: str
-    connected: bool = True
+    status: str = "connected"
+    source: str | None = None
+
+    @property
+    def connected(self) -> bool:
+        """Whether the server is connected."""
+        return self.status == "connected"
+
+    @property
+    def failed(self) -> bool:
+        """Whether the server is not connected for a reason other than an account connector
+        which was never authenticated - connecting it is a choice of the account, not a failure.
+        """
+        return not self.connected and not (
+            self.source == _ACCOUNT_CONNECTOR_SOURCE and self.status == _NEEDS_AUTHENTICATION
+        )
 
 
 @final
@@ -43,8 +74,9 @@ class ClaudeCodeStarted(State):
 
     @property
     def failed_mcp_servers(self) -> Sequence[str]:
-        """Names of the configured MCP servers which are not connected."""
-        return tuple(server.name for server in self.mcp_servers if not server.connected)
+        """Names of the MCP servers which failed to connect, account connectors which were never
+        authenticated are not among them."""
+        return tuple(server.name for server in self.mcp_servers if server.failed)
 
 
 @final
@@ -411,7 +443,8 @@ def _mcp_servers(
             servers.append(
                 ClaudeCodeMCPServer(
                     name=name,
-                    connected=_string(entry.get("status")) in (None, "connected"),
+                    status=_string(entry.get("status")) or "connected",
+                    source=_string(entry.get("source")),
                 )
             )
 

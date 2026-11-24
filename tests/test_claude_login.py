@@ -884,6 +884,50 @@ async def test_static_credentials_are_resolved_to_themselves() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("keychain", [True, False])
+async def test_an_expired_file_is_refused_at_startup_only_where_logins_are_in_the_keychain(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    keychain: bool,
+) -> None:
+    directory = _login_directory(tmp_path, expires_in_ms=-HOUR_MS)
+    monkeypatch.setattr("draive.claude.login._keychain_platform", lambda: keychain)
+    login = ClaudeCodeLocalLogin(config_directory=str(directory))
+
+    if keychain:
+        with pytest.raises(ClaudeCodeUnavailable, match="keychain") as exc_info:
+            await ClaudeCodeLogins.verify(login)
+
+        assert "has expired" in str(exc_info.value)
+        assert not _holds(exc_info.value, TOKEN)
+        assert not _holds(exc_info.value, REFRESH_TOKEN)
+
+    else:
+        await ClaudeCodeLogins.verify(login)  # refreshed when a run needs it
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("keychain", [True, False])
+async def test_an_expired_login_mentions_the_keychain_only_where_it_is_used(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    keychain: bool,
+) -> None:
+    directory = _login_directory(tmp_path, expires_in_ms=-60_000)
+    (directory / "mode").write_text("nothing")
+    monkeypatch.setattr("draive.claude.login._keychain_platform", lambda: keychain)
+
+    async with ctx.scope("test"):
+        with pytest.raises(ClaudeCodeUnavailable, match="expired") as exc_info:
+            await ClaudeCodeLogins().resolve(
+                ClaudeCodeLocalLogin(config_directory=str(directory)),
+                binary=_fake_binary(tmp_path),
+            )
+
+    assert ("keychain" in str(exc_info.value)) == keychain
+
+
+@pytest.mark.asyncio
 async def test_entering_the_scope_verifies_the_login_file(tmp_path: Path) -> None:
     binary = write_fake_claude(tmp_path)
     (tmp_path / "empty").mkdir()

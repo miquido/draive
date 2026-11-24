@@ -37,6 +37,7 @@ def test_init_is_parsed_into_started() -> None:
                     {"name": "docs", "status": "connected"},
                     {"name": "broken", "status": "failed"},
                     {"name": "unknown"},
+                    {"name": "claude.ai Slack", "status": "needs-auth", "source": "claudeai"},
                 ],
                 "plugins": [{"name": "cc-plugin-privacy", "path": "builtin"}],
             }
@@ -52,8 +53,9 @@ def test_init_is_parsed_into_started() -> None:
         tools=("Read", "Grep"),
         mcp_servers=(
             ClaudeCodeMCPServer(name="docs"),
-            ClaudeCodeMCPServer(name="broken", connected=False),
+            ClaudeCodeMCPServer(name="broken", status="failed"),
             ClaudeCodeMCPServer(name="unknown"),  # no status is reported by every version
+            ClaudeCodeMCPServer(name="claude.ai Slack", status="needs-auth", source="claudeai"),
         ),
         plugins=("cc-plugin-privacy",),
     )
@@ -283,13 +285,17 @@ def test_started_derives_its_failed_servers_from_their_status() -> None:
                     {"name": "a", "status": "connected"},
                     {"name": "b", "status": "needs-auth"},
                     {"name": "c"},
+                    # an account connector never authenticated is the choice of the account
+                    {"name": "claude.ai Slack", "status": "needs-auth", "source": "claudeai"},
+                    {"name": "claude.ai Drive", "status": "failed", "source": "claudeai"},
+                    {"name": "claude.ai Docs", "status": "connected", "source": "claudeai"},
                 ],
             }
         )
     )
 
     assert isinstance(event, ClaudeCodeStarted)
-    assert event.failed_mcp_servers == ("b",)
+    assert event.failed_mcp_servers == ("b", "claude.ai Drive")
 
 
 def test_malformed_result_fields_fall_back_to_defaults() -> None:

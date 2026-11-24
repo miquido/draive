@@ -70,7 +70,9 @@ them on per run, so the same application can have them on for some runs and off 
     connected yet.
 
 Nothing allows the tools of connectors for you - add them to `allowed_tools`, i.e.
-`mcp__claude_ai_Slack__*`.
+`mcp__claude_ai_Slack__*`. Connectors the account never authenticated are reported by Claude Code as
+`needs-auth` and are not counted as MCP servers which failed to connect, so they raise no warning; a
+connector which failed does.
 
 Connectors need a token with the `user:mcp_servers` scope. API keys and `claude setup-token` tokens
 never have it, so a run which asks for connectors with them fails with `ClaudeCodeUnavailable`
@@ -110,14 +112,15 @@ are wanted.
 The login has to be made on this machine, as the user the process runs as. It is read from
 `<config_directory>/.credentials.json` - only file based logins are supported, logins kept in the
 keychain (macOS) are not, so there is usually no such file there, and entering the scope fails when
-the file is missing. Every run reads the access token (valid for a few hours) from it. When the
-token has less than `refresh_margin` seconds left (1800, 30 minutes, by default), draive refreshes
-the login through Claude Code itself (`claude auth status`) under a lock - within the scope and
-across draive processes, as a refresh rotates the refresh token. The lock is the file
-`<config_directory>/.login-refresh.lock`, so the directory has to be writable for refreshes. The
-lock coordinates draive processes only, not the interactive Claude Code of the user, which may
-refresh the same login. A run gets the access token only - never the refresh token nor the directory
-of the login - and still has its private home and configuration.
+the file is missing. A file left over there is not updated by Claude Code, so on macOS entering the
+scope also fails when its token has already expired. Every run reads the access token (valid for a
+few hours) from it. When the token has less than `refresh_margin` seconds left (1800, 30 minutes, by
+default), draive refreshes the login through Claude Code itself (`claude auth status`) under a lock
+\- within the scope and across draive processes, as a refresh rotates the refresh token. The lock is
+the file `<config_directory>/.login-refresh.lock`, so the directory has to be writable for
+refreshes. The lock coordinates draive processes only, not the interactive Claude Code of the user,
+which may refresh the same login. A run gets the access token only - never the refresh token nor the
+directory of the login - and still has its private home and configuration.
 
 A refresh runs on its own task, a run which is cancelled or gives up on it does not stop it, and
 exiting the `ClaudeCode` scope waits for the refreshes still in flight. A login has at most one

@@ -3,6 +3,7 @@ import contextvars
 import fcntl
 import json
 import os
+import sys
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from functools import partial
@@ -27,6 +28,12 @@ __all__ = ("ClaudeCodeLogins",)
 _CREDENTIALS_FILE: Final[str] = ".credentials.json"
 _LOCK_FILE: Final[str] = ".login-refresh.lock"
 _LOCK_POLL: Final[float] = 0.05
+# on macOS Claude Code keeps its login in the keychain, a credentials file there is a leftover which
+# a refresh never updates
+_KEYCHAIN_HINT: Final[str] = (
+    " - on macOS Claude Code keeps its login in the keychain and does not update this file,"
+    " logins kept in the keychain are not supported"
+)
 # a credentials file is a few hundred bytes, anything far larger is not one
 _MAX_CREDENTIALS_BYTES: Final[int] = 64 * 1024
 
@@ -115,11 +122,17 @@ class ClaudeCodeLogins:
         Raises
         ------
         ClaudeCodeUnavailable
-            When the file of a login is missing or malformed.
+            When the file of a login is missing or malformed, or on macOS already expired - there
+            it is a leftover of a login which lives in the keychain.
         """
         match credential:
             case ClaudeCodeLocalLogin() as login:
-                await asyncio.to_thread(_read_login, _credentials_path(login))
+                path: str = _credentials_path(login)
+                token: ClaudeCodeAccessToken = await asyncio.to_thread(_read_login, path)
+                if _keychain_platform() and _remaining(token) <= 0:
+                    raise ClaudeCodeUnavailable(
+                        f"the credentials file of the login ({path}) has expired{_KEYCHAIN_HINT}"
+                    )
 
             case ClaudeCodeApiKey() | ClaudeCodeOAuthToken():
                 pass
@@ -185,6 +198,7 @@ class ClaudeCodeLogins:
             raise ClaudeCodeUnavailable(
                 "the access token of the login has expired and could not be refreshed,"
                 " log in again with `claude /login` as the user of the login"
+                + (_KEYCHAIN_HINT if _keychain_platform() else "")
             )
 
         if remaining < login.refresh_margin:
@@ -333,6 +347,10 @@ class ClaudeCodeLogins:
             if process.returncode is None:
                 process.kill()
                 await process.wait()
+
+
+def _keychain_platform() -> bool:
+    return sys.platform == "darwin"
 
 
 def _credentials_path(
