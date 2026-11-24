@@ -131,6 +131,10 @@ async with ctx.scope("app", disposables=(MCPClients(      # one disposable aggre
 - `MCPClient.stdio(identifier=None, *, command, args, env, features, tags)`, `.streamable_http(url=,
   headers=, timeout=30, ...)` (preferred remote transport), `.sse(url=, ...)` (deprecated). Entering
   installs `ToolsProvider` and `ResourcesRepository`; one client is a disposable on its own.
+- Server tool schemas are translated into `ModelToolParametersSpecification` (`$defs` inlined,
+  `allOf` combined, `oneOf`/root alternatives merged, value constraints such as `minimum` dropped -
+  the server still enforces them). A tool whose schema cannot be translated faithfully is skipped
+  with a warning, the rest of the server's tools still load.
 - Serve your own: `MCPServer(name=, version=, instructions=, resources=, tools=Toolbox | [Tool],
   disposables=())`; `await server.run_stdio()`, or mount `server.prepare_streamable_http_asgi(
   path="/mcp", stateless=False)` (ASGI app; `prepare_asgi()` is the deprecated SSE variant). Its

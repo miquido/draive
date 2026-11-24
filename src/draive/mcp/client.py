@@ -1,4 +1,5 @@
 import json
+import re
 from asyncio import (
     FIRST_EXCEPTION,
     AbstractEventLoop,
@@ -15,7 +16,7 @@ from collections.abc import AsyncGenerator, Callable, Collection, Coroutine, Map
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from itertools import chain
 from types import TracebackType
-from typing import Any, Self, cast, final
+from typing import Any, Final, Self, cast, final
 from urllib.parse import ParseResult, urlparse
 from uuid import uuid4
 
@@ -26,6 +27,7 @@ from haiway import (
     Paginated,
     Pagination,
     PaginationToken,
+    ValidationError,
     as_dict,
     as_list,
     as_tuple,
@@ -51,7 +53,7 @@ from mcp.types import Resource as MCPResource
 from mcp.types import ResourceLink as MCPResourceLink
 from mcp.types import TextContent as MCPTextContent
 
-from draive.models import ModelToolParametersSpecification
+from draive.models import ModelToolFunctionSpecification, ModelToolParametersSpecification
 from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
 from draive.resources import ResourceContent, ResourceReference, ResourcesRepository
 from draive.tools import CoroutineTool, Tool, ToolException, ToolsProvider
@@ -495,15 +497,26 @@ class MCPClient:
             cursor = result.next_cursor
             visited_cursors.add(cursor)
 
-        return tuple(
-            _convert_tool(
-                tool,
-                tool_call=self._tool_call,
-                source=self.identifier,
-                tags=self.tags,
-            )
-            for tool in mcp_tools
-        )
+        tools: list[Tool] = []
+        for mcp_tool in mcp_tools:
+            try:
+                tools.append(
+                    _convert_tool(
+                        mcp_tool,
+                        tool_call=self._tool_call,
+                        source=self.identifier,
+                        tags=self.tags,
+                    )
+                )
+
+            except _UnsupportedSchema as exc:
+                # a single tool with an unsupported schema should not hide the others
+                ctx.log_warning(
+                    f"Skipping MCP tool {mcp_tool.name} of {self.identifier},"
+                    f" its input schema is not supported: {exc}"
+                )
+
+        return tuple(tools)
 
     async def _tool_call(
         self,
@@ -836,6 +849,390 @@ async def _convert_error_content(
         return MultimodalContent.of(f"<{content.type}/>")
 
 
+class _UnsupportedSchema(Exception):
+    """An MCP tool schema which can not be translated without changing its meaning."""
+
+
+def _tool_parameters(
+    name: str,
+    input_schema: Mapping[str, Any],
+    /,
+) -> ModelToolParametersSpecification:
+    # server schemas carry keywords the specification does not declare (`default`,
+    # `minimum`...), decoding skips them while validating the rest, arguments stay closed
+    try:
+        parameters: ModelToolParametersSpecification | None = (
+            ModelToolFunctionSpecification.from_mapping(
+                {
+                    "name": name,
+                    "parameters": {
+                        **_SchemaTranslation(input_schema).translated_arguments(),
+                        "additionalProperties": False,
+                    },
+                },
+                ignore_extra=True,
+            ).parameters
+        )
+
+    except ValidationError as exc:
+        raise _UnsupportedSchema(str(exc)) from exc
+
+    if parameters is None:
+        raise _UnsupportedSchema("arguments are missing")
+
+    return parameters
+
+
+_DEFINITIONS: Final[Mapping[str, str]] = {
+    "$defs": "#/$defs/",
+    "definitions": "#/definitions/",
+}
+# annotations without an equivalent in the specification, dropped wherever they appear
+_DROPPED_KEYWORDS: Final[frozenset[str]] = frozenset(
+    ("$comment", "$defs", "$id", "$schema", "definitions", "title")
+)
+_STRUCTURAL_KEYWORDS: Final[frozenset[str]] = frozenset(
+    ("additionalProperties", "enum", "items", "prefixItems", "properties", "required", "type")
+)
+_ANCHOR_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[A-Za-z_][-A-Za-z0-9._]*$")
+
+
+@final
+class _SchemaTranslation:
+    """Translate a JSON schema into the form of a type specification, or refuse it.
+
+    References to `$defs` and `definitions` are inlined, a recursive definition is anchored
+    where it is inlined first and referenced as `#Name` afterwards, as a recursive State is.
+    A reference with sibling keywords and every `allOf` branch are combined into a single
+    schema, `oneOf` becomes `anyOf` and `const` a single value `enum`. Objects get an
+    explicit `additionalProperties`, closed when they declare properties. Arguments declared
+    by root `anyOf` branches become root properties. Anything which can not be translated
+    without changing what the schema accepts raises `_UnsupportedSchema`, keywords without
+    an equivalent which only constrain values further (`minimum`, `pattern`...) are left
+    for decoding to skip.
+    """
+
+    __slots__ = (
+        "_active",
+        "_anchored",
+        "_definitions",
+        "_recursive",
+        "_root",
+    )
+
+    def __init__(
+        self,
+        root: Mapping[str, Any],
+    ) -> None:
+        self._root: Mapping[str, Any] = root
+        self._definitions: dict[str, Mapping[str, Any]] = {}
+        for keyword, prefix in _DEFINITIONS.items():
+            definitions: Any = root.get(keyword)
+            if definitions is None:
+                continue
+
+            if not isinstance(definitions, Mapping):
+                raise _UnsupportedSchema(f"{keyword} is not a mapping")
+
+            self._definitions[prefix] = cast(Mapping[str, Any], definitions)
+
+        self._active: list[str] = []
+        self._recursive: set[str] = set()
+        self._anchored: set[str] = set()
+
+    def translated_arguments(self) -> Mapping[str, Any]:
+        node: dict[str, Any] = self.translated(self._root, path="$")
+        if node.pop("type", "object") != "object":
+            raise _UnsupportedSchema("$ is not an object")
+
+        properties: dict[str, list[Any]] = {
+            key: [value] for key, value in node.pop("properties", {}).items()
+        }
+        required: list[str] = list(node.pop("required", ()))
+        match node.pop("anyOf", None):
+            case None:
+                pass
+
+            case branches:
+                shared: set[str] | None = None
+                for index, branch in enumerate(branches):
+                    branch_path: str = f"$.anyOf[{index}]"
+                    if branch.get("type", "object") != "object" or "anyOf" in branch:
+                        raise _UnsupportedSchema(f"{branch_path} is not a plain object")
+
+                    for key, value in branch.get("properties", {}).items():
+                        declared: list[Any] = properties.setdefault(key, [])
+                        if value not in declared:
+                            declared.append(value)
+
+                    branch_required: set[str] = set(branch.get("required", ()))
+                    shared = branch_required if shared is None else shared & branch_required
+
+                required.extend(sorted(shared or ()))
+
+        if not properties and node.get("additionalProperties", False) is not False:
+            # arguments of any name can not be declared, closing them would drop all
+            if self._root.get("additionalProperties", False) is not False:
+                raise _UnsupportedSchema("$ declares open arguments only")
+
+        arguments: dict[str, Any] = {
+            **{key: value for key, value in node.items() if key == "description"},
+            "type": "object",
+            "properties": {
+                key: declared[0] if len(declared) == 1 else {"anyOf": declared}
+                for key, declared in properties.items()
+            },
+        }
+        if required:
+            arguments["required"] = list(dict.fromkeys(required))
+
+        _verify_references(arguments)
+        return arguments
+
+    def translated(  # noqa: C901, PLR0912
+        self,
+        schema: Any,
+        /,
+        *,
+        path: str,
+    ) -> dict[str, Any]:
+        if not isinstance(schema, Mapping):
+            raise _UnsupportedSchema(f"{path} is not a schema")
+
+        node: dict[str, Any] = {
+            key: value
+            for key, value in cast(Mapping[str, Any], schema).items()
+            if key not in _DROPPED_KEYWORDS
+        }
+        reference: Any = node.pop("$ref", None)
+        branches: Any = node.pop("allOf", None)
+
+        if "oneOf" in node:
+            if "anyOf" in node:
+                raise _UnsupportedSchema(f"{path} declares both anyOf and oneOf")
+
+            node["anyOf"] = node.pop("oneOf")
+
+        if "const" in node:
+            constant: Any = node.pop("const")
+            enum: Any = node.get("enum")
+            if enum is not None and (not _is_sequence(enum) or constant not in enum):
+                raise _UnsupportedSchema(f"{path} declares const outside of its enum")
+
+            node["enum"] = [constant]
+
+        if "properties" in node:
+            node.setdefault("type", "object")  # properties constrain objects only
+
+        node = self._translated_keywords(node, path=path)
+
+        if reference is not None:
+            if not isinstance(reference, str):
+                raise _UnsupportedSchema(f"{path}.$ref is not a string")
+
+            node = _combined(self._resolved(reference, path=path), node, path=path)
+
+        if branches is not None:
+            if not _is_sequence(branches) or not branches:
+                raise _UnsupportedSchema(f"{path}.allOf is not a sequence of schemas")
+
+            for index, branch in enumerate(cast(Sequence[Any], branches)):
+                node = _combined(
+                    self.translated(branch, path=f"{path}.allOf[{index}]"),
+                    node,
+                    path=path,
+                )
+
+        if "$ref" in node and node.keys() - {"$ref", "description"}:
+            raise _UnsupportedSchema(f"{path} constrains a recursive reference")
+
+        # alternatives alongside other structure require both, which a specification can not
+        # express - the root is the exception as its alternatives become arguments
+        if path != "$" and "anyOf" in node and node.keys() & _STRUCTURAL_KEYWORDS:
+            raise _UnsupportedSchema(f"{path} constrains its alternatives")
+
+        if node.get("type") == "object":
+            if "properties" in node:
+                # declared properties close the object, as the arguments are closed
+                node["additionalProperties"] = False
+
+            else:
+                # an object without properties is open unless it declares its values
+                node.setdefault("additionalProperties", True)
+
+        return node
+
+    def _translated_keywords(  # noqa: C901
+        self,
+        node: Mapping[str, Any],
+        /,
+        *,
+        path: str,
+    ) -> dict[str, Any]:
+        translated: dict[str, Any] = {}
+        for keyword, value in node.items():
+            match keyword:
+                case "properties":
+                    if not isinstance(value, Mapping):
+                        raise _UnsupportedSchema(f"{path}.properties is not a mapping")
+
+                    translated[keyword] = {
+                        key: self.translated(element, path=f"{path}.{key}")
+                        for key, element in cast(Mapping[str, Any], value).items()
+                    }
+
+                case "required":
+                    if not _is_sequence(value) or not all(
+                        isinstance(element, str) for element in cast(Sequence[Any], value)
+                    ):
+                        raise _UnsupportedSchema(f"{path}.required is not a sequence of names")
+
+                    translated[keyword] = list(cast(Sequence[str], value))
+
+                case "items" | "additionalProperties" if isinstance(value, bool):
+                    translated[keyword] = value
+
+                case "items" | "additionalProperties":
+                    translated[keyword] = self.translated(value, path=f"{path}.{keyword}")
+
+                case "anyOf" | "prefixItems":
+                    if not _is_sequence(value) or not value:
+                        raise _UnsupportedSchema(f"{path}.{keyword} is not a sequence of schemas")
+
+                    translated[keyword] = [
+                        self.translated(element, path=f"{path}.{keyword}[{index}]")
+                        for index, element in enumerate(cast(Sequence[Any], value))
+                    ]
+
+                case "enum":
+                    if not _is_sequence(value):
+                        raise _UnsupportedSchema(f"{path}.enum is not a sequence")
+
+                    translated[keyword] = list(cast(Sequence[Any], value))
+
+                case _:
+                    translated[keyword] = value
+
+        return translated
+
+    def _resolved(
+        self,
+        reference: str,
+        /,
+        *,
+        path: str,
+    ) -> dict[str, Any]:
+        for prefix, definitions in self._definitions.items():
+            if not reference.startswith(prefix):
+                continue
+
+            name: str = reference.removeprefix(prefix)
+            if "/" in name or name not in definitions:
+                break
+
+            # names of both dialects can repeat, anchors have to stay distinct
+            anchor: str = name if prefix == _DEFINITIONS["$defs"] else f"definitions.{name}"
+            if anchor in self._active:
+                if not _ANCHOR_PATTERN.match(anchor):
+                    raise _UnsupportedSchema(f"{path} recursive definition can not be anchored")
+
+                self._recursive.add(anchor)
+                return {"$ref": f"#{anchor}"}
+
+            if anchor in self._anchored:
+                return {"$ref": f"#{anchor}"}
+
+            self._active.append(anchor)
+            try:
+                resolved: dict[str, Any] = self.translated(
+                    definitions[name],
+                    path=f"{path}.$ref",
+                )
+
+            finally:
+                self._active.pop()
+
+            if anchor in self._recursive:
+                self._anchored.add(anchor)
+                return {**resolved, "$anchor": anchor}
+
+            return resolved
+
+        raise _UnsupportedSchema(f"{path} references {reference!r} which is not a definition")
+
+
+def _combined(
+    first: Mapping[str, Any],
+    second: Mapping[str, Any],
+    /,
+    *,
+    path: str,
+) -> dict[str, Any]:
+    # both schemas apply - properties and requirements of both are kept, a keyword declared
+    # differently by them can not be expressed, descriptions of the second take precedence
+    combined: dict[str, Any] = dict(first)
+    for keyword, value in second.items():
+        current: Any = combined.get(keyword)
+        if keyword not in combined or current == value or keyword == "description":
+            combined[keyword] = value
+
+        elif keyword == "properties":
+            properties: dict[str, Any] = dict(current)
+            for key, element in value.items():
+                if key in properties and properties[key] != element:
+                    raise _UnsupportedSchema(f"{path}.{key} is declared differently")
+
+                properties[key] = element
+
+            combined[keyword] = properties
+
+        elif keyword == "required":
+            combined[keyword] = list(dict.fromkeys((*current, *value)))
+
+        elif keyword == "additionalProperties" and False in (current, value):
+            combined[keyword] = False
+
+        else:
+            raise _UnsupportedSchema(f"{path}.{keyword} is declared differently")
+
+    return combined
+
+
+def _verify_references(
+    arguments: Mapping[str, Any],
+    /,
+) -> None:
+    anchors: set[str] = set()
+    references: set[str] = set()
+
+    def collect(value: Any) -> None:
+        if isinstance(value, Mapping):
+            for key, element in cast(Mapping[str, Any], value).items():
+                if key == "$anchor":
+                    anchors.add(element)
+
+                elif key == "$ref":
+                    references.add(element)
+
+                else:
+                    collect(element)
+
+        elif _is_sequence(value):
+            for element in cast(Sequence[Any], value):
+                collect(element)
+
+    collect(arguments)
+    if dangling := {reference for reference in references if reference[1:] not in anchors}:
+        raise _UnsupportedSchema(f"references {sorted(dangling)} lost their definitions")
+
+
+def _is_sequence(
+    value: Any,
+    /,
+) -> bool:
+    return isinstance(value, Sequence) and not isinstance(value, str | bytes)
+
+
 def _convert_tool(
     mcp_tool: MCPTool,
     /,
@@ -855,13 +1252,7 @@ def _convert_tool(
     return CoroutineTool(
         name=name,
         description=mcp_tool.description,
-        parameters=cast(
-            ModelToolParametersSpecification,
-            {
-                **mcp_tool.input_schema,
-                "additionalProperties": False,
-            },
-        ),
+        parameters=_tool_parameters(name, mcp_tool.input_schema),
         function=remote_call,
         handling="response",
         meta=Meta.of(

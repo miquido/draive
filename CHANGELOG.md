@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.122.0
+
+### Changed
+
+- Requires haiway 0.65.0. A `TypedDict` attribute now refuses keys it does not declare instead of
+  dropping them, and `State.from_mapping`, `State.from_json` and `State.from_json_array` accept
+  `ignore_extra=True` to skip unknown keys.
+- Dependencies refreshed to their latest releases.
+- `ModelToolFunctionSpecification.parameters`, `Tool.parameters` and the `parameters` of
+  `CoroutineTool` and `tool` take `ModelToolParameters`: a `ModelToolParametersSpecification` or a
+  plain JSON schema mapping, as declared by external tools.
+
+### Fixed
+
+- MCP tool input schemas are translated into `ModelToolParametersSpecification`, they failed to
+  convert under haiway 0.65.0: references to `$defs` and `definitions` are inlined (recursive
+  definitions anchored as recursive States are), references with sibling keywords and `allOf`
+  branches are combined, `oneOf` becomes `anyOf`, `const` a single value `enum`, arguments of root
+  `anyOf` branches become arguments (alternatives of a property kept as `anyOf`), objects get an
+  explicit `additionalProperties` and keywords which only constrain values further (`default`,
+  `minimum`, `pattern`...) are skipped. A tool whose schema can not be translated without changing
+  what it accepts is skipped with a warning instead of failing the whole tools fetch. Schemas with keywords outside of
+  `ModelToolParametersSpecification` (`title`, `default`, `minimum`, `$defs` and `$ref`, `oneOf`...)
+  failed to convert under haiway 0.65.0, and `$defs` were dropped before.
+- Gemini skips the thinking config when the thinking budget is zero (0.121.1).
+
 ## 0.121.0
 
 ### Changed
