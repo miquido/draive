@@ -223,6 +223,25 @@ def test_mcp_tool_parameters_keep_additional_properties_of_the_server() -> None:
     }
 
 
+@pytest.mark.parametrize("keyword", ["allOf", "anyOf", "oneOf"])
+def test_mcp_tool_parameters_stay_open_for_composed_arguments(keyword: str) -> None:
+    schema: Mapping[str, Any] = {
+        "type": "object",
+        keyword: [
+            {"properties": {"query": {"type": "string"}}, "required": ["query"]},
+            {"properties": {"id": {"type": "integer"}}, "required": ["id"]},
+        ],
+    }
+    tool = _convert_tool(  # pyright: ignore[reportPrivateUsage]
+        MCPTool(name="tool", input_schema=schema),
+        tool_call=_unused_tool_call,
+        source="source",
+        tags=(),
+    )
+
+    assert _plain(tool.specification.parameters) == schema
+
+
 def _plain(value: Any) -> Any:
     if isinstance(value, Mapping):
         return {key: _plain(element) for key, element in value.items()}  # pyright: ignore[reportUnknownVariableType]

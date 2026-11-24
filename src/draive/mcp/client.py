@@ -15,7 +15,7 @@ from collections.abc import AsyncGenerator, Callable, Collection, Coroutine, Map
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from itertools import chain
 from types import TracebackType
-from typing import Any, Self, cast, final
+from typing import Any, Final, Self, cast, final
 from urllib.parse import ParseResult, urlparse
 from uuid import uuid4
 
@@ -835,6 +835,26 @@ async def _convert_error_content(
         return MultimodalContent.of(f"<{content.type}/>")
 
 
+# root keywords which declare arguments outside of the root `properties`, closing the root
+# would refuse every argument declared by them
+_COMPOSITION_KEYWORDS: Final[frozenset[str]] = frozenset(("allOf", "anyOf", "oneOf"))
+
+
+def _tool_parameters(
+    input_schema: Mapping[str, Any],
+    /,
+) -> Mapping[str, Any]:
+    # the schema declared by the server reaches the model unchanged, closed for arguments
+    # it does not declare unless the server decided otherwise or composes its arguments
+    if "additionalProperties" in input_schema or not _COMPOSITION_KEYWORDS.isdisjoint(input_schema):
+        return input_schema
+
+    return {
+        **input_schema,
+        "additionalProperties": False,
+    }
+
+
 def _convert_tool(
     mcp_tool: MCPTool,
     /,
@@ -854,12 +874,7 @@ def _convert_tool(
     return CoroutineTool(
         name=name,
         description=mcp_tool.description,
-        # the schema declared by the server reaches the model unchanged, closed for
-        # arguments it does not declare unless the server decided otherwise
-        parameters={
-            "additionalProperties": False,
-            **mcp_tool.input_schema,
-        },
+        parameters=_tool_parameters(mcp_tool.input_schema),
         function=remote_call,
         handling="response",
         meta=Meta.of(
