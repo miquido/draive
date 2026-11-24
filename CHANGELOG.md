@@ -15,11 +15,13 @@
 ### Fixed
 
 - MCP tool input schemas are translated into `ModelToolParametersSpecification`, they failed to
-  convert under haiway 0.65.0: references to `$defs` are inlined (recursive definitions anchored as
-  recursive States are), `oneOf` becomes `anyOf`, `const` a single value `enum`, a single element
-  `allOf` is merged, objects get an explicit `additionalProperties` and keywords the specification
-  does not declare (`title`, `default`, `minimum`...) are skipped at every level. A tool whose schema
-  still can not be translated is skipped with a warning instead of failing the whole tools fetch. Schemas with keywords outside of
+  convert under haiway 0.65.0: references to `$defs` and `definitions` are inlined (recursive
+  definitions anchored as recursive States are), references with sibling keywords and `allOf`
+  branches are combined, `oneOf` becomes `anyOf`, `const` a single value `enum`, arguments of root
+  `anyOf` branches become arguments (alternatives of a property kept as `anyOf`), objects get an
+  explicit `additionalProperties` and keywords which only constrain values further (`default`,
+  `minimum`, `pattern`...) are skipped. A tool whose schema can not be translated without changing
+  what it accepts is skipped with a warning instead of failing the whole tools fetch. Schemas with keywords outside of
   `ModelToolParametersSpecification` (`title`, `default`, `minimum`, `$defs` and `$ref`, `oneOf`...)
   failed to convert under haiway 0.65.0, and `$defs` were dropped before.
 - Gemini skips the thinking config when the thinking budget is zero (0.121.1).

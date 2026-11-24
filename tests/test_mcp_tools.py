@@ -8,7 +8,12 @@ from mcp.types import TextContent as MCPTextContent
 from mcp.types import Tool as MCPTool
 
 from draive import ctx
-from draive.mcp.client import MCPClient, _convert_tool  # pyright: ignore[reportPrivateUsage]
+from draive.mcp.client import (  # pyright: ignore[reportPrivateUsage]
+    MCPClient,
+    _convert_tool,
+    _tool_parameters,
+    _UnsupportedSchema,
+)
 from draive.tools import ToolException
 
 
@@ -254,13 +259,7 @@ def test_mcp_tool_parameters_inline_definitions() -> None:
                     "additionalProperties": False,
                 },
             },
-            "main": {
-                "type": "object",
-                "properties": {"sku": {"type": "string"}},
-                "required": ["sku"],
-                "additionalProperties": False,
-                "description": "Main item",
-            },
+            "main": {"type": "string", "description": "Main item"},
         },
         "required": ["items"],
         "additionalProperties": False,
@@ -350,6 +349,115 @@ def test_mcp_tool_parameters_merge_root_composition_arguments() -> None:
         "required": ["b", "a", "n"],
         "additionalProperties": False,
     }
+
+
+def test_mcp_tool_parameters_translate_multi_branch_all_of_and_reference_siblings() -> None:
+    assert _converted_parameters(
+        {
+            "type": "object",
+            "allOf": [
+                {"properties": {"a": {"$ref": "#/$defs/A"}}, "required": ["a"]},
+                {"properties": {"b": {"type": "string", "title": "B"}}},
+            ],
+            "properties": {"c": {"$ref": "#/$defs/A", "description": "C"}},
+            "$defs": {"A": {"type": "object", "properties": {"x": {"type": "string"}}}},
+        }
+    ) == {
+        "type": "object",
+        "properties": {
+            "a": {
+                "type": "object",
+                "properties": {"x": {"type": "string"}},
+                "additionalProperties": False,
+            },
+            "b": {"type": "string"},
+            "c": {
+                "type": "object",
+                "properties": {"x": {"type": "string"}},
+                "additionalProperties": False,
+                "description": "C",
+            },
+        },
+        "required": ["a"],
+        "additionalProperties": False,
+    }
+
+
+def test_mcp_tool_parameters_keep_every_alternative_of_root_branches() -> None:
+    assert _converted_parameters(
+        {
+            "type": "object",
+            "anyOf": [
+                {
+                    "type": "object",
+                    "properties": {"mode": {"const": "search"}, "q": {"type": "string"}},
+                    "required": ["mode", "q"],
+                },
+                {
+                    "type": "object",
+                    "properties": {"mode": {"const": "get"}, "id": {"type": "integer"}},
+                    "required": ["mode", "id"],
+                },
+            ],
+        }
+    ) == {
+        "type": "object",
+        "properties": {
+            "mode": {"anyOf": [{"enum": ["search"]}, {"enum": ["get"]}]},
+            "q": {"type": "string"},
+            "id": {"type": "integer"},
+        },
+        "required": ["mode"],
+        "additionalProperties": False,
+    }
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        # references which do not resolve to a definition
+        {"type": "object", "properties": {"a": {"$ref": "#/$defs/Missing"}}, "$defs": {}},
+        {
+            "type": "object",
+            "properties": {"a": {"$ref": "#/$defs/A/properties/b"}},
+            "$defs": {"A": {"type": "object", "properties": {"b": {"type": "string"}}}},
+        },
+        {
+            "type": "object",
+            "properties": {"a": {"$ref": "#/properties/b"}, "b": {"type": "string"}},
+        },
+        # schemas which can not be combined without changing their meaning
+        {
+            "type": "object",
+            "properties": {"a": {"$ref": "#/$defs/S", "type": "integer"}},
+            "$defs": {"S": {"type": "string"}},
+        },
+        {
+            "type": "object",
+            "properties": {},
+            "anyOf": [{"properties": {"a": {"type": "string"}}}],
+            "oneOf": [{"properties": {"b": {"type": "string"}}}],
+        },
+        {"type": "object", "properties": {"a": {"const": "a", "enum": ["b"]}}},
+        {
+            "type": "object",
+            "properties": {"a": {"$ref": "#/$defs/A", "oneOf": [{"type": "object"}]}},
+            "$defs": {"A": {"type": "object", "properties": {"x": {"type": "string"}}}},
+        },
+        {"type": "object", "additionalProperties": {"type": "string"}},
+        {"type": "string"},
+        # malformed schemas
+        {"type": "object", "properties": True},
+        {"type": "object", "properties": {"q": {"type": "string"}}, "required": "q"},
+        {"type": "object", "properties": {"x": {"allOf": [{"required": 3}], "required": ["a"]}}},
+        {"type": "object", "properties": {"x": {}}},
+    ],
+)
+def test_mcp_tool_parameters_refuse_schemas_which_can_not_be_translated(
+    schema: Mapping[str, Any],
+) -> None:
+    with pytest.raises(_UnsupportedSchema):
+        _tool_parameters("tool", schema)  # pyright: ignore[reportPrivateUsage]
 
 
 @pytest.mark.asyncio
