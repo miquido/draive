@@ -32,11 +32,13 @@ async with ctx.scope(
 
 ## Authentication
 
-Runs authenticate with the key or the token you give - never with the login of the user. The
-credential is passed through a file descriptor, so it is not part of the arguments or the
-environment of the process, and the process has its own private home, so the sessions, keychain and
-settings of a logged in Claude Code are out of its reach. When Claude Code reports to authenticate
-in any other way the run is stopped, and entering the scope without a credential fails.
+Runs authenticate with the key or the token you give - never with the login of the user, unless you
+give a `ClaudeCodeLocalLogin` (see
+[Account connectors and local login](#account-connectors-and-local-login)). The credential is passed
+through a file descriptor, so it is not part of the arguments or the environment of the process, and
+the process has its own private home, so the sessions, keychain and settings of a logged in Claude
+Code are out of its reach. When Claude Code reports to authenticate in any other way the run is
+stopped, and entering the scope without a credential fails.
 
 An OAuth token of a Team or Enterprise account may bring the `cc-plugin-sec-default` plugin its
 organization enforces. No setting disables it, and it is not reported as a leak of the isolation.
@@ -45,13 +47,79 @@ organization enforces. No setting disables it, and it is not reported as a leak 
 | ----------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | `ClaudeCode(credential=ClaudeCodeApiKey(...))`, `ANTHROPIC_API_KEY`           | Anthropic API key (`sk-ant-api...`)                              |
 | `ClaudeCode(credential=ClaudeCodeOAuthToken(...))`, `CLAUDE_CODE_OAUTH_TOKEN` | OAuth token of `claude setup-token` (`sk-ant-oat...`)            |
+| `ClaudeCode(credential=ClaudeCodeLocalLogin(...))`                            | local Claude Code login (`claude /login`), see below             |
 | `ClaudeCode(base_url=...)`                                                    | custom API endpoint, i.e. a gateway - it can take any credential |
 
-A credential is exactly one of the two kinds - there is no pair of keys to choose between - and it
-can not be empty or larger than 4096 bytes, so it fits the pipe it is handed over through.
+A credential is exactly one of the kinds - there is no pair of keys to choose between - and it can
+not be empty or larger than 4096 bytes, so it fits the pipe it is handed over through.
 
 The `claude` executable is resolved from `binary=`, `CLAUDE_CODE_BINARY`, the `PATH` and
 `~/.local/bin/claude`.
+
+## Account connectors and local login
+
+The connectors of a claude.ai account (cloud MCP servers such as Slack or Drive, their tools are
+named `mcp__claude_ai_<Name>__<tool>`) are off by default. `ClaudeCodeConfig(connectors=...)` turns
+them on per run, so the same application can have them on for some runs and off for others:
+
+- `ClaudeCodeNoConnectors()` - the default, only `mcp_servers` of the configuration are loaded.
+- `ClaudeCodeAccountConnectors(wait=True)` - the connectors of the account are loaded in addition to
+    the configured servers. With `wait` Claude Code waits (for a limited time, which it caps) for
+    them to connect, otherwise the model does not see the tools of connectors which are not
+    connected yet.
+
+Nothing allows the tools of connectors for you - add them to `allowed_tools`, i.e.
+`mcp__claude_ai_Slack__*`.
+
+Connectors need a token with the `user:mcp_servers` scope. API keys and `claude setup-token` tokens
+never have it, so a run which asks for connectors with them fails with `ClaudeCodeUnavailable`
+instead of silently seeing no tools. A login made with `claude /login` does have it,
+`ClaudeCodeLocalLogin` uses it:
+
+```python
+from draive import ctx
+from draive.claude import (
+    ClaudeCode,
+    ClaudeCodeAccountConnectors,
+    ClaudeCodeConfig,
+    ClaudeCodeLocalLogin,
+    claude_code_agent,
+)
+
+async with ctx.scope(
+    "assistant",
+    ClaudeCodeConfig(
+        connectors=ClaudeCodeAccountConnectors(),
+        allowed_tools=("mcp__claude_ai_Slack__*",),
+    ),
+    disposables=(
+        ClaudeCode(credential=ClaudeCodeLocalLogin(config_directory="~/.claude")),
+    ),
+):
+    assistant = claude_code_agent("assistant", instructions="Summarize my unread messages.")
+    async for chunk in assistant.call(input="What did I miss?"):
+        print(chunk)
+```
+
+The login has to be made on this machine, as the user the process runs as. It is read from
+`<config_directory>/.credentials.json` - logins kept in the keychain (macOS) are not supported, and
+entering the scope fails when the file is missing. Every run reads the access token (valid for a few
+hours) from it. When the token has less than `refresh_margin` (30 minutes by default) left, draive
+refreshes the login through Claude Code itself (`claude auth status`) under a lock - within the
+scope and across draive processes, as a refresh rotates the refresh token. The lock coordinates
+draive processes only, not the interactive Claude Code of the user, which may refresh the same
+login. Whether `claude auth status` refreshes at a margin as large as 30 minutes is not verified -
+Claude Code may refresh only near the expiry. A refresh which does not extend the token is logged
+and the token is used while it is valid, without another attempt for a minute. A refresh started by
+a run which is then cancelled still runs to its end, so the login is never left half refreshed. A
+run gets the access token only - never the refresh token nor the directory of the login - and still
+has its private home and configuration.
+
+A run holds an access token and can not refresh it, so a run which outlives its token fails. A
+refresh may also revoke the access tokens other processes still hold. Size `refresh_margin` above
+your longest run (`timeout` of the configuration is its upper bound). A token which is shorter than
+the margin but still valid is used, with a warning; an expired one which could not be refreshed
+fails the run with `ClaudeCodeUnavailable`.
 
 ## Isolation and permissions
 

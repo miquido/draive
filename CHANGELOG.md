@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.123.0
+
+### Added
+
+- `draive.claude` can use the connectors of a claude.ai account (cloud MCP servers, tools named
+  `mcp__claude_ai_<Name>__*`) per run: `ClaudeCodeConfig.connectors` takes
+  `ClaudeCodeAccountConnectors(wait=True)`, the default is `ClaudeCodeNoConnectors()`. Connectors
+  need a credential with the `user:mcp_servers` scope, a run with any other one fails with
+  `ClaudeCodeUnavailable` instead of silently having no connector tools.
+- `ClaudeCodeLocalLogin`, a credential of a local Claude Code login (`claude /login`) read from
+  `<config directory>/.credentials.json` (not available on macOS, where logins are kept in the
+  keychain). A token about to expire is refreshed under a lock (it coordinates draive processes
+  only) through `claude auth status`; a run only gets a short-lived `ClaudeCodeAccessToken` and
+  cannot refresh it, so `refresh_margin` has to be longer than the longest run.
+
 ## 0.122.0
 
 ### Changed

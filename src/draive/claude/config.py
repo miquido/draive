@@ -6,10 +6,13 @@ from haiway import BasicValue, Configuration, Missing, Sensitive, State, Verifie
 
 __all__ = (
     "RUN_MARKER_VARIABLE",
+    "ClaudeCodeAccountConnectors",
     "ClaudeCodeAutoCompaction",
     "ClaudeCodeCompaction",
     "ClaudeCodeConfig",
+    "ClaudeCodeConnectors",
     "ClaudeCodeNoCompaction",
+    "ClaudeCodeNoConnectors",
     "ClaudeCodeTelemetry",
 )
 
@@ -162,6 +165,38 @@ type ClaudeCodeCompaction = ClaudeCodeAutoCompaction | ClaudeCodeNoCompaction
 
 
 @final
+class ClaudeCodeNoConnectors(State, serializable=True):
+    """Runs do not use the connectors of the claude.ai account, only the configured MCP servers."""
+
+    type: Literal["none"] = "none"
+
+
+@final
+class ClaudeCodeAccountConnectors(State, serializable=True):
+    """Runs use the connectors of the claude.ai account - its cloud MCP servers.
+
+    Connectors are fetched at the start of every run and their tools are named
+    ``mcp__claude_ai_<Name>__<tool>``, allow them with ``allowed_tools`` of the configuration -
+    nothing allows them otherwise. They need a credential declaring the ``user:mcp_servers``
+    scope, which is only a ``ClaudeCodeLocalLogin``. MCP servers of the configuration are still
+    loaded.
+
+    Attributes
+    ----------
+    wait
+        Whether Claude Code waits (for a limited time, which it caps) for the connectors to
+        connect before the model starts. Without it the tools of connectors which are not
+        connected yet are not seen by the model.
+    """
+
+    wait: bool = True
+    type: Literal["account"] = "account"
+
+
+type ClaudeCodeConnectors = ClaudeCodeNoConnectors | ClaudeCodeAccountConnectors
+
+
+@final
 class ClaudeCodeTelemetry(State, serializable=True):
     """OpenTelemetry export of Claude Code, to the system collecting the telemetry of draive.
 
@@ -276,7 +311,9 @@ class ClaudeCodeConfig(Configuration):
         its tool guidance, or ``replace`` it.
     mcp_servers
         MCP servers by name, i.e. ``{"command": "npx", "args": [...]}`` or
-        ``{"type": "http", "url": ...}``, nothing else is loaded.
+        ``{"type": "http", "url": ...}``, nothing else is loaded unless ``connectors`` are used.
+    connectors
+        Whether runs use the connectors of the claude.ai account, none by default.
     subagents
         Subagents by name, with ``description`` and ``prompt`` at least.
     plugin_directories
@@ -318,6 +355,7 @@ class ClaudeCodeConfig(Configuration):
     stream_deltas: bool = False
     system_prompt: Literal["append", "replace"] = "append"
     mcp_servers: Mapping[str, Mapping[str, BasicValue]] = {}
+    connectors: ClaudeCodeConnectors = ClaudeCodeNoConnectors()
     subagents: Mapping[str, Mapping[str, BasicValue]] = {}
     plugin_directories: Annotated[Sequence[str], Verifier(_absolute_directories)] = ()
     settings: Mapping[str, BasicValue] = {}
