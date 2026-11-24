@@ -3,7 +3,7 @@ from typing import Protocol, final, runtime_checkable
 
 from haiway import Default, Missing, State
 
-from draive.claude.credentials import ClaudeCodeCredential
+from draive.claude.credentials import ClaudeCodeCredential, ClaudeCodeResolvedCredential
 from draive.claude.events import ClaudeCodeEvent
 from draive.claude.exceptions import (
     ClaudeCodeEnded,
@@ -23,6 +23,7 @@ __all__ = (
     "ClaudeCodeException",
     "ClaudeCodeFailed",
     "ClaudeCodeOutputTooLarge",
+    "ClaudeCodeResolving",
     "ClaudeCodeRunner",
     "ClaudeCodeRunning",
     "ClaudeCodeTimedOut",
@@ -45,6 +46,24 @@ class ClaudeCodeRunning(Protocol):
     ) -> AsyncGenerator[ClaudeCodeEvent]: ...
 
 
+@runtime_checkable
+class ClaudeCodeResolving(Protocol):
+    """Protocol of resolving the credential of a single run, a local login becomes its current
+    access token."""
+
+    async def __call__(
+        self,
+        credential: ClaudeCodeCredential,
+        /,
+        *,
+        binary: str,
+    ) -> ClaudeCodeResolvedCredential: ...
+
+
+def _own_resolving() -> ClaudeCodeResolving:
+    return ClaudeCodeLogins().resolve
+
+
 @final
 class ClaudeCodeRunner(State):
     """Installed capability of running Claude Code, prepared by ``ClaudeCode``.
@@ -57,9 +76,10 @@ class ClaudeCodeRunner(State):
         Implementation of the run, replace it to fake the process in tests.
     credential
         The only credential of the runs, never part of the representation of the state.
-    logins
-        Owner of the refreshes of local logins, prepared by ``ClaudeCode`` which waits for them
-        when its scope exits; a runner made without it gets its own.
+    resolving
+        Resolution of the credential for each run, prepared by ``ClaudeCode`` which waits for
+        the refreshes of a local login when its scope exits; a runner made without it gets its
+        own.
     base_url
         Custom API endpoint, i.e. a gateway.
     """
@@ -67,5 +87,5 @@ class ClaudeCodeRunner(State):
     binary: str
     running: ClaudeCodeRunning
     credential: ClaudeCodeCredential | Missing = Missing
-    logins: ClaudeCodeLogins = Default(factory=ClaudeCodeLogins)
+    resolving: ClaudeCodeResolving = Default(factory=_own_resolving)
     base_url: str | Missing = Missing

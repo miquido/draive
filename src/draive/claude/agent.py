@@ -174,7 +174,7 @@ def claude_code_agent(
                 credential: ClaudeCodeResolvedCredential | Missing = (
                     Missing
                     if runner.credential is Missing
-                    else await runner.logins.resolve(runner.credential, binary=runner.binary)
+                    else await runner.resolving(runner.credential, binary=runner.binary)
                 )
                 stream = runner.running(
                     build_launch(

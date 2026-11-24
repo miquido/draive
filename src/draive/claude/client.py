@@ -76,6 +76,7 @@ class ClaudeCode:
         "_base_url",
         "_binary",
         "_credential",
+        "_entered",
         "_logins",
     )
 
@@ -92,7 +93,10 @@ class ClaudeCode:
         self._credential: ClaudeCodeCredential | None = credential
         self._binary: str | None = binary
         self._base_url: str | None = base_url
+        # shared by every entry of the instance, each exit waits for all refreshes in flight -
+        # entries can not be told apart, haiway enters and exits them from different tasks
         self._logins: ClaudeCodeLogins | None = None
+        self._entered: int = 0
 
     def __repr__(self) -> str:
         return "ClaudeCode()"  # nothing of the credential
@@ -105,10 +109,14 @@ class ClaudeCode:
                 credential
             )  # fails at startup, the token is resolved per run
 
-        self._logins = ClaudeCodeLogins()
+        if self._logins is None:
+            self._logins = ClaudeCodeLogins()
+
+        logins: ClaudeCodeLogins = self._logins
+        self._entered += 1
         return (
             ClaudeCodeRunner(
-                logins=self._logins,
+                resolving=logins.resolve,
                 binary=_resolved_binary(self._binary),
                 running=run_process,
                 credential=credential,
@@ -124,10 +132,15 @@ class ClaudeCode:
     ) -> None:
         # runs release their processes on their own, refreshes of a login are waited for - one
         # cut off by the end of the event loop could lose the rotated refresh token
-        if self._logins is not None:
-            logins: ClaudeCodeLogins = self._logins
-            self._logins = None
-            await logins.drain()
+        logins: ClaudeCodeLogins | None = self._logins
+        try:
+            if logins is not None:
+                await logins.drain()
+
+        finally:
+            self._entered -= 1
+            if self._entered == 0:
+                self._logins = None
 
 
 def _environment_credential() -> ClaudeCodeCredential:

@@ -120,17 +120,19 @@ refresh the same login. A run gets the access token only - never the refresh tok
 of the login - and still has its private home and configuration.
 
 A refresh runs on its own task, a run which is cancelled or gives up on it does not stop it, and
-exiting the `ClaudeCode` scope waits for the refreshes still in flight. A run whose token is still
-valid waits for a refresh at most `refresh_timeout` (15 seconds) and then goes on with its current
-token - also when the refresh fails, i.e. the lock file can not be created or another process holds
-the lock longer than `lock_timeout` (30 seconds). Only a run whose token has already expired fails
-with `ClaudeCodeUnavailable`, with the error of the refresh or the one of the expired token.
-`claude auth status` is killed only after `refresh_limit` (120 seconds), when the refresh hangs.
+exiting the `ClaudeCode` scope waits for the refreshes still in flight. A login has at most one
+refresh in flight, shared by every run which needs it meanwhile. A run whose token is still valid
+waits for a refresh at most `refresh_timeout` (15 seconds, and never past the expiry of the token)
+and then goes on with its current token - also when the refresh fails, i.e. the lock file can not be
+created or another process holds the lock longer than `lock_timeout` (30 seconds). A run whose token
+has expired waits for the refresh to end, and fails with `ClaudeCodeUnavailable` only when it did
+not help. `claude auth status` is killed only after `refresh_limit` (120 seconds), when the refresh
+hangs.
 
 Whether `claude auth status` refreshes at a margin as large as 30 minutes is not verified - Claude
-Code may refresh only near the expiry. A refresh which does not extend the token is logged, the
-token is used while it is valid, with a warning, and the refresh is retried after the cooldown of a
-minute.
+Code may refresh only near the expiry. A refresh which does not extend the token, or which fails, is
+logged, the token is used while it is valid, with a warning, and the refresh is retried after the
+cooldown of a minute.
 
 A run holds an access token and can not refresh it, so a run which outlives its token fails. A
 refresh may also revoke the access tokens other processes still hold. Keep `refresh_margin` above
@@ -262,7 +264,8 @@ itself - the token usage as the usual `model.*` metrics (provider `claude_code`)
 
 ## Testing
 
-`ClaudeCodeRunner` is the installed capability, replace its `running` to fake the process:
+`ClaudeCodeRunner` is the installed capability, replace its `running` to fake the process (a runner
+made this way resolves credentials on its own, `ClaudeCode` also waits for refreshes of a login):
 
 ```python
 from draive.claude import ClaudeCodeResult, ClaudeCodeRunner, ClaudeCodeSuccess, ClaudeCodeText

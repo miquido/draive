@@ -19,8 +19,10 @@
 
 ### Changed
 
-- `ClaudeCodeLaunch.credential` is now a `ClaudeCodeResolvedCredential`. New exports:
-  `ClaudeCodeAccessToken`, `ClaudeCodeResolvedCredential` and `ClaudeCodeConnectors`.
+- `ClaudeCodeLaunch.credential` is now a `ClaudeCodeResolvedCredential`, and `ClaudeCodeRunner`
+  has a `resolving` (`ClaudeCodeResolving`) of the credential of each run. New exports:
+  `ClaudeCodeAccessToken`, `ClaudeCodeResolvedCredential`, `ClaudeCodeResolving` and
+  `ClaudeCodeConnectors`.
 
 ## 0.122.0
 

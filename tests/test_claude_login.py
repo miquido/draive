@@ -25,6 +25,7 @@ from draive.claude import (
     ClaudeCodeEvent,
     ClaudeCodeLaunch,
     ClaudeCodeLocalLogin,
+    ClaudeCodeResolving,
     ClaudeCodeRunner,
     ClaudeCodeUnavailable,
     claude_code_agent,
@@ -58,8 +59,8 @@ if mode == "hang":
     with open(os.path.join(directory, "pid"), "w") as file:
         file.write(str(os.getpid()))
     time.sleep(30)
-time.sleep(0.3)
-if mode == "refresh":
+time.sleep(1.0 if mode == "slow" else 0.3)
+if mode in ("refresh", "slow"):
     with open(os.path.join(directory, ".credentials.json"), "w") as file:
         json.dump(
             {{
@@ -530,6 +531,7 @@ async def test_a_cancelled_wait_for_the_lock_never_leaks_it(tmp_path: Path, dela
         # whatever the cancelled resolution left running finishes and lets go of the lock
         await _until(lambda: _lock_is_free(directory))
         token = await ClaudeCodeLogins(lock_timeout=1).resolve(login, binary=binary)
+        await logins.drain()  # the refresh of the cancelled resolution, it may still run
 
     assert isinstance(token, ClaudeCodeAccessToken)
     assert token.value == REFRESHED
@@ -604,11 +606,22 @@ _MALFORMED = {
             }
         }
     ).encode(),
-    "nested too deep": b'{"claudeAiOauth": {"refreshToken": "'
+    "too large": json.dumps(
+        {
+            "claudeAiOauth": {
+                "accessToken": TOKEN,
+                "refreshToken": REFRESH_TOKEN,
+                "expiresAt": 1,
+                "scopes": [],
+                "padding": "x" * 70_000,
+            }
+        }
+    ).encode(),
+    "nested deep": b'{"claudeAiOauth": {"refreshToken": "'
     + REFRESH_TOKEN.encode()
     + b'", "deep": '
-    + b"[" * 200_000
-    + b"]" * 200_000
+    + b"[" * 30_000
+    + b"]" * 30_000
     + b"}}",
     "no scopes": json.dumps(
         {
@@ -647,15 +660,60 @@ def test_an_access_token_needs_a_timezone() -> None:
     assert ClaudeCodeAccessToken(value=TOKEN, scopes=(), expires_at=datetime.now(UTC))
 
 
-def test_a_runner_made_without_logins_gets_its_own() -> None:
+def test_a_runner_made_without_resolving_gets_its_own() -> None:
     runner = ClaudeCodeRunner(binary="/bin/claude", running=_never_running)
 
-    assert isinstance(runner.logins, ClaudeCodeLogins)
-    assert runner.updating(binary="/bin/other").logins is runner.logins
+    assert isinstance(runner.resolving, ClaudeCodeResolving)
+    assert runner.updating(binary="/bin/other").resolving is runner.resolving
+    assert runner.to_mapping()["resolving"] == runner.resolving
+
+
+def _combined_binary(root: Path) -> str:
+    # `claude auth status` refreshes, anything else is a run
+    refresh = _fake_binary(root)
+    run = write_fake_claude(root)
+    path = root / "claude-combined"
+    path.write_text(
+        f'#!/bin/sh\nif [ "$1" = auth ]; then exec {refresh} "$@"; fi\nexec {run} "$@"\n'
+    )
+    path.chmod(path.stat().st_mode | stat.S_IXUSR)
+    return str(path)
 
 
 @pytest.mark.asyncio
-async def test_the_scope_shares_its_logins_and_waits_for_their_refreshes(
+async def test_the_scope_waits_for_a_refresh_its_cancelled_run_left(tmp_path: Path) -> None:
+    directory = _login_directory(tmp_path, expires_in_ms=60_000)
+    binary = _combined_binary(tmp_path)
+
+    async with ctx.scope(
+        "test",
+        ClaudeCodeConfig(timeout=30, stop_grace=2),
+        disposables=(
+            ClaudeCode(
+                binary=binary,
+                credential=ClaudeCodeLocalLogin(config_directory=str(directory)),
+            ),
+        ),
+    ):
+
+        async def running() -> None:
+            _ = [chunk async for chunk in claude_code_agent("coder").call(input="hello")]
+
+        run = asyncio.ensure_future(running())
+        await _until(lambda: bool(_invocations(directory)))  # the refresh is running
+        run.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await run
+
+        assert REFRESHED not in (directory / ".credentials.json").read_text()
+
+    # the refresh takes a while, it is written only because the exit waited for it
+    assert REFRESHED in (directory / ".credentials.json").read_text()
+    assert _lock_is_free(directory)
+
+
+@pytest.mark.asyncio
+async def test_every_entry_of_the_scope_drains_the_shared_logins(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -668,21 +726,154 @@ async def test_the_scope_shares_its_logins_and_waits_for_their_refreshes(
         await original(self)
 
     monkeypatch.setattr(ClaudeCodeLogins, "drain", recording)
+    client = ClaudeCode(
+        binary=write_fake_claude(tmp_path),
+        credential=ClaudeCodeLocalLogin(config_directory=str(directory)),
+    )
 
-    async with ctx.scope(
-        "test",
-        disposables=(
-            ClaudeCode(
-                binary=write_fake_claude(tmp_path),
-                credential=ClaudeCodeLocalLogin(config_directory=str(directory)),
-            ),
-        ),
-    ):
-        logins = ctx.state(ClaudeCodeRunner).logins
-        assert ctx.state(ClaudeCodeRunner).logins is logins
-        assert drained == []
+    async with ctx.scope("outer", disposables=(client,)):
+        outer = ctx.state(ClaudeCodeRunner).resolving
+        async with ctx.scope("inner", disposables=(client,)):
+            assert ctx.state(ClaudeCodeRunner).resolving == outer
 
-    assert drained == [logins]
+        assert [logins.resolve for logins in drained] == [outer]
+
+    assert [logins.resolve for logins in drained] == [outer, outer]
+    async with ctx.scope("again", disposables=(client,)):
+        assert ctx.state(ClaudeCodeRunner).resolving != outer  # a fresh one after the last exit
+
+
+@pytest.mark.asyncio
+async def test_a_token_expiring_while_waiting_gets_the_refresh(tmp_path: Path) -> None:
+    directory = _login_directory(tmp_path, expires_in_ms=500)
+    (directory / "mode").write_text("slow")  # longer than the token lives
+
+    async with ctx.scope("test"):
+        token = await ClaudeCodeLogins(refresh_timeout=0.7).resolve(
+            ClaudeCodeLocalLogin(config_directory=str(directory)),
+            binary=_fake_binary(tmp_path),
+        )
+
+    assert isinstance(token, ClaudeCodeAccessToken)
+    assert token.value == REFRESHED
+
+
+@pytest.mark.asyncio
+async def test_concurrent_runs_share_one_refresh_attempt(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    directory = _login_directory(tmp_path, expires_in_ms=HOUR_MS)
+    login = ClaudeCodeLocalLogin(config_directory=str(directory), refresh_margin=7200)
+    logins = ClaudeCodeLogins(lock_timeout=0.2, refresh_timeout=1, cooldown=0)
+    holder = _hold_lock(directory, 2)
+
+    try:
+        async with ctx.scope("test"):
+            tokens = await asyncio.gather(
+                *(logins.resolve(login, binary=_fake_binary(tmp_path)) for _ in range(5))
+            )
+            await logins.drain()
+
+    finally:
+        holder.kill()
+        holder.wait()
+
+    assert {token.value for token in tokens if isinstance(token, ClaudeCodeAccessToken)} == {TOKEN}
+    # one attempt waited for the lock and failed, every run shared it
+    assert caplog.text.count("Refreshing the Claude Code login failed: ") == 1
+    assert caplog.text.count("its current token is used") == 5
+
+
+@pytest.mark.asyncio
+async def test_a_failed_refresh_is_not_attempted_again_during_the_cooldown(
+    tmp_path: Path,
+) -> None:
+    directory = _login_directory(tmp_path, expires_in_ms=HOUR_MS)
+    login = ClaudeCodeLocalLogin(config_directory=str(directory), refresh_margin=7200)
+    logins = ClaudeCodeLogins(lock_timeout=0.2)
+    binary = _fake_binary(tmp_path)
+    holder = _hold_lock(directory, 3)
+
+    try:
+        async with ctx.scope("test"):
+            first = await logins.resolve(login, binary=binary)
+            started = time.monotonic()
+            second = await logins.resolve(login, binary=binary)
+            elapsed = time.monotonic() - started
+
+    finally:
+        holder.kill()
+        holder.wait()
+
+    assert isinstance(first, ClaudeCodeAccessToken)
+    assert isinstance(second, ClaudeCodeAccessToken)
+    assert second.value == TOKEN
+    assert elapsed < 0.15  # no second wait for the lock
+    assert _invocations(directory) == []
+
+
+@pytest.mark.asyncio
+async def test_a_refresh_reports_to_its_scope_after_the_run_ended(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    directory = _login_directory(tmp_path, expires_in_ms=HOUR_MS)
+    (directory / "mode").write_text("nothing")
+    login = ClaudeCodeLocalLogin(config_directory=str(directory), refresh_margin=7200)
+
+    async with ctx.scope("owner"):
+        logins = ClaudeCodeLogins(refresh_timeout=0.05)
+        async with ctx.scope("run"):
+            await logins.resolve(login, binary=_fake_binary(tmp_path))
+
+        caplog.clear()
+        await logins.drain()  # the refresh ends after the run
+
+    assert "did not extend its token" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_a_parser_running_out_of_stack_does_not_leak(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    directory = _login_directory(tmp_path)
+
+    def exhausted(content: str) -> Any:
+        held = content  # like the frames of the parser, holding the whole file
+        raise RecursionError(f"maximum recursion depth exceeded {len(held)}")
+
+    monkeypatch.setattr("draive.claude.login.json.loads", exhausted)
+
+    with pytest.raises(ClaudeCodeUnavailable, match="malformed") as exc_info:
+        await ClaudeCodeLogins().resolve(
+            ClaudeCodeLocalLogin(config_directory=str(directory)), binary="/bin/claude"
+        )
+
+    assert exc_info.value.__cause__ is None
+    assert exc_info.value.__context__ is None
+    for codeword in (REFRESH_TOKEN, TOKEN):
+        assert not _holds(exc_info.value, codeword)
+
+
+@pytest.mark.asyncio
+async def test_a_cancelled_drain_does_not_cancel_the_refresh(tmp_path: Path) -> None:
+    directory = _login_directory(tmp_path, expires_in_ms=HOUR_MS)
+    logins = ClaudeCodeLogins(refresh_timeout=0.01)
+    login = ClaudeCodeLocalLogin(config_directory=str(directory), refresh_margin=7200)
+
+    async with ctx.scope("test"):
+        await logins.resolve(login, binary=_fake_binary(tmp_path))
+        drain = asyncio.ensure_future(logins.drain())
+        await asyncio.sleep(0.05)
+        drain.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await drain
+
+        await logins.drain()
+
+    assert REFRESHED in (directory / ".credentials.json").read_text()
 
 
 @pytest.mark.asyncio
