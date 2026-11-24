@@ -28,6 +28,41 @@ print(simplified_schema(Example.__SPECIFICATION__, indent=2))
 `json_schema(...)` is precise and machine-oriented; `simplified_schema(...)` is compact and often
 useful when injecting schema hints into LLM prompts.
 
+## Decoding External Input
+
+Decoding is strict: a key which is neither an attribute name nor an alias is refused, and so is a
+key a `TypedDict` attribute does not declare (`Unexpected key 'y' for Point`), in every way a
+`State` is built. When the input comes from a source which may add fields of its own, such as a
+third party API, pass `ignore_extra=True` to `from_mapping`, `from_json` or `from_json_array`.
+Unknown keys are then skipped in every nested `State`, `TypedDict`, sequence, mapping and union the
+decoding reaches.
+
+```python
+from typing import TypedDict
+
+from draive import State
+
+
+class Point(TypedDict):
+    x: int
+
+
+class Item(State):
+    name: str
+    point: Point
+
+
+payload = '{"name": "a", "point": {"x": 1, "y": 2}, "added_later": true}'
+
+item = Item.from_json(payload, ignore_extra=True)  # Item(name="a", point={"x": 1})
+Item.from_json(payload)  # raises ValueError, the keys are unknown
+```
+
+The constructor, `updating(...)` and `validate(...)` keep refusing unknown keys, only the decoding
+helpers take the flag. In a union the first alternative which validates wins once keys are skipped,
+so list the most specific alternative first or tell them apart with a `Literal` attribute. A
+`TypedDict | Mapping[...]` attribute given undeclared keys selects the mapping, keeping every key.
+
 ## Immutability And Updates
 
 ```python

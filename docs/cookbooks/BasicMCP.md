@@ -50,6 +50,26 @@ async with ctx.scope(
 `MCPClient` contributes `ToolsProvider`/`ResourcesRepository` states inside `ctx.scope(...)`, so you
 can load MCP tools dynamically and keep all dependencies lifecycle-managed by context.
 
+## Tool Argument Schemas
+
+The input schema of an MCP tool is translated into the typed `ModelToolParametersSpecification`
+every Draive tool declares, so all providers receive the same well-formed schema:
+
+- References to `$defs` and `definitions` are inlined, a recursive definition is anchored and
+    referenced as `#Name`, the way a recursive `State` is.
+- A reference with sibling keywords and the branches of `allOf` are combined into one schema,
+    `oneOf` becomes `anyOf` and `const` a single value `enum`.
+- Arguments declared by root `anyOf`/`oneOf` branches become arguments of the tool: required are
+    only the ones every branch requires, and a property declared differently by the branches keeps
+    each declaration as an `anyOf`.
+- Objects with properties are closed for undeclared keys. Keywords which only constrain values
+    further (`default`, `minimum`, `pattern`, `title`...) are dropped, the server still validates
+    them when the tool is called.
+
+A tool whose schema cannot be translated without changing what it accepts, for example one with an
+unresolvable `$ref` or an argument of any type (`{}`), is skipped with a warning naming the tool and
+the reason; the other tools of the server stay available.
+
 ## Example: Remote MCP Server
 
 For remote servers use the Streamable HTTP transport. `MCPClient.sse` is still available but the SSE

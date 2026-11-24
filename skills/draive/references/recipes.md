@@ -100,7 +100,11 @@ except ValueError as exc:                          # malformed JSON and invalid 
 ```
 
 `from_json` raises `ValueError`; `from_mapping`, `State.validate(value)` and the constructor raise
-`ValidationError` (not a `ValueError`) naming the failing path. Put format rules into the type
+`ValidationError` (not a `ValueError`) naming the failing path, or `TypeError` for an unknown
+attribute. Unknown keys are refused everywhere, undeclared `TypedDict` keys included; for input
+which may grow fields of its own (third party APIs) decode with `from_json(payload,
+ignore_extra=True)` (also `from_mapping`, `from_json_array`), which skips them at every level. The
+constructor, `updating` and `validate` never skip. Put format rules into the type
 (`Validator` to coerce before validation, `Verifier` to enforce after, `Literal`, unions) so invalid
 data cannot get past the boundary. Return data with `to_json()`/`to_mapping()`.
 
