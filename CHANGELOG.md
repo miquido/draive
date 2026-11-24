@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.122.0
+
+### Changed
+
+- Requires haiway 0.65.0. A `TypedDict` attribute now refuses keys it does not declare instead of
+  dropping them, and `State.from_mapping`, `State.from_json` and `State.from_json_array` accept
+  `ignore_extra=True` to skip unknown keys.
+- Dependencies refreshed to their latest releases.
+
+### Fixed
+
+- MCP tools keep only the `type`, `properties` and `required` keys of a server's input schema, so
+  schemas carrying `title`, `$schema`, `description` or other root keys no longer fail to convert
+  under haiway 0.65.0.
+- Gemini skips the thinking config when the thinking budget is zero (0.121.1).
+
 ## 0.121.0
 
 ### Changed

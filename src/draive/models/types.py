@@ -311,8 +311,6 @@ class ModelToolParametersSpecification(TypedDict, total=False):
         JSON Schema root type. Must be ``"object"``.
     properties
         Mapping of argument names to typed specifications.
-    description
-        Optional description of the parameter object.
     required
         Optional list of required argument names.
     additionalProperties

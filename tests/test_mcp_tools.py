@@ -7,7 +7,7 @@ from mcp.types import ResourceLink as MCPResourceLink
 from mcp.types import TextContent as MCPTextContent
 from mcp.types import Tool as MCPTool
 
-from draive.mcp.client import MCPClient
+from draive.mcp.client import MCPClient, _convert_tool  # pyright: ignore[reportPrivateUsage]
 from draive.tools import ToolException
 
 
@@ -169,3 +169,42 @@ async def test_mcp_tools_fetch_stops_on_cyclic_cursors() -> None:
 
     assert [tool.name for tool in tools] == ["a", "b", "c"]
     assert session.cursors == [None, "cursor-2", "cursor-3"]
+
+
+async def _unused_tool_call(name: str, arguments: Mapping[str, Any]) -> Any:
+    raise AssertionError(f"unexpected call of {name} with {arguments}")
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {},
+        {"title": "Arguments"},
+        {"$schema": "https://json-schema.org/draft/2020-12/schema"},
+        {"description": "Tool arguments"},
+        {"$defs": {"Item": {"type": "string"}}},
+        {"additionalProperties": True},
+    ],
+)
+def test_mcp_tool_parameters_keep_only_declared_schema_keys(extra: Mapping[str, Any]) -> None:
+    tool = _convert_tool(  # pyright: ignore[reportPrivateUsage]
+        MCPTool(
+            name="tool",
+            input_schema={
+                "type": "object",
+                "properties": {"query": {"type": "string"}},
+                "required": ["query"],
+                **extra,
+            },
+        ),
+        tool_call=_unused_tool_call,
+        source="source",
+        tags=(),
+    )
+
+    assert tool.specification.parameters == {
+        "type": "object",
+        "properties": {"query": {"type": "string"}},
+        "required": ("query",),
+        "additionalProperties": False,
+    }
