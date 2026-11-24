@@ -176,35 +176,58 @@ async def _unused_tool_call(name: str, arguments: Mapping[str, Any]) -> Any:
 
 
 @pytest.mark.parametrize(
-    "extra",
+    "schema",
     [
-        {},
-        {"title": "Arguments"},
-        {"$schema": "https://json-schema.org/draft/2020-12/schema"},
-        {"description": "Tool arguments"},
-        {"$defs": {"Item": {"type": "string"}}},
-        {"additionalProperties": True},
+        {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]},
+        {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "title": "Arguments",
+            "description": "Tool arguments",
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "title": "Query", "default": "x", "minLength": 1},
+                "item": {"$ref": "#/$defs/Item"},
+                "choice": {"oneOf": [{"const": "a"}, {"type": ["integer", "null"]}]},
+            },
+            "required": ["query"],
+            "$defs": {"Item": {"type": "object", "properties": {"id": {"type": "integer"}}}},
+        },
     ],
 )
-def test_mcp_tool_parameters_keep_only_declared_schema_keys(extra: Mapping[str, Any]) -> None:
+def test_mcp_tool_parameters_keep_the_server_schema(schema: Mapping[str, Any]) -> None:
+    tool = _convert_tool(  # pyright: ignore[reportPrivateUsage]
+        MCPTool(name="tool", input_schema=schema),
+        tool_call=_unused_tool_call,
+        source="source",
+        tags=(),
+    )
+
+    assert _plain(tool.specification.parameters) == {**schema, "additionalProperties": False}
+
+
+def test_mcp_tool_parameters_keep_additional_properties_of_the_server() -> None:
     tool = _convert_tool(  # pyright: ignore[reportPrivateUsage]
         MCPTool(
             name="tool",
-            input_schema={
-                "type": "object",
-                "properties": {"query": {"type": "string"}},
-                "required": ["query"],
-                **extra,
-            },
+            input_schema={"type": "object", "properties": {}, "additionalProperties": True},
         ),
         tool_call=_unused_tool_call,
         source="source",
         tags=(),
     )
 
-    assert tool.specification.parameters == {
+    assert _plain(tool.specification.parameters) == {
         "type": "object",
-        "properties": {"query": {"type": "string"}},
-        "required": ("query",),
-        "additionalProperties": False,
+        "properties": {},
+        "additionalProperties": True,
     }
+
+
+def _plain(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _plain(element) for key, element in value.items()}  # pyright: ignore[reportUnknownVariableType]
+
+    if isinstance(value, tuple):
+        return [_plain(element) for element in value]  # pyright: ignore[reportUnknownVariableType]
+
+    return value

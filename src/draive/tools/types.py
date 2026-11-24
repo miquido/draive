@@ -9,7 +9,7 @@ from haiway import BasicValue, Meta, MetaValues
 
 from draive.models import (
     ModelToolHandling,
-    ModelToolParametersSpecification,
+    ModelToolParameters,
     ModelToolSpecification,
 )
 from draive.multimodal import MultimodalContentPart
@@ -69,7 +69,7 @@ class Tool(Protocol):
         ...
 
     @property
-    def parameters(self) -> ModelToolParametersSpecification | None:
+    def parameters(self) -> ModelToolParameters | None:
         """Parameter schema accepted by this tool, when declared."""
         ...
 

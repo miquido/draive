@@ -15,7 +15,7 @@ from collections.abc import AsyncGenerator, Callable, Collection, Coroutine, Map
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from itertools import chain
 from types import TracebackType
-from typing import Any, Final, Self, cast, final
+from typing import Any, Self, cast, final
 from urllib.parse import ParseResult, urlparse
 from uuid import uuid4
 
@@ -51,7 +51,6 @@ from mcp.types import Resource as MCPResource
 from mcp.types import ResourceLink as MCPResourceLink
 from mcp.types import TextContent as MCPTextContent
 
-from draive.models import ModelToolParametersSpecification
 from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
 from draive.resources import ResourceContent, ResourceReference, ResourcesRepository
 from draive.tools import CoroutineTool, Tool, ToolException, ToolsProvider
@@ -836,24 +835,6 @@ async def _convert_error_content(
         return MultimodalContent.of(f"<{content.type}/>")
 
 
-# keys of ModelToolParametersSpecification taken from a server schema, others such as
-# `title` or `$schema` are dropped as the TypedDict refuses keys it does not declare
-_TOOL_PARAMETERS_KEYS: Final[frozenset[str]] = frozenset(("type", "properties", "required"))
-
-
-def _tool_parameters(
-    input_schema: Mapping[str, Any],
-    /,
-) -> ModelToolParametersSpecification:
-    return cast(
-        ModelToolParametersSpecification,
-        {
-            **{key: value for key, value in input_schema.items() if key in _TOOL_PARAMETERS_KEYS},
-            "additionalProperties": False,
-        },
-    )
-
-
 def _convert_tool(
     mcp_tool: MCPTool,
     /,
@@ -873,7 +854,12 @@ def _convert_tool(
     return CoroutineTool(
         name=name,
         description=mcp_tool.description,
-        parameters=_tool_parameters(mcp_tool.input_schema),
+        # the schema declared by the server reaches the model unchanged, closed for
+        # arguments it does not declare unless the server decided otherwise
+        parameters={
+            "additionalProperties": False,
+            **mcp_tool.input_schema,
+        },
         function=remote_call,
         handling="response",
         meta=Meta.of(
