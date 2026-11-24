@@ -1,6 +1,6 @@
 import json
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, Final, cast, final
+from typing import Any, Final, Literal, cast, final
 
 from haiway import BasicValue, State
 
@@ -9,6 +9,7 @@ __all__ = (
     "ClaudeCodeEvent",
     "ClaudeCodeFailure",
     "ClaudeCodeMCPServer",
+    "ClaudeCodeMCPStatus",
     "ClaudeCodeResult",
     "ClaudeCodeStarted",
     "ClaudeCodeSuccess",
@@ -20,43 +21,39 @@ __all__ = (
 )
 
 
-# account connectors which the account has not authenticated are reported, and never connect
-_ACCOUNT_CONNECTOR_SOURCE: Final[str] = "claudeai"
-_NEEDS_AUTHENTICATION: Final[str] = "needs-auth"
+_CONNECTOR_SOURCE: Final[str] = "claudeai"
+_UNAUTHORIZED: Final[int] = 401
+_UNAVAILABLE_STATUSES: Final[Sequence[str]] = ("failed", "needs-auth")
+
+
+type ClaudeCodeMCPStatus = Literal[
+    "connected", "failed", "needs-auth", "pending", "disabled", "unknown"
+]
 
 
 @final
 class ClaudeCodeMCPServer(State):
-    """MCP server reported by Claude Code, with its status as reported.
+    """MCP server reported by Claude Code, whether it was connected or not.
 
     Attributes
     ----------
     name
-        Name of the server, ``claude.ai <Name>`` for an account connector.
+        Name of the server, connectors of the account are named ``claude.ai <Name>``.
     status
-        Status as reported, i.e. ``connected``, ``failed`` or ``needs-auth`` - versions which
-        report none connect the servers on start.
+        Status reported by Claude Code, ``unknown`` for one this version does not know and none
+        when it reports no status.
     source
-        Where the server comes from, ``claudeai`` for an account connector.
+        Where the server comes from when reported, connectors of the account are ``claudeai``.
     """
 
     name: str
-    status: str = "connected"
+    status: ClaudeCodeMCPStatus | None = None
     source: str | None = None
 
     @property
     def connected(self) -> bool:
-        """Whether the server is connected."""
-        return self.status == "connected"
-
-    @property
-    def failed(self) -> bool:
-        """Whether the server is not connected for a reason other than an account connector
-        which was never authenticated - connecting it is a choice of the account, not a failure.
-        """
-        return not self.connected and not (
-            self.source == _ACCOUNT_CONNECTOR_SOURCE and self.status == _NEEDS_AUTHENTICATION
-        )
+        """Whether the server is connected, also when its status is not reported."""
+        return self.status in (None, "connected")
 
 
 @final
@@ -74,9 +71,31 @@ class ClaudeCodeStarted(State):
 
     @property
     def failed_mcp_servers(self) -> Sequence[str]:
-        """Names of the MCP servers which failed to connect, account connectors which were never
-        authenticated are not among them."""
-        return tuple(server.name for server in self.mcp_servers if server.failed)
+        """Names of the configured MCP servers which are not connected, connectors excluded."""
+        return tuple(
+            server.name
+            for server in self.mcp_servers
+            if not server.connected and server.source != _CONNECTOR_SOURCE
+        )
+
+    @property
+    def unavailable_connectors(self) -> Sequence[str]:
+        """Names of the connectors of the account which failed or need an authorization."""
+        return tuple(
+            server.name
+            for server in self.mcp_servers
+            if server.source == _CONNECTOR_SOURCE and server.status in _UNAVAILABLE_STATUSES
+        )
+
+    @property
+    def failed_connectors(self) -> Sequence[str]:
+        """Names of the connectors of the account which failed to connect - the ones which need
+        an authorization are not among them, most were never authorized by the account."""
+        return tuple(
+            server.name
+            for server in self.mcp_servers
+            if server.source == _CONNECTOR_SOURCE and server.status == "failed"
+        )
 
 
 @final
@@ -153,11 +172,21 @@ class ClaudeCodeFailure(State):
         HTTP status of the API failure which ended the run, when it was one.
     terminal_reason
         Reason reported by Claude Code for ending the run, i.e. ``api_error``.
+    api_error_type
+        Type of the API failure which ended the run, i.e. ``authentication_error``.
     """
 
     reason: str
     api_error_status: int | None = None
     terminal_reason: str | None = None
+    api_error_type: str | None = None
+
+    @property
+    def authentication_failed(self) -> bool:
+        """Whether the API rejected the credential of the run."""
+        return (
+            self.api_error_type == "authentication_error" or self.api_error_status == _UNAUTHORIZED
+        )
 
 
 @final
@@ -374,6 +403,7 @@ def _result(
             reason=text or subtype or "the run failed",
             api_error_status=status if isinstance(status, int) and status else None,
             terminal_reason=_string(payload.get("terminal_reason")),
+            api_error_type=_string(payload.get("api_error_type")),
         )
 
     else:
@@ -443,12 +473,27 @@ def _mcp_servers(
             servers.append(
                 ClaudeCodeMCPServer(
                     name=name,
-                    status=_string(entry.get("status")) or "connected",
+                    status=_mcp_status(entry.get("status")),
                     source=_string(entry.get("source")),
                 )
             )
 
     return tuple(servers)
+
+
+def _mcp_status(
+    value: Any,
+    /,
+) -> ClaudeCodeMCPStatus | None:
+    match _string(value):
+        case None:
+            return None
+
+        case "connected" | "failed" | "needs-auth" | "pending" | "disabled" as status:
+            return status
+
+        case _:
+            return "unknown"
 
 
 def _mapping(

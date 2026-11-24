@@ -6,10 +6,12 @@ from haiway import Default, Missing, State
 from draive.claude.credentials import ClaudeCodeCredential, ClaudeCodeResolvedCredential
 from draive.claude.events import ClaudeCodeEvent
 from draive.claude.exceptions import (
+    ClaudeCodeAuthenticationFailed,
     ClaudeCodeEnded,
     ClaudeCodeErrored,
     ClaudeCodeException,
     ClaudeCodeFailed,
+    ClaudeCodeLoginUnusable,
     ClaudeCodeOutputTooLarge,
     ClaudeCodeTimedOut,
     ClaudeCodeUnavailable,
@@ -18,10 +20,12 @@ from draive.claude.launch import ClaudeCodeLaunch
 from draive.claude.login import ClaudeCodeLogins
 
 __all__ = (
+    "ClaudeCodeAuthenticationFailed",
     "ClaudeCodeEnded",
     "ClaudeCodeErrored",
     "ClaudeCodeException",
     "ClaudeCodeFailed",
+    "ClaudeCodeLoginUnusable",
     "ClaudeCodeOutputTooLarge",
     "ClaudeCodeResolving",
     "ClaudeCodeRunner",

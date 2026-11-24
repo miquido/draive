@@ -5,10 +5,12 @@ from draive.agents.types import AgentException
 from draive.claude.events import ClaudeCodeFailure
 
 __all__ = (
+    "ClaudeCodeAuthenticationFailed",
     "ClaudeCodeEnded",
     "ClaudeCodeErrored",
     "ClaudeCodeException",
     "ClaudeCodeFailed",
+    "ClaudeCodeLoginUnusable",
     "ClaudeCodeOutputTooLarge",
     "ClaudeCodeTimedOut",
     "ClaudeCodeUnavailable",
@@ -19,9 +21,10 @@ class ClaudeCodeException(AgentException):
     """Base exception of Claude Code runs."""
 
 
-@final
 class ClaudeCodeUnavailable(ClaudeCodeException):
     """Raised when Claude Code can not be started - missing binary or credentials, bad setup.
+
+    ``ClaudeCodeLoginUnusable`` is the only variant of it.
 
     Parameters
     ----------
@@ -40,6 +43,23 @@ class ClaudeCodeUnavailable(ClaudeCodeException):
 
     def __str__(self) -> str:
         return f"Claude Code is unavailable: {self.reason}"
+
+
+@final
+class ClaudeCodeLoginUnusable(ClaudeCodeUnavailable):
+    """A ``ClaudeCodeLocalLogin`` gives no valid access token - log in again.
+
+    Its credentials file is missing, unreadable or malformed, a leftover of a login kept in the
+    keychain (macOS), or its token has expired and could not be refreshed. Logging in again
+    (``claude /login`` as the user of the login) is what helps. Still a ``ClaudeCodeUnavailable``.
+
+    Parameters
+    ----------
+    reason
+        Description of why the login is unusable, never carrying its tokens.
+    """
+
+    __slots__ = ()
 
 
 class ClaudeCodeFailed(ClaudeCodeException, ABC):
@@ -130,9 +150,10 @@ class ClaudeCodeEnded(ClaudeCodeFailed):
         return "the process ended without a result"
 
 
-@final
 class ClaudeCodeErrored(ClaudeCodeFailed):
     """The run ended with an error reported by Claude Code.
+
+    ``ClaudeCodeAuthenticationFailed`` is the only variant of it.
 
     Parameters
     ----------
@@ -153,6 +174,31 @@ class ClaudeCodeErrored(ClaudeCodeFailed):
         super().__init__(session_id=session_id)
         self.failure: ClaudeCodeFailure = failure
 
+    @staticmethod
+    def of(
+        failure: ClaudeCodeFailure,
+        *,
+        session_id: str | None = None,
+    ) -> ClaudeCodeErrored:
+        """Prepare the exception of the failure - the variant when the credential was rejected.
+
+        Parameters
+        ----------
+        failure
+            The error the run ended with.
+        session_id
+            Claude Code session of the run, when it got to report one.
+
+        Returns
+        -------
+        ClaudeCodeErrored
+            ``ClaudeCodeAuthenticationFailed`` for an authentication failure, the base otherwise.
+        """
+        if failure.authentication_failed:
+            return ClaudeCodeAuthenticationFailed(failure=failure, session_id=session_id)
+
+        return ClaudeCodeErrored(failure=failure, session_id=session_id)
+
     @property
     def reason(self) -> str:
         return self.failure.reason
@@ -166,6 +212,24 @@ class ClaudeCodeErrored(ClaudeCodeFailed):
     def terminal_reason(self) -> str | None:
         """Reason reported by Claude Code for ending the run, i.e. ``api_error``."""
         return self.failure.terminal_reason
+
+
+@final
+class ClaudeCodeAuthenticationFailed(ClaudeCodeErrored):
+    """The API rejected the credential of the run - HTTP 401 or an authentication error.
+
+    A token of a ``ClaudeCodeLocalLogin`` which was revoked or rotated by another process fails
+    this way, refreshing the login and running again may help. Still a ``ClaudeCodeErrored``.
+
+    Parameters
+    ----------
+    failure
+        The error the run ended with, it never carries the credential.
+    session_id
+        Claude Code session of the run, when it got to report one.
+    """
+
+    __slots__ = ()
 
 
 @final

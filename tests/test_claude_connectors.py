@@ -1,14 +1,17 @@
+import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
-from haiway import Missing, ctx
+from haiway import Missing, ValidationError, ctx
 
 from draive.claude import (
     ClaudeCodeAccessToken,
     ClaudeCodeAccountConnectors,
+    ClaudeCodeAllConnectors,
     ClaudeCodeApiKey,
     ClaudeCodeConfig,
+    ClaudeCodeConnectorsAt,
     ClaudeCodeNoConnectors,
     ClaudeCodeOAuthToken,
     ClaudeCodeUnavailable,
@@ -17,6 +20,8 @@ from draive.claude.launch import (
     build_launch,
     claude_arguments,
     claude_environment,
+    claude_settings,
+    verify_allowed_servers,
     verify_connectors,
 )
 from draive.claude.workspace import ClaudeCodeWorkspace
@@ -139,3 +144,165 @@ def test_launches_refuse_connectors_with_credentials_without_the_scope() -> None
             workspace=WORKSPACE,
             credential=ClaudeCodeApiKey(value="sk-ant-api03-key"),
         )
+
+
+def _settings(config: ClaudeCodeConfig) -> Any:
+    return json.loads(claude_settings(config))
+
+
+def test_connectors_have_no_filters_by_default() -> None:
+    settings = _settings(ClaudeCodeConfig(connectors=ClaudeCodeAccountConnectors()))
+
+    assert "deniedMcpServers" not in settings
+    assert "allowedMcpServers" not in settings
+
+
+def test_excluded_connectors_are_denied_by_their_display_names_and_urls() -> None:
+    config = ClaudeCodeConfig(
+        connectors=ClaudeCodeAccountConnectors(
+            excluded=("Slack", "Claude Data"),
+            excluded_urls=("https://mcp.atlassian.com/*",),
+        )
+    )
+
+    settings = _settings(config)
+
+    assert settings["deniedMcpServers"] == [
+        {"serverName": "claude.ai Slack"},
+        {"serverName": "claude.ai Claude Data"},
+        {"serverUrl": "https://mcp.atlassian.com/*"},
+    ]
+    assert "allowedMcpServers" not in settings
+
+
+def test_allowed_connectors_are_matched_by_urls_and_the_configured_servers_are_kept() -> None:
+    config = ClaudeCodeConfig(
+        connectors=ClaudeCodeAccountConnectors(
+            allowed=ClaudeCodeConnectorsAt(urls=("https://mcp.slack.com/*",))
+        ),
+        mcp_servers={
+            "docs": {"type": "http", "url": "https://docs.example"},
+            "local": {"command": "local-server"},
+        },
+    )
+
+    settings = _settings(config)
+
+    assert settings["allowedMcpServers"] == [
+        {"serverUrl": "https://mcp.slack.com/*"},
+        {"serverName": "docs"},
+        {"serverName": "local"},
+    ]
+
+
+def test_configured_filters_are_added_to_the_derived_ones() -> None:
+    config = ClaudeCodeConfig(
+        connectors=ClaudeCodeAccountConnectors(
+            excluded=("Slack",),
+            allowed=ClaudeCodeConnectorsAt(urls=("https://mcp.slack.com/*",)),
+        ),
+        settings={
+            "deniedMcpServers": [{"serverName": "claude.ai Slack"}, {"serverName": "other"}],
+            "allowedMcpServers": [{"serverName": "extra"}],
+            "custom": 1,
+        },
+    )
+
+    settings = _settings(config)
+
+    assert settings["deniedMcpServers"] == [
+        {"serverName": "claude.ai Slack"},
+        {"serverName": "other"},
+    ]
+    assert settings["allowedMcpServers"] == [
+        {"serverUrl": "https://mcp.slack.com/*"},
+        {"serverName": "extra"},
+    ]
+    assert settings["custom"] == 1
+
+
+def test_configured_filters_are_left_as_they_are_without_connectors_filters() -> None:
+    config = ClaudeCodeConfig(
+        connectors=ClaudeCodeAccountConnectors(),
+        settings={"allowedMcpServers": [{"serverName": "x"}]},
+    )
+
+    assert _settings(config)["allowedMcpServers"] == [{"serverName": "x"}]
+
+
+def test_filters_are_not_sent_without_connectors() -> None:
+    settings = _settings(ClaudeCodeConfig(mcp_servers={"docs": {"command": "docs"}}))
+
+    assert "deniedMcpServers" not in settings
+    assert "allowedMcpServers" not in settings
+
+
+@pytest.mark.parametrize("key", ["claudeMdExcludes", "allowedMcpServers", "deniedMcpServers"])
+@pytest.mark.parametrize("value", ["claude.ai Slack", {"serverName": "x"}, 1, None])
+def test_configured_filters_which_are_not_lists_can_not_be_created(key: str, value: Any) -> None:
+    with pytest.raises(ValidationError):
+        ClaudeCodeConfig(settings={key: value})
+
+
+def test_configured_filters_which_are_lists_are_accepted() -> None:
+    ClaudeCodeConfig(settings={"deniedMcpServers": [], "allowedMcpServers": ({"serverName": "a"},)})
+
+
+def test_excluded_connectors_are_named_by_their_display_names() -> None:
+    with pytest.raises(ValidationError):
+        ClaudeCodeAccountConnectors(excluded=("claude.ai Slack",))
+
+
+def test_allowed_connectors_need_urls() -> None:
+    with pytest.raises(ValidationError):
+        ClaudeCodeConnectorsAt(urls=())
+
+
+def test_every_connector_is_allowed_by_default() -> None:
+    assert ClaudeCodeAccountConnectors().allowed == ClaudeCodeAllConnectors()
+
+
+@pytest.mark.parametrize("name", ["my server", "docs.v2", "dócs", "a/b"])
+def test_servers_which_an_allowlist_can_not_name_are_refused_with_allowed_connectors(
+    name: str,
+) -> None:
+    config = ClaudeCodeConfig(
+        connectors=ClaudeCodeAccountConnectors(
+            allowed=ClaudeCodeConnectorsAt(urls=("https://mcp.slack.com/*",))
+        ),
+        mcp_servers={name: {"command": "x"}},
+    )
+
+    with pytest.raises(ClaudeCodeUnavailable, match="can not be allowed"):
+        verify_allowed_servers(config)
+
+    with pytest.raises(ClaudeCodeUnavailable, match="can not be allowed"):
+        build_launch(
+            config,
+            binary="/bin/claude",
+            prompt=[],
+            workspace=WORKSPACE,
+            credential=_access_token("user:inference", "user:mcp_servers"),
+        )
+
+
+def test_any_server_name_is_fine_without_an_allowlist() -> None:
+    verify_allowed_servers(
+        ClaudeCodeConfig(
+            connectors=ClaudeCodeAccountConnectors(),
+            mcp_servers={"my server": {"command": "x"}},
+        )
+    )
+    verify_allowed_servers(ClaudeCodeConfig(mcp_servers={"my server": {"command": "x"}}))
+
+
+def test_connector_filters_survive_serialization() -> None:
+    config = ClaudeCodeConfig(
+        connectors=ClaudeCodeAccountConnectors(
+            excluded=("Slack",),
+            excluded_urls=("https://a/*",),
+            allowed=ClaudeCodeConnectorsAt(urls=("https://b/*",)),
+        )
+    )
+
+    assert ClaudeCodeConfig.from_mapping(config.to_mapping()) == config

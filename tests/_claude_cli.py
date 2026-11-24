@@ -178,6 +178,16 @@ elif scenario == "error401":
     )
     sys.exit(1)
 
+elif scenario == "overloaded":
+    result(
+        result="Overloaded",
+        is_error=True,
+        api_error_status=529,
+        api_error_type="overloaded_error",
+        terminal_reason="api_error",
+    )
+    sys.exit(1)
+
 elif scenario == "bigline":
     emit(
         {{

@@ -482,6 +482,7 @@ def test_telemetry_from_env_without_variables_leaves_defaults(
         lambda: ClaudeCodeConfig(directory="relative"),
         lambda: ClaudeCodeTelemetry(export_interval_ms=0),
         lambda: ClaudeCodeConfig(inherit_env=("ANTHROPIC_API_KEY",)),
+        lambda: ClaudeCodeConfig(inherit_env=("MCP_CONNECTION_NONBLOCKING",)),
         *[
             (lambda name=name: ClaudeCodeConfig(env={name: "x"}))
             for name in (
@@ -495,6 +496,8 @@ def test_telemetry_from_env_without_variables_leaves_defaults(
                 "TMPDIR",
                 "TRACEPARENT",
                 "DRAIVE_CLAUDE_RUN",
+                "MCP_CONNECTION_NONBLOCKING",
+                "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD",
             )
         ],
     ],
