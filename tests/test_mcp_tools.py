@@ -318,6 +318,40 @@ def test_mcp_tool_parameters_translate_composition_keywords() -> None:
     }
 
 
+def test_mcp_tool_parameters_merge_root_composition_arguments() -> None:
+    assert _converted_parameters(
+        {
+            "type": "object",
+            "properties": {"a": {"type": "string"}},
+            "required": ["a"],
+            "allOf": [
+                {"properties": {"b": {"type": "integer"}}, "required": ["b"]},
+            ],
+            "oneOf": [
+                {
+                    "properties": {"q": {"type": "string"}, "n": {"type": "integer"}},
+                    "required": ["q", "n"],
+                },
+                {
+                    "properties": {"id": {"type": "integer"}, "n": {"type": "integer"}},
+                    "required": ["id", "n"],
+                },
+            ],
+        }
+    ) == {
+        "type": "object",
+        "properties": {
+            "b": {"type": "integer"},
+            "a": {"type": "string"},
+            "q": {"type": "string"},
+            "n": {"type": "integer"},
+            "id": {"type": "integer"},
+        },
+        "required": ["b", "a", "n"],
+        "additionalProperties": False,
+    }
+
+
 @pytest.mark.asyncio
 async def test_mcp_tools_fetch_skips_tools_with_unsupported_schemas() -> None:
     class Session(_DummySession):

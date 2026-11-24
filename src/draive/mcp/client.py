@@ -859,13 +859,58 @@ def _tool_parameters(
         {
             "name": name,
             "parameters": {
-                "properties": {},
-                **_SchemaTranslation(input_schema).translated(input_schema),
+                **_merged_arguments(_SchemaTranslation(input_schema).translated(input_schema)),
                 "additionalProperties": False,
             },
         },
         ignore_extra=True,
     ).parameters
+
+
+def _merged_arguments(
+    schema: Mapping[str, Any],
+    /,
+) -> Mapping[str, Any]:
+    # arguments declared by root composition branches become root properties - all of them
+    # with `allOf` where every branch requires its own, with `anyOf` only the arguments
+    # required by every branch stay required, the server validates the exact combination
+    properties: dict[str, Any] = dict(schema.get("properties", {}))
+    required: list[str] = list(schema.get("required", ()))
+    merged: dict[str, Any] = {
+        key: value for key, value in schema.items() if key not in ("allOf", "anyOf")
+    }
+
+    match schema.get("allOf"):
+        case [*branches] if branches:
+            for branch in branches:
+                if isinstance(branch, Mapping):
+                    properties.update(cast(Mapping[str, Any], branch).get("properties", {}))
+                    required.extend(cast(Mapping[str, Any], branch).get("required", ()))
+
+        case _:
+            pass
+
+    match schema.get("anyOf"):
+        case [*branches] if branches:
+            shared: set[str] | None = None
+            for branch in branches:
+                branch_required: set[str] = set()
+                if isinstance(branch, Mapping):
+                    properties.update(cast(Mapping[str, Any], branch).get("properties", {}))
+                    branch_required = set(cast(Mapping[str, Any], branch).get("required", ()))
+
+                shared = branch_required if shared is None else shared & branch_required
+
+            required.extend(sorted(shared or ()))
+
+        case _:
+            pass
+
+    merged["properties"] = properties
+    if required:
+        merged["required"] = list(dict.fromkeys(required))
+
+    return merged
 
 
 _DEFINITIONS_PREFIXES: Final[tuple[str, ...]] = ("#/$defs/", "#/definitions/")
@@ -934,7 +979,9 @@ class _SchemaTranslation:
 
         match node.pop("allOf", None):
             case [single]:
-                node = {**self.translated(single), **node}
+                branch: Any = self.translated(single)
+                if isinstance(branch, Mapping):
+                    node = _combined(cast(Mapping[str, Any], branch), node)
 
             case None:
                 pass
@@ -998,6 +1045,22 @@ class _SchemaTranslation:
             return {**cast(Mapping[str, Any], resolved), "$anchor": name}
 
         return cast(Mapping[str, Any], resolved)
+
+
+def _combined(
+    branch: Mapping[str, Any],
+    node: Mapping[str, Any],
+    /,
+) -> dict[str, Any]:
+    # the node wins for annotations while properties and requirements of both apply
+    combined: dict[str, Any] = {**branch, **node}
+    if "properties" in branch and "properties" in node:
+        combined["properties"] = {**branch["properties"], **node["properties"]}
+
+    if "required" in branch and "required" in node:
+        combined["required"] = list(dict.fromkeys((*branch["required"], *node["required"])))
+
+    return combined
 
 
 def _definition_name(
