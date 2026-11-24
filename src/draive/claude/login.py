@@ -31,17 +31,27 @@ _LOCK_POLL: Final[float] = 0.05
 class ClaudeCodeLogins:
     """Resolves local Claude Code logins into access tokens and owns their refreshes.
 
-    Prepared by ``ClaudeCode`` for the scope it enters. Within it refreshes of a login are
-    serialized and an attempt which did not help is not repeated during a cooldown. Across
-    processes refreshes are serialized with a file lock, which coordinates draive processes
-    only - not an interactive Claude Code of the user.
+    Prepared by ``ClaudeCode`` for the scope it enters, which waits for the refreshes still in
+    flight when it exits. Within it refreshes of a login are serialized and an attempt which did
+    not help is not repeated during a cooldown. Across processes refreshes are serialized with a
+    file lock (``.login-refresh.lock`` in the configuration directory of the login, which has to
+    be writable), which coordinates draive processes only - not an interactive Claude Code of the
+    user.
+
+    A refresh runs on its own task: a run which is cancelled, or which stops waiting for it, does
+    not stop it, so a rotated refresh token is still written. A run whose token is still valid
+    waits for a refresh at most ``refresh_timeout`` and then goes on with that token, also when
+    the refresh failed; a run whose token has expired waits for the refresh to end.
 
     Parameters
     ----------
     lock_timeout
         Limit in seconds of waiting for the lock of another process.
     refresh_timeout
-        Limit in seconds of a single ``claude auth status`` refresh.
+        Limit in seconds of waiting for a refresh by a run whose token is still valid.
+    refresh_limit
+        Limit in seconds of a single ``claude auth status`` refresh, after which its process is
+        killed - only a refresh which hangs gets there.
     cooldown
         Time in seconds after a refresh which did not extend the token, in which no other refresh
         of the same login is attempted.
@@ -53,6 +63,7 @@ class ClaudeCodeLogins:
         "_cooldown",
         "_lock_timeout",
         "_locks",
+        "_refresh_limit",
         "_refresh_timeout",
     )
 
@@ -61,10 +72,12 @@ class ClaudeCodeLogins:
         *,
         lock_timeout: float = 30.0,
         refresh_timeout: float = 15.0,
+        refresh_limit: float = 120.0,
         cooldown: float = 60.0,
     ) -> None:
         self._lock_timeout: float = lock_timeout
         self._refresh_timeout: float = refresh_timeout
+        self._refresh_limit: float = refresh_limit
         self._cooldown: float = cooldown
         self._locks: dict[str, asyncio.Lock] = {}
         self._attempts: dict[str, float] = {}
@@ -93,6 +106,15 @@ class ClaudeCodeLogins:
 
             case ClaudeCodeApiKey() | ClaudeCodeOAuthToken():
                 pass
+
+    async def drain(self) -> None:
+        """Wait for the refreshes still in flight, so none is cut off when the scope ends.
+
+        Bounded by ``lock_timeout`` and ``refresh_limit`` of each refresh. Their failures were
+        reported to the runs which waited for them and are not raised again.
+        """
+        while self._background:
+            await asyncio.gather(*self._background, return_exceptions=True)
 
     async def resolve(
         self,
@@ -138,15 +160,7 @@ class ClaudeCodeLogins:
         path: str = _credentials_path(login)
         token: ClaudeCodeAccessToken = await asyncio.to_thread(_read_login, path)
         if _remaining(token) < login.refresh_margin:
-            key: str = await asyncio.to_thread(os.path.realpath, os.path.dirname(path))
-            # refreshing rotates the refresh token, it is not left half done when the caller is
-            # cancelled - the file would not get the new one - so it runs on its own task
-            task: asyncio.Task[ClaudeCodeAccessToken] = asyncio.ensure_future(
-                self._refreshed(login, key=key, binary=binary)
-            )
-            self._background.add(task)
-            task.add_done_callback(self._finished)
-            token = await asyncio.shield(task)
+            token = await self._refreshing(login, token, path=path, binary=binary)
 
         remaining: float = _remaining(token)
         if remaining <= 0:
@@ -159,6 +173,42 @@ class ClaudeCodeLogins:
             ctx.log_warning(
                 f"The access token of the Claude Code login expires in {remaining:.0f} seconds,"
                 " a run which outlives it fails"
+            )
+
+        return token
+
+    async def _refreshing(
+        self,
+        login: ClaudeCodeLocalLogin,
+        token: ClaudeCodeAccessToken,
+        /,
+        *,
+        path: str,
+        binary: str,
+    ) -> ClaudeCodeAccessToken:
+        key: str = await asyncio.to_thread(os.path.realpath, os.path.dirname(path))
+        # refreshing rotates the refresh token, it is not left half done when the caller is
+        # cancelled or stops waiting - the file would not get the new one - so it runs on its own
+        # task, which the scope waits for when it exits
+        task: asyncio.Task[ClaudeCodeAccessToken] = asyncio.ensure_future(
+            self._refreshed(login, key=key, binary=binary)
+        )
+        self._background.add(task)
+        task.add_done_callback(self._finished)
+        if _remaining(token) <= 0:
+            return await asyncio.shield(task)  # nothing to go on with, the refresh decides
+
+        try:
+            return await asyncio.wait_for(asyncio.shield(task), timeout=self._refresh_timeout)
+
+        except TimeoutError:
+            ctx.log_warning(
+                "Refreshing the Claude Code login takes too long, its current token is used"
+            )
+
+        except ClaudeCodeUnavailable as exc:
+            ctx.log_warning(
+                f"Refreshing the Claude Code login failed, its current token is used: {exc}"
             )
 
         return token
@@ -231,12 +281,13 @@ class ClaudeCodeLogins:
 
         try:
             # the exit code is not a verdict, the file is - it is read again
-            await asyncio.wait_for(process.wait(), timeout=self._refresh_timeout)
+            await asyncio.wait_for(process.wait(), timeout=self._refresh_limit)
 
         except TimeoutError:
-            ctx.log_warning("Refreshing the Claude Code login timed out")
+            ctx.log_warning("Refreshing the Claude Code login hangs, it is stopped")
 
         finally:
+            # only a hung refresh, or one torn down with its event loop, is still running here
             if process.returncode is None:
                 process.kill()
                 await process.wait()
@@ -400,7 +451,9 @@ def _load(
     except OSError as exc:
         return f"the credentials file of the login ({path}) can not be read: {exc.strerror}"
 
-    except ValueError:  # malformed JSON or encoding, the exceptions carry the content
+    # malformed JSON or encoding, or nesting deeper than the parser goes - the exceptions and the
+    # frames of the parser carry the content
+    except ValueError, RecursionError:
         return _malformed(path)
 
     return _access_token(content, path=path)

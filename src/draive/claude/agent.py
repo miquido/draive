@@ -20,7 +20,6 @@ from draive.claude.events import (
     ClaudeCodeToolUse,
 )
 from draive.claude.launch import build_launch
-from draive.claude.login import ClaudeCodeLogins
 from draive.claude.sessions import (
     ClaudeCodeNewSession,
     ClaudeCodeNoSession,
@@ -175,9 +174,7 @@ def claude_code_agent(
                 credential: ClaudeCodeResolvedCredential | Missing = (
                     Missing
                     if runner.credential is Missing
-                    else await (
-                        ClaudeCodeLogins() if runner.logins is Missing else runner.logins
-                    ).resolve(runner.credential, binary=runner.binary)
+                    else await runner.logins.resolve(runner.credential, binary=runner.binary)
                 )
                 stream = runner.running(
                     build_launch(

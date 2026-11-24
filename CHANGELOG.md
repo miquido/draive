@@ -10,10 +10,17 @@
   need a credential with the `user:mcp_servers` scope, a run with any other one fails with
   `ClaudeCodeUnavailable` instead of silently having no connector tools.
 - `ClaudeCodeLocalLogin`, a credential of a local Claude Code login (`claude /login`) read from
-  `<config directory>/.credentials.json` (not available on macOS, where logins are kept in the
-  keychain). A token about to expire is refreshed under a lock (it coordinates draive processes
-  only) through `claude auth status`; a run only gets a short-lived `ClaudeCodeAccessToken` and
-  cannot refresh it, so `refresh_margin` has to be longer than the longest run.
+  `<config_directory>/.credentials.json` (logins kept in the keychain (macOS) are not supported). A
+  token about to expire is refreshed under a lock file in `config_directory` (it coordinates draive
+  processes only) through `claude auth status`; a run only gets a short-lived
+  `ClaudeCodeAccessToken` and can not refresh it, so `refresh_margin` has to be longer than the
+  longest run. A run whose token is still valid waits for a refresh at most `refresh_timeout` and
+  goes on with its token, the `ClaudeCode` scope waits for refreshes still in flight when it exits.
+
+### Changed
+
+- `ClaudeCodeLaunch.credential` is now a `ClaudeCodeResolvedCredential`. New exports:
+  `ClaudeCodeAccessToken`, `ClaudeCodeResolvedCredential` and `ClaudeCodeConnectors`.
 
 ## 0.122.0
 

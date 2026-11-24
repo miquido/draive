@@ -36,6 +36,15 @@ def _credential(
     return value
 
 
+def _aware(
+    value: datetime,
+) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("A moment has to carry its timezone")
+
+    return value
+
+
 def _not_negative(
     value: float,
 ) -> float:
@@ -111,12 +120,12 @@ class ClaudeCodeAccessToken(State):
     scopes
         Scopes the token was granted, i.e. ``user:inference`` and ``user:mcp_servers``.
     expires_at
-        Moment the token expires, a run which outlives it fails.
+        Moment the token expires, timezone-aware, a run which outlives it fails.
     """
 
     value: Annotated[str, Sensitive(), Verifier(_credential)]
     scopes: Sequence[str]
-    expires_at: datetime
+    expires_at: Annotated[datetime, Verifier(_aware)]
 
     @property
     def descriptor(self) -> str:
@@ -139,8 +148,8 @@ class ClaudeCodeLocalLogin(State):
     ``claude /login`` on this machine, as the user the process runs as.
 
     It is a source of credentials, not a value: every run reads a short-lived access token from
-    the credentials file of the login (``<config_directory>/.credentials.json``, which is not
-    available on macOS, where logins are kept in the keychain). A token which is about to expire
+    the credentials file of the login (``<config_directory>/.credentials.json`` - logins kept in
+    the keychain, as on macOS, are not supported). A token which is about to expire
     is refreshed first through Claude Code itself (``claude auth status``), within a lock so
     only one draive process refreshes at a time - the lock does not coordinate with an
     interactive Claude Code of the user, which may refresh the same login. Whether ``claude auth

@@ -76,6 +76,7 @@ class ClaudeCode:
         "_base_url",
         "_binary",
         "_credential",
+        "_logins",
     )
 
     def __init__(
@@ -91,6 +92,7 @@ class ClaudeCode:
         self._credential: ClaudeCodeCredential | None = credential
         self._binary: str | None = binary
         self._base_url: str | None = base_url
+        self._logins: ClaudeCodeLogins | None = None
 
     def __repr__(self) -> str:
         return "ClaudeCode()"  # nothing of the credential
@@ -103,9 +105,10 @@ class ClaudeCode:
                 credential
             )  # fails at startup, the token is resolved per run
 
+        self._logins = ClaudeCodeLogins()
         return (
             ClaudeCodeRunner(
-                logins=ClaudeCodeLogins(),
+                logins=self._logins,
                 binary=_resolved_binary(self._binary),
                 running=run_process,
                 credential=credential,
@@ -119,7 +122,12 @@ class ClaudeCode:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        pass  # runs release their processes on their own
+        # runs release their processes on their own, refreshes of a login are waited for - one
+        # cut off by the end of the event loop could lose the rotated refresh token
+        if self._logins is not None:
+            logins: ClaudeCodeLogins = self._logins
+            self._logins = None
+            await logins.drain()
 
 
 def _environment_credential() -> ClaudeCodeCredential:

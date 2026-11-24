@@ -1,7 +1,7 @@
 from collections.abc import AsyncGenerator
 from typing import Protocol, final, runtime_checkable
 
-from haiway import Missing, State
+from haiway import Default, Missing, State
 
 from draive.claude.credentials import ClaudeCodeCredential
 from draive.claude.events import ClaudeCodeEvent
@@ -58,7 +58,8 @@ class ClaudeCodeRunner(State):
     credential
         The only credential of the runs, never part of the representation of the state.
     logins
-        Owner of the refreshes of local logins, prepared by ``ClaudeCode``.
+        Owner of the refreshes of local logins, prepared by ``ClaudeCode`` which waits for them
+        when its scope exits; a runner made without it gets its own.
     base_url
         Custom API endpoint, i.e. a gateway.
     """
@@ -66,5 +67,5 @@ class ClaudeCodeRunner(State):
     binary: str
     running: ClaudeCodeRunning
     credential: ClaudeCodeCredential | Missing = Missing
-    logins: ClaudeCodeLogins | Missing = Missing
+    logins: ClaudeCodeLogins = Default(factory=ClaudeCodeLogins)
     base_url: str | Missing = Missing
