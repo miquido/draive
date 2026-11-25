@@ -26,3 +26,6 @@ class AnthropicConfig(Configuration):
     # depth of both thinking and the answer itself
     effort: Literal["low", "medium", "high", "xhigh", "max"] | Missing = Missing
     stop_sequences: Sequence[str] | Missing = Missing
+    # time-to-live of a cache marker placed on the instructions, the cached prefix
+    # covers tool declarations and instructions; instructions are not cached when missing
+    instructions_cache: Literal["5m", "1h"] | Missing = Missing

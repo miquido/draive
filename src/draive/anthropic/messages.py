@@ -93,6 +93,7 @@ class AnthropicMessages(AnthropicAPI):
                 stop_sequences=config.stop_sequences,
                 thinking=config.thinking,
                 effort=config.effort,
+                instructions_cache=config.instructions_cache,
             )
 
             messages: list[MessageParam]
@@ -125,7 +126,10 @@ class AnthropicMessages(AnthropicAPI):
                 reasoning_block: str | None = None
                 async with self._client.messages.stream(
                     model=config.model,
-                    system=instructions if instructions else omit,
+                    system=_system(
+                        instructions,
+                        cache_ttl=config.instructions_cache,
+                    ),
                     messages=messages,
                     max_tokens=config.max_output_tokens,
                     thinking=_thinking_config(config.thinking),
@@ -646,6 +650,31 @@ def _content_elements(  # noqa: C901, PLR0912
     last_cacheable["cache_control"] = {  # pyright: ignore[reportGeneralTypeIssues]
         "type": cache_type,
     }
+
+
+def _system(
+    instructions: ModelInstructions,
+    /,
+    *,
+    cache_ttl: Literal["5m", "1h"] | Missing,
+) -> str | list[TextBlockParam] | Omit:
+    if not instructions:
+        return omit
+
+    if cache_ttl is Missing:
+        return instructions
+
+    # the marker caches the whole prefix up to it - tool declarations and instructions
+    return [
+        {
+            "type": "text",
+            "text": instructions,
+            "cache_control": {
+                "type": "ephemeral",
+                "ttl": cache_ttl,
+            },
+        }
+    ]
 
 
 def _output_config(

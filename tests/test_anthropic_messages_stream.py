@@ -20,10 +20,14 @@ from anthropic.types import (
     ThinkingDelta,
     ToolUseBlock,
 )
-from haiway import ctx
+from haiway import Missing, ctx
 
 from draive.anthropic.config import AnthropicConfig
-from draive.anthropic.messages import AnthropicMessages, _context_messages  # pyright: ignore[reportPrivateUsage]
+from draive.anthropic.messages import (
+    AnthropicMessages,
+    _context_messages,  # pyright: ignore[reportPrivateUsage]
+    _system,  # pyright: ignore[reportPrivateUsage]
+)
 from draive.models import (
     ModelInput,
     ModelOutput,
@@ -361,6 +365,33 @@ def test_cache_marker_lands_on_the_last_visible_element() -> None:
     assert "cache_control" not in content[0]
     assert content[1]["type"] == "image"
     assert content[1]["cache_control"] == {"type": "ephemeral"}
+
+
+@pytest.mark.parametrize(
+    ("instructions", "cache_ttl", "expected"),
+    (
+        ("", Missing, anthropic.omit),
+        ("", "1h", anthropic.omit),
+        ("be brief", Missing, "be brief"),
+        (
+            "be brief",
+            "1h",
+            [
+                {
+                    "type": "text",
+                    "text": "be brief",
+                    "cache_control": {"type": "ephemeral", "ttl": "1h"},
+                }
+            ],
+        ),
+    ),
+)
+def test_instructions_carry_cache_marker_only_when_configured(
+    instructions: str,
+    cache_ttl: Any,
+    expected: Any,
+) -> None:
+    assert _system(instructions, cache_ttl=cache_ttl) == expected
 
 
 @pytest.mark.parametrize(
