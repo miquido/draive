@@ -134,7 +134,7 @@ from draive.gemini import Gemini, GeminiConfig
 async def joke_with_claude() -> None:
     async with ctx.scope(
         "claude",
-        AnthropicConfig(model="claude-sonnet-5"),
+        AnthropicConfig(model="claude-sonnet-5-5"),
         disposables=(Anthropic(),),
     ):
         print(
@@ -148,7 +148,7 @@ async def joke_with_claude() -> None:
 async def joke_with_gemini() -> None:
     async with ctx.scope(
         "gemini",
-        GeminiConfig(model="gemini-2.5-flash"),
+        GeminiConfig(model="gemini-3.8-flash"),
         disposables=(Gemini(),),
     ):
         print(

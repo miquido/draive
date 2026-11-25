@@ -50,8 +50,9 @@ async with ctx.scope("app", OpenAIResponsesConfig(model="gpt-5.5"), disposables=
 - Defaults that bite: `AnthropicConfig.max_output_tokens=16384` and thinking consumes it (a small
   limit ends a turn without an answer); `GeminiConfig.temperature=1.0` and every Gemini safety
   category is **off** unless `safety=GeminiSafetyConfig(...)`; Mistral reasoning models need
-  `prompt_mode="reasoning"`; Ollama ones `thinking=...`; Bedrock takes an inline
-  `guardrail_identifier`/`guardrail_version` on `BedrockChatConfig`.
+  `prompt_mode="reasoning"` or `reasoning_effort=...`; Ollama ones `thinking=...`; Bedrock takes an
+  inline `guardrail_identifier`/`guardrail_version` on `BedrockChatConfig` and sends `temperature`
+  only when set.
 
 ### OpenAI strict structured output
 

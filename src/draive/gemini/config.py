@@ -40,8 +40,7 @@ class GeminiConfig(Configuration):
     speech_voice_name: str | Missing = Missing
     speech_language_code: str | Missing = Missing
     media_resolution: Literal["low", "medium", "high"] | Missing = Missing
-    thinking_budget: int | Missing = Missing
-    thinking_level: Literal["minimal", "low", "medium", "high"] | Missing = Missing
+    thinking_level: Literal["minimal", "low", "medium", "high", "xhigh"] | Missing = Missing
     context_window_compression: bool | Missing = Missing
     # live sessions only - disable server side voice activity detection to take
     # over turn segmentation through explicit ModelSessionEvent signals

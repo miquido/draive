@@ -108,6 +108,7 @@ def test_output_config_carries_effort_level() -> None:
 def test_thinking_config_maps_requested_mode() -> None:
     assert _thinking_config("adaptive") == {"type": "adaptive"}
     assert _thinking_config("disabled") == {"type": "disabled"}
+    assert _thinking_config("between_tools") == {"type": "between_tools"}
 
 
 def test_thinking_config_omitted_without_configuration() -> None:
@@ -123,6 +124,36 @@ def test_tools_none_selection_omits_declarations() -> None:
 
     assert tool_choice is omit
     assert tools is omit
+
+
+@pytest.mark.asyncio
+async def test_tools_required_selection_falls_back_to_auto() -> None:
+    async with ctx.scope("test"):
+        tool_choice, tools = _tools_as_tool_params(
+            selection="required",
+            specification=(
+                ModelToolSpecification.of(name="ping"),
+                ModelToolSpecification.of(name="pong"),
+            ),
+        )
+
+    assert tool_choice == {"type": "auto"}
+    assert tools is not omit
+    assert [tool["name"] for tool in tools] == ["ping", "pong"]
+
+
+@pytest.mark.asyncio
+async def test_tools_specific_selection_falls_back_to_auto() -> None:
+    pong = ModelToolSpecification.of(name="pong")
+    async with ctx.scope("test"):
+        tool_choice, tools = _tools_as_tool_params(
+            selection=pong,
+            specification=(ModelToolSpecification.of(name="ping"), pong),
+        )
+
+    assert tool_choice == {"type": "auto"}
+    assert tools is not omit
+    assert [tool["name"] for tool in tools] == ["ping", "pong"]
 
 
 @pytest.mark.asyncio
@@ -144,7 +175,7 @@ async def test_invalid_context_reports_the_rejection_reason() -> None:
                 ModelOutput.of(MultimodalContent.of("Paris is")),
             ),
             output="text",
-            config=AnthropicConfig(model="claude-opus-5"),
+            config=AnthropicConfig(model="claude-opus-5-5"),
         )
         with pytest.raises(ModelInputInvalid) as error:
             async for _ in stream:

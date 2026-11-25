@@ -87,7 +87,7 @@ async def test_text_embed_sends_cohere_body_without_model(
 ) -> None:
     async with _cohere_bedrock(aws_region="us-east-1") as client:
         response = await client.embed(
-            model="cohere.embed-english-v3",
+            model="cohere.embed-v4:0",
             texts=["a", "b"],
             embedding_types=["float"],
             input_type="search_document",
@@ -96,7 +96,7 @@ async def test_text_embed_sends_cohere_body_without_model(
     assert len(bedrock_runtime.requests) == 1
     request = bedrock_runtime.requests[0]
     # the model travels as a Bedrock argument, never inside the body
-    assert request["modelId"] == "cohere.embed-english-v3"
+    assert request["modelId"] == "cohere.embed-v4:0"
     assert request["contentType"] == "application/json"
 
     body = json.loads(request["body"])
@@ -115,7 +115,7 @@ async def test_text_embed_sends_cohere_body_without_model(
 async def test_image_embed_sends_images_body(bedrock_runtime: _FakeBedrockRuntime) -> None:
     async with _cohere_bedrock() as client:
         await client.embed(
-            model="cohere.embed-english-v3",
+            model="cohere.embed-v4:0",
             images=["data:image/jpeg;base64,QQ=="],
             embedding_types=["float"],
             input_type="image",
@@ -169,7 +169,7 @@ async def test_token_counts_are_read_from_bedrock_headers(
 ) -> None:
     async with _cohere_bedrock() as client:
         response = await client.embed(
-            model="cohere.embed-english-v3",
+            model="cohere.embed-v4:0",
             texts=["a"],
             input_type="search_document",
         )
@@ -190,7 +190,7 @@ async def test_response_without_identifier_is_accepted(monkeypatch: pytest.Monke
 
     async with _cohere_bedrock() as client:
         response = await client.embed(
-            model="cohere.embed-english-v3",
+            model="cohere.embed-v4:0",
             texts=["a"],
             input_type="search_document",
         )

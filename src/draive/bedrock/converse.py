@@ -452,9 +452,7 @@ def _request_parameters(
     parameters: dict[str, Any] = {
         "modelId": config.model,
         "messages": messages,
-        "inferenceConfig": {
-            "temperature": config.temperature,
-        },
+        "inferenceConfig": {},
     }
     if instructions:
         parameters["system"] = [{"text": instructions}]
@@ -464,6 +462,9 @@ def _request_parameters(
         tool_selection=tools.selection,
     ):
         parameters["toolConfig"] = tool_config
+
+    if config.temperature is not Missing:
+        parameters["inferenceConfig"]["temperature"] = config.temperature
 
     if config.max_output_tokens is not Missing:
         parameters["inferenceConfig"]["maxTokens"] = config.max_output_tokens

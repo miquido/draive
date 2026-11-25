@@ -1,14 +1,19 @@
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from haiway import Missing, ctx
+from mistralai.client import UNSET
 
 from draive.mistral.completions import (  # pyright: ignore[reportPrivateUsage]
+    MistralCompletions,
     _content_chunks,
     _image_mime_type,
     _response_format,
     _tools_as_tool_config,
 )
-from draive.models import ModelToolSpecification
+from draive.mistral.config import MistralChatConfig
+from draive.models import ModelTools, ModelToolSpecification
 from draive.multimodal import ArtifactContent, TextContent
 from draive.resources import ResourceContent, ResourceReference
 
@@ -181,3 +186,51 @@ def test_built_messages_are_materialized_and_serialize_identically_twice() -> No
 
     assert json.dumps(messages) == json.dumps(messages)
     assert len(json.dumps(messages)) > 100
+
+
+class _EmptyStream:
+    async def __aenter__(self) -> _EmptyStream:
+        return self
+
+    async def __aexit__(self, *_: Any) -> None:
+        return None
+
+    def __aiter__(self) -> _EmptyStream:
+        return self
+
+    async def __anext__(self) -> Any:
+        raise StopAsyncIteration
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("reasoning_effort", "expected"),
+    [
+        pytest.param(Missing, UNSET, id="unset"),
+        pytest.param("none", "none", id="none"),
+        pytest.param("high", "high", id="high"),
+    ],
+)
+async def test_reasoning_effort_reaches_the_request_only_when_set(
+    reasoning_effort: Any,
+    expected: Any,
+) -> None:
+    requests: list[dict[str, Any]] = []
+
+    async def _stream_async(**request: Any) -> _EmptyStream:
+        requests.append(request)
+        return _EmptyStream()
+
+    model = object.__new__(MistralCompletions)
+    model._client = SimpleNamespace(chat=SimpleNamespace(stream_async=_stream_async))  # pyright: ignore[reportPrivateUsage]
+    async with ctx.scope("test"):
+        async for _ in model.completion(
+            instructions="",
+            tools=ModelTools.none,
+            context=(),
+            output="text",
+            config=MistralChatConfig(model="mistral-test", reasoning_effort=reasoning_effort),
+        ):
+            pass
+
+    assert requests[0]["reasoning_effort"] == expected

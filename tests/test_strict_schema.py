@@ -415,5 +415,5 @@ def test_patterns_are_refused_where_strict_mode_does_not_support_them() -> None:
 def test_only_fine_tuned_models_drop_patterns() -> None:
     from draive.openai.responses import _follows_patterns  # pyright: ignore[reportPrivateUsage]
 
-    assert _follows_patterns("gpt-5-nano")
-    assert not _follows_patterns("ft:gpt-5-nano:org::abc")
+    assert _follows_patterns("gpt-6-luna")
+    assert not _follows_patterns("ft:gpt-6-luna:org::abc")

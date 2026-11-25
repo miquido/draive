@@ -295,7 +295,8 @@ async def preparing(
 - They are merged into the toolbox passed to the agent and **replace** provided tools using the same
     names, so prefix memory tool names to avoid shadowing agent tools by accident.
 - They participate in the toolbox suggestion strategy; with `Toolbox.of(..., suggesting=True)` the
-    model may be required to call one of them.
+    model may be required to call one of them (Anthropic only suggests it, see
+    [Tools](BasicToolsUse.md#4-use-toolbox-for-selection-strategy)).
 - Returning `None` or an empty sequence contributes nothing and leaves the toolbox untouched.
 - Requests and responses of prepared tools are part of the context passed to `remember`, so a stored
     turn may reference a tool that a later turn no longer offers. Keep tool names stable, or drop

@@ -87,6 +87,11 @@ result = await TextGeneration.generate(
 )
 ```
 
+A suggestion forces the tool call where the provider supports it. Claude Fable 5.2, Opus 5.5 and
+Sonnet 5.5 reject a forced tool choice, so the Anthropic adapter falls back to automatic selection
+for every Claude model, logs a warning, and leaves the call to the model. Name the tool in the
+instructions when the call matters.
+
 ## 5. Advanced Tool Behavior
 
 `@tool(...)` supports:

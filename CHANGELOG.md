@@ -106,9 +106,28 @@
   `ClaudeCodeAuthenticationFailed` and `ClaudeCodeLoginUnusable` extend them.
 - `MCP_CONNECTION_NONBLOCKING` is a reserved environment variable of runs, a configuration setting
   it in `env` or `inherit_env` is refused.
+- Provider model support moves to the current generations (OpenAI GPT 5.0+, Claude 5.0+, Gemini 4
+  and `gemini-3.8-flash`): model name `Literal`s of `OpenAIResponsesConfig` (gpt-6.x, gpt-5.4+),
+  `OpenAIRealtimeConfig` and `AnthropicConfig` list the current models only.
+- `OpenAIResponsesConfig.reasoning` accepts `"minimal"`. **Breaking:**
+  `OpenAIImageGenerationConfig.model` defaults to `gpt-image-2.6-sunburst` (the gpt-image-1 family
+  shuts down on 2026-12-01).
+- `AnthropicConfig.thinking` accepts `"between_tools"`.
+- `GeminiConfig.thinking_level` accepts `"xhigh"`. **Breaking:** `GeminiConfig.thinking_budget` is
+  removed, use `thinking_level`.
+- `MistralChatConfig.reasoning_effort` (`none`, `low`, `medium`, `high`) is sent with the request
+  when set.
+- **Breaking:** `BedrockChatConfig.temperature` defaults to `Missing` and is sent only when set
+  (it was always sent as `1.0`).
+- **Breaking:** Anthropic falls back to automatic tool selection, with a warning, when a tool call
+  is required or a specific tool is selected - Claude Fable 5.2, Opus 5.5 and Sonnet 5.5 reject a
+  forced `tool_choice`, the fallback applies to every model alike. A toolbox suggestion no longer
+  guarantees a tool call on Anthropic.
 
 ### Fixed
 
+- Completion-based decisions list options as `<option identifier="...">description</option>`, a
+  `- id: description` listing made models answer with the whole line and fail the decision.
 - SurrealDB field definitions keep their types under haiway 0.67.0: they follow the attributes as
   haiway resolves them - type aliases, forward references and tuples included - instead of the JSON
   schema of a State, which no longer tells a `datetime` or a `bool` apart. An attribute which can

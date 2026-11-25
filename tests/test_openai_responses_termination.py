@@ -81,7 +81,7 @@ async def _consume(model: OpenAIResponses) -> list[Any]:
             tools=ModelTools.none,
             context=(),
             output="text",
-            config=OpenAIResponsesConfig(model="gpt-5", max_output_tokens=16),
+            config=OpenAIResponsesConfig(model="gpt-6.2-sol", max_output_tokens=16),
         )
         return [chunk async for chunk in stream]
 
@@ -145,7 +145,7 @@ async def test_requests_are_never_stored_and_carry_encrypted_reasoning() -> None
             tools=ModelTools.none,
             context=(),
             output="text",
-            config=OpenAIResponsesConfig(model="gpt-5"),
+            config=OpenAIResponsesConfig(model="gpt-6.2-sol"),
         ):
             pass
 
@@ -178,7 +178,7 @@ async def test_custom_base_url_omits_unsupported_include() -> None:
             tools=ModelTools.none,
             context=(),
             output="text",
-            config=OpenAIResponsesConfig(model="gpt-5"),
+            config=OpenAIResponsesConfig(model="gpt-6.2-sol"),
         ):
             pass
 

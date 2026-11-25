@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import Any, cast, overload
+from typing import Any, Literal, cast, overload
 
 from google.genai.errors import APIError
 from google.genai.types import SpeechConfigDict, ThinkingConfigDict, ThinkingLevel
@@ -115,24 +115,17 @@ def thinking_config(
     config: GeminiConfig,
     /,
 ) -> ThinkingConfigDict | None:
-    # thinking level is the current API, thinking budget is kept for older models
-    if config.thinking_level is not Missing:
-        return {
-            "include_thoughts": True,
-            "thinking_level": _resolve_thinking_level(config.thinking_level),
-        }
+    if config.thinking_level is Missing:
+        return None
 
-    if config.thinking_budget is not Missing and config.thinking_budget != 0:
-        return {
-            "include_thoughts": True,
-            "thinking_budget": config.thinking_budget,
-        }
-
-    return None
+    return {
+        "include_thoughts": True,
+        "thinking_level": _resolve_thinking_level(config.thinking_level),
+    }
 
 
 def _resolve_thinking_level(
-    level: str,
+    level: Literal["minimal", "low", "medium", "high", "xhigh"],
     /,
 ) -> ThinkingLevel:
     match level:
@@ -148,8 +141,8 @@ def _resolve_thinking_level(
         case "high":
             return ThinkingLevel.HIGH
 
-        case _:
-            raise ValueError(f"Unsupported thinking level: {level}")
+        case "xhigh":
+            return ThinkingLevel.XHIGH
 
 
 def quota_limit(error: APIError) -> int | None:

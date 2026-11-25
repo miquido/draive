@@ -20,7 +20,7 @@ uv run tools/evals/verify_evaluator.py \
 # Pin a specific model and raise concurrency.
 uv run tools/evals/verify_evaluator.py \
     --provider anthropic \
-    --model claude-sonnet-4-5 \
+    --model claude-sonnet-5-5 \
     --baseline path/to/coherence_real.yaml \
     --concurrency 8
 

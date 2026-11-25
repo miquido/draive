@@ -36,16 +36,16 @@ uv run generate_instruction.py --provider openai "Create a function to validate 
 echo "Write unit tests for authentication" | uv run generate_instruction.py --provider openai
 
 # With custom model:
-uv run generate_instruction.py --provider anthropic --model claude-sonnet-4-20250514 "Custom task"
+uv run generate_instruction.py --provider anthropic --model claude-sonnet-5-5 "Custom task"
 
 # Injecting guardrails/guidelines:
 uv run generate_instruction.py --provider openai --guidelines "Prefer Python" "Port legacy pipeline"
 
 SUPPORTED PROVIDERS:
 -------------------
-- Anthropic: Uses Claude 3.5 models for instruction generation (default: claude-sonnet-4-20250514)
-- OpenAI: Uses GPT-5 models for instruction generation (default: gpt-5-mini)
-- Gemini: Uses Gemini 2.x models for instruction generation (default: gemini-2.0-flash)
+- Anthropic: Uses Claude 5 models for instruction generation (default: claude-sonnet-5-5)
+- OpenAI: Uses GPT-6 models for instruction generation (default: gpt-6-luna)
+- Gemini: Uses Gemini 3.8 models for instruction generation (default: gemini-3.8-flash)
 
 OUTPUT:
 -------
@@ -92,21 +92,21 @@ PROVIDERS: dict[str, ProviderSpec] = {
     "anthropic": ProviderSpec(
         key="anthropic",
         display_name="Anthropic",
-        default_model="claude-sonnet-4-20250514",
+        default_model="claude-sonnet-5-5",
         config_factory=lambda model: AnthropicConfig(model=model),
         disposable_factory=Anthropic,
     ),
     "openai": ProviderSpec(
         key="openai",
         display_name="OpenAI",
-        default_model="gpt-5-mini",
+        default_model="gpt-6-luna",
         config_factory=lambda model: OpenAIResponsesConfig(model=model),
         disposable_factory=OpenAI,
     ),
     "gemini": ProviderSpec(
         key="gemini",
         display_name="Gemini",
-        default_model="gemini-2.0-flash",
+        default_model="gemini-3.8-flash",
         config_factory=lambda model: GeminiConfig(model=model),
         disposable_factory=Gemini,
     ),
@@ -151,7 +151,7 @@ Examples:
   uv run generate_instruction.py --provider openai "Create a function to validate email addresses"
   echo "Write unit tests" | uv run generate_instruction.py --provider openai
   uv run generate_instruction.py --provider gemini "Explain machine learning concepts"
-  uv run generate_instruction.py --provider openai --model gpt-5 "Complex coding task"
+  uv run generate_instruction.py --provider openai --model gpt-6-luna "Complex coding task"
   uv run generate_instruction.py --provider anthropic --guidelines "Prefer TypeScript" "Ship auth flow"
         """.strip(),  # noqa: E501
     )

@@ -175,7 +175,7 @@ class _MockClient:
 
 def _realtime_config() -> OpenAIRealtimeConfig:
     return OpenAIRealtimeConfig(
-        model="gpt-realtime",
+        model="gpt-realtime-2.1",
         input_parameters={"format": {"type": "audio/pcm", "rate": 24000}},
         output_parameters={"format": {"type": "audio/pcm", "rate": 24000}, "voice": "alloy"},
     )

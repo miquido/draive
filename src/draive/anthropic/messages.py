@@ -675,7 +675,7 @@ def _output_config(
 
 
 def _thinking_config(
-    thinking: Literal["adaptive", "disabled"] | Missing,
+    thinking: Literal["adaptive", "between_tools", "disabled"] | Missing,
     /,
 ) -> ThinkingConfigParam | Omit:
     # thinking is adaptive unless requested otherwise, omitting it keeps that default
@@ -683,10 +683,15 @@ def _thinking_config(
     if thinking is Missing:
         return omit
 
-    if thinking == "disabled":
-        return {"type": "disabled"}
+    match thinking:
+        case "disabled":
+            return {"type": "disabled"}
 
-    return {"type": "adaptive"}
+        case "between_tools":
+            return {"type": "between_tools"}
+
+        case "adaptive":
+            return {"type": "adaptive"}
 
 
 def _tools_as_tool_params(
@@ -729,17 +734,25 @@ def _tools_as_tool_params(
                 tool_params,
             )
 
+        # Claude Fable 5.2, Opus 5.5 and Sonnet 5.5 reject a forced tool choice, both `any` and
+        # `tool` - every model falls back to `auto` alike, leaving the call to the model, and the
+        # declared tools stay the same on each turn so the cached prompt prefix is kept
         case "required":
+            ctx.log_warning(
+                "Anthropic does not support a required tool call, falling back to automatic"
+                " tool selection"
+            )
             return (
-                {"type": "any"},
+                {"type": "auto"},
                 tool_params,
             )
 
-        case specific_tool:
+        case _:
+            ctx.log_warning(
+                "Anthropic does not support forcing a specific tool, falling back to automatic"
+                " tool selection"
+            )
             return (
-                {
-                    "type": "tool",
-                    "name": specific_tool.name,
-                },
+                {"type": "auto"},
                 tool_params,
             )

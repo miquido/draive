@@ -16,17 +16,32 @@ __all__ = (
 class OpenAIResponsesConfig(Configuration):
     model: (
         Literal[
-            "gpt-5.6-terra",
+            "gpt-6.2-astra",
+            "gpt-6.2-sol",
+            "gpt-6.1-sol",
+            "gpt-6.1-terra",
+            "gpt-6-luna",
+            "gpt-6-astra",
+            "gpt-6-sol",
             "gpt-5.6-sol",
+            "gpt-5.6-terra",
             "gpt-5.6-luna",
             "gpt-5.5",
+            "gpt-5.5-pro",
+            "gpt-5.4",
+            "gpt-5.4-mini",
+            "gpt-5.4-pro",
         ]
         | str
     )
     vision_details: Literal["auto", "low", "high"] = "auto"
     verbosity: Literal["low", "medium", "high"] | Missing = Missing
-    # "max" requires the gpt-5.6 generation, older models stop at "xhigh"
-    reasoning: Literal["none", "low", "medium", "high", "xhigh", "max"] | Missing = Missing
+    # accepted values are model dependent, the api names the supported ones when rejecting -
+    # "max" is available from the gpt-5.6 generation, "minimal" only on some models (gpt-6 Luna
+    # and gpt-5.4 mini reject it), and gpt-6 Astra, 6.1 Sol and 6.2 Astra/Sol reject "none"
+    reasoning: Literal["none", "minimal", "low", "medium", "high", "xhigh", "max"] | Missing = (
+        Missing
+    )
     reasoning_summary: Literal["auto", "concise", "detailed"] = "auto"
     # scope of the reasoning carried into a turn, the default differs between model
     # generations - gpt-5.6 uses "all_turns" where gpt-5.5 uses "current_turn"
@@ -48,9 +63,6 @@ class OpenAIRealtimeConfig(Configuration):
             "gpt-realtime-2.1",
             "gpt-realtime-2.1-mini",
             "gpt-realtime-2",
-            "gpt-realtime-1.5",
-            "gpt-realtime",
-            "gpt-realtime-mini",
         ]
         | str
     ) = "gpt-realtime-2.1"
@@ -69,9 +81,15 @@ class OpenAIEmbeddingConfig(Configuration):
 class OpenAIImageGenerationConfig(Configuration):
     # gpt-image models always return base64 encoded content in the requested output format,
     # `response_format` and `style` are not available for them
-    model: Literal["gpt-image-1", "gpt-image-1-mini", "gpt-image-1.5", "gpt-image-2"] | str = (
-        "gpt-image-1"
-    )
+    model: (
+        Literal[
+            "gpt-image-2.6-sunburst",
+            "gpt-image-2.6-flare",
+            "gpt-image-2.5-sunburst",
+            "gpt-image-2.5-flare",
+        ]
+        | str
+    ) = "gpt-image-2.6-sunburst"
     quality: Literal["auto", "low", "medium", "high"] = "auto"
     size: Literal["auto", "1024x1024", "1536x1024", "1024x1536"] = "auto"
     background: Literal["auto", "transparent", "opaque"] = "auto"

@@ -77,9 +77,9 @@ async def _run(
         responses=SimpleNamespace(stream=lambda **_: _Stream(events, failure=failure))
     )
     config = (
-        OpenAIResponsesConfig(model="gpt-5")
+        OpenAIResponsesConfig(model="gpt-6.2-sol")
         if max_output_tokens is None
-        else OpenAIResponsesConfig(model="gpt-5", max_output_tokens=max_output_tokens)
+        else OpenAIResponsesConfig(model="gpt-6.2-sol", max_output_tokens=max_output_tokens)
     )
     async with ctx.scope("test"):
         return [
@@ -269,7 +269,7 @@ async def test_usage_is_recorded(monkeypatch: pytest.MonkeyPatch) -> None:
     assert recorded == [
         {
             "provider": "openai",
-            "model": "gpt-5",
+            "model": "gpt-6.2-sol",
             "input_tokens": 5,
             "cached_input_tokens": 2,
             "output_tokens": 7,
@@ -340,7 +340,7 @@ async def test_unsupported_context_is_reported_as_input_failure() -> None:
                         ),
                     ),
                     output="text",
-                    config=OpenAIResponsesConfig(model="gpt-5"),
+                    config=OpenAIResponsesConfig(model="gpt-6.2-sol"),
                 )
             ]
 

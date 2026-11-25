@@ -332,3 +332,25 @@ def test_stop_sequences_reach_the_request_only_when_given(
     )
 
     assert parameters["inferenceConfig"].get("stopSequences") == expected
+
+
+@pytest.mark.parametrize(
+    ("temperature", "expected"),
+    [
+        pytest.param(Missing, None, id="unset"),
+        pytest.param(0.0, 0.0, id="zero"),
+        pytest.param(0.4, 0.4, id="given"),
+    ],
+)
+def test_temperature_reaches_the_request_only_when_given(
+    temperature: Any,
+    expected: float | None,
+) -> None:
+    parameters = _request_parameters(
+        instructions="system",
+        messages=[],
+        tools=ModelTools.none,
+        config=BedrockChatConfig(model="bedrock-test", temperature=temperature),
+    )
+
+    assert parameters["inferenceConfig"].get("temperature") == expected
