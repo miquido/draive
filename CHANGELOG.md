@@ -101,12 +101,13 @@
 
 ### Fixed
 
-- SurrealDB field definitions keep their types under haiway 0.66.0: a `datetime` attribute is a
-  `datetime` field and a `bool` one a `bool` field, also within optionals and sequences, taken from
-  the annotations as the schema of a State no longer tells them apart. An attribute which can be
-  `Missing` is an `option`, as a missing value is left out of the record.
+- SurrealDB field definitions keep their types under haiway 0.66.0: they follow the attributes as
+  haiway resolves them - type aliases, forward references and tuples included - instead of the JSON
+  schema of a State, which no longer tells a `datetime` or a `bool` apart. An attribute which can
+  be `Missing` is an `option`, as a missing value is left out of the record.
 - An MCP tool whose input schema has a closed tuple without `minItems` and `maxItems` loads again:
-  the length of the tuple is stated, every position required.
+  the length of the tuple is stated - every position required unless the schema says otherwise, and
+  no more items than positions.
 - Bedrock Converse requests leave out `stopSequences` when none are configured - every request
   without them carried the unset value and was refused by botocore before it was sent.
 

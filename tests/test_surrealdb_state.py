@@ -1,11 +1,11 @@
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 from types import TracebackType
-from typing import Any, cast
+from typing import Annotated, Any, Literal, cast
 from uuid import UUID
 
 import pytest
-from haiway import AttributeRequirement, Missing, Pagination, State, ctx
+from haiway import AttributeRequirement, Missing, Pagination, State, Validator, ctx
 from surrealdb import RecordID, Table
 
 from draive.surreal.schema import surreal_field_definitions
@@ -689,3 +689,53 @@ def test_surrealdb_field_definitions_take_datetimes_and_bools_from_annotations()
         "DEFINE FIELD IF NOT EXISTS flag ON TABLE _Timestamps TYPE bool;",
         "DEFINE FIELD IF NOT EXISTS maybe ON TABLE _Timestamps TYPE option<bool>;",
     )
+
+
+type _Stamp = datetime
+
+
+class _Inner(State):
+    value: int
+
+
+def _self_referencing() -> type[State]:
+    # defined within a function, its forward reference resolves within the function only
+    class _Node(State):
+        inner: _Inner
+        parent: _Node | None = None
+
+    return _Node
+
+
+def test_surrealdb_field_definitions_follow_the_resolved_attributes() -> None:
+    class _Shapes(State):
+        stamps: tuple[datetime, ...] = ()
+        alias: _Stamp | None = None
+        pair: tuple[int, str] = (0, "")
+        choice: Literal["a", "b"] = "a"
+        number: Literal[1, 2] = 1
+        checked: Annotated[int, Validator(_positive)] = 1
+        unique: frozenset[int] = frozenset()
+        identifier: UUID | Missing = Missing
+        mixed: int | str = 0
+
+    assert surreal_field_definitions(_Shapes) == (
+        "DEFINE FIELD IF NOT EXISTS stamps ON TABLE _Shapes TYPE array<datetime>;",
+        "DEFINE FIELD IF NOT EXISTS alias ON TABLE _Shapes TYPE option<datetime>;",
+        "DEFINE FIELD IF NOT EXISTS pair ON TABLE _Shapes TYPE array;",
+        "DEFINE FIELD IF NOT EXISTS choice ON TABLE _Shapes TYPE string;",
+        "DEFINE FIELD IF NOT EXISTS number ON TABLE _Shapes TYPE int;",
+        "DEFINE FIELD IF NOT EXISTS checked ON TABLE _Shapes TYPE int;",
+        "DEFINE FIELD IF NOT EXISTS unique ON TABLE _Shapes TYPE array<int>;",
+        "DEFINE FIELD IF NOT EXISTS identifier ON TABLE _Shapes TYPE option<string>;",
+        "DEFINE FIELD IF NOT EXISTS mixed ON TABLE _Shapes TYPE any;",
+    )
+    assert surreal_field_definitions(_self_referencing(), table="node") == (
+        "DEFINE FIELD IF NOT EXISTS inner ON TABLE node TYPE object FLEXIBLE;",
+        "DEFINE FIELD IF NOT EXISTS parent ON TABLE node TYPE option<object> FLEXIBLE;",
+    )
+
+
+def _positive(value: int) -> None:
+    if value < 0:
+        raise ValueError("negative")

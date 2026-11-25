@@ -323,6 +323,8 @@ def test_mcp_tool_parameters_translate_composition_keywords() -> None:
         pytest.param({}, (2, 2), id="counts_left_out"),
         pytest.param({"minItems": 1}, (1, 2), id="minimum_kept"),
         pytest.param({"minItems": 2, "maxItems": 2}, (2, 2), id="counts_stated"),
+        pytest.param({"maxItems": 5}, (2, 2), id="maximum_above_the_positions"),
+        pytest.param({"minItems": 1, "maxItems": 5}, (1, 2), id="range_above_the_positions"),
     ],
 )
 def test_mcp_tool_parameters_state_the_length_of_closed_tuples(

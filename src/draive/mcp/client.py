@@ -908,8 +908,13 @@ def _counted_tuple(
         return translated
 
     length: int = len(cast(list[Any], items))
-    translated.setdefault("maxItems", length)
-    translated.setdefault("minItems", translated["maxItems"])
+    # a closed tuple holds no more than its positions, whatever the schema allows
+    maximum: Any = translated.get("maxItems")
+    translated["maxItems"] = min(maximum, length) if isinstance(maximum, int) else length
+    minimum: Any = translated.get("minItems")
+    translated["minItems"] = (
+        min(minimum, translated["maxItems"]) if isinstance(minimum, int) else length
+    )
     return translated
 
 
