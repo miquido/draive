@@ -866,7 +866,7 @@ def _tool_parameters(
                 {
                     "name": name,
                     "parameters": {
-                        **_SchemaTranslation(input_schema).translated_arguments(),
+                        **_counted_tuples(_SchemaTranslation(input_schema).translated_arguments()),
                         "additionalProperties": False,
                     },
                 },
@@ -895,6 +895,49 @@ _STRUCTURAL_KEYWORDS: Final[frozenset[str]] = frozenset(
     ("additionalProperties", "enum", "items", "prefixItems", "properties", "required", "type")
 )
 _ANCHOR_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[A-Za-z_][-A-Za-z0-9._]*$")
+
+
+def _counted_tuples(
+    value: Any,
+    /,
+) -> Any:
+    # applied to the composed schema, after references were inlined and their siblings merged -
+    # a count derived before would conflict with the bounds stated next to a reference
+    match value:
+        case dict():
+            return _counted_tuple(
+                {key: _counted_tuples(item) for key, item in cast(dict[str, Any], value).items()}
+            )
+
+        case list():
+            return [_counted_tuples(item) for item in cast(list[Any], value)]
+
+        case _:
+            return value
+
+
+def _counted_tuple(
+    translated: dict[str, Any],
+    /,
+) -> dict[str, Any]:
+    # a closed tuple of the specification states its length, a schema may leave it out - every
+    # position is required then, a tool takes all of its arguments
+    items: Any = translated.get("prefixItems")
+    if translated.get("items") is not False or not isinstance(items, list):
+        return translated
+
+    length: int = len(cast(list[Any], items))
+    # a closed tuple holds no more than its positions, whatever the schema allows
+    maximum: Any = translated.get("maxItems")
+    translated["maxItems"] = min(maximum, length) if isinstance(maximum, int) else length
+    minimum: Any = translated.get("minItems")
+    if isinstance(minimum, int) and minimum > translated["maxItems"]:
+        # no array satisfies the schema, a tool which can not be called is refused
+        raise _UnsupportedSchema(f"a closed tuple of {length} positions requires {minimum} items")
+
+    # every position is required unless the schema states a smaller count
+    translated["minItems"] = minimum if isinstance(minimum, int) else translated["maxItems"]
+    return translated
 
 
 @final

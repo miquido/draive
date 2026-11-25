@@ -20,6 +20,8 @@ class MistralChatConfig(Configuration):
     # reasoning models require explicitly requesting the reasoning prompt
     # mode to produce and report their thinking
     prompt_mode: Literal["reasoning"] | Missing | None = Missing
+    # accepted values are model dependent, the request is rejected for unsupported ones
+    reasoning_effort: Literal["none", "low", "medium", "high"] | Missing = Missing
 
 
 class MistralEmbeddingConfig(Configuration):

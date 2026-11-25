@@ -15,7 +15,7 @@ export UV_PYTHON
 endif
 
 ifndef UV_VERSION
-	UV_VERSION := 0.13.9
+	UV_VERSION := 0.13.10
 endif
 
 .PHONY: uv_check venv sync update format lint test docs docs-server docs-format docs-lint release

@@ -19,7 +19,7 @@ def _validate_converse_parameters(
     # botocore validates the request parameters locally, before any network access
     operation = get_session().get_service_model("bedrock-runtime").operation_model("Converse")
     parameters: dict[str, Any] = {
-        "modelId": "anthropic.claude-3-5-sonnet-20240620-v1:0",
+        "modelId": "us.anthropic.claude-sonnet-5-5",
         "messages": [{"role": "user", "content": [{"text": "hello"}]}],
     }
     if tool_config:
@@ -118,7 +118,7 @@ def test_tool_request_arguments_pass_validation() -> None:
     operation = get_session().get_service_model("bedrock-runtime").operation_model("Converse")
     validate_parameters(
         {
-            "modelId": "anthropic.claude-3-5-sonnet-20240620-v1:0",
+            "modelId": "us.anthropic.claude-sonnet-5-5",
             "messages": messages,
         },
         operation.input_shape,

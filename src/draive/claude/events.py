@@ -2,7 +2,7 @@ import json
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Final, Literal, cast, final
 
-from haiway import BasicValue, State
+from haiway import BasicValue, Default, State
 
 __all__ = (
     "ClaudeCodeDelta",
@@ -119,7 +119,7 @@ class ClaudeCodeToolUse(State):
 
     identifier: str
     tool: str
-    arguments: Mapping[str, BasicValue] = {}
+    arguments: Mapping[str, BasicValue] = Default(factory=dict[str, BasicValue])
     parent: str | None = None
 
 

@@ -105,7 +105,7 @@ Draive library comes with optional integrations to 3rd party services:
 
 - OpenAI:
 
-Use OpenAI services client, including GPT, dall-e and embedding. Allows to use Azure services as
+Use OpenAI services client, including GPT, gpt-image and embedding. Allows to use Azure services as
 well.
 
 ```bash

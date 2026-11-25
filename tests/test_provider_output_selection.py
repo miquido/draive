@@ -1,5 +1,7 @@
 """Unsupported output modalities have to fail instead of silently answering with text."""
 
+from datetime import datetime
+from functools import partial
 from typing import Any
 
 import pytest
@@ -44,7 +46,7 @@ def _anthropic(output: ModelOutputSelection) -> Any:
 
 # every provider entry point resolving a requested output selection
 CONVERTERS = (
-    _text_output,
+    partial(_text_output, patterns=True),
     _anthropic,
     _gemini_output_config,
     _mistral_response_format,
@@ -99,7 +101,7 @@ class TestOpenAIJsonOutput:
         class Example(State, serializable=True):
             name: str
 
-        config = _text_output(Example)
+        config = _text_output(Example, patterns=True)
 
         assert not isinstance(config, Omit)
         assert config["format"]["type"] == "json_schema"
@@ -107,10 +109,23 @@ class TestOpenAIJsonOutput:
     def test_a_schema_less_selection_requests_no_format(self) -> None:
         # json_object requires the word "json" within the input itself, which
         # cannot be satisfied without synthesizing content into the request
-        assert isinstance(_text_output("json"), Omit)
+        assert isinstance(_text_output("json", patterns=True), Omit)
+
+    def test_a_fine_tuned_model_gets_a_patterned_schema_unenforced(self) -> None:
+        # strict mode of a fine-tuned model has no `pattern`, the schema goes as a hint
+        class Timed(State, serializable=True):
+            moment: datetime
+
+        enforced = _text_output(Timed, patterns=True)
+        hinted = _text_output(Timed, patterns=False)
+
+        assert not isinstance(enforced, Omit)
+        assert not isinstance(hinted, Omit)
+        assert enforced["format"]["strict"] is True  # pyright: ignore[reportTypedDictNotRequiredAccess, reportGeneralTypeIssues]
+        assert hinted["format"]["strict"] is False  # pyright: ignore[reportTypedDictNotRequiredAccess, reportGeneralTypeIssues]
 
     def test_a_schema_less_selection_still_carries_verbosity(self) -> None:
-        config = _text_output("json", verbosity="low")
+        config = _text_output("json", verbosity="low", patterns=True)
 
         assert not isinstance(config, Omit)
         assert config == {"verbosity": "low"}

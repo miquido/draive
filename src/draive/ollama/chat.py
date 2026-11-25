@@ -32,6 +32,7 @@ from draive.ollama.api import OllamaAPI
 from draive.ollama.config import OllamaChatConfig
 from draive.ollama.utils import unwrap_missing
 from draive.resources import ResourceContent, ResourceReference
+from draive.utils.schema import written_format
 
 __all__ = ("OllamaChat",)
 
@@ -456,6 +457,23 @@ def _normalize_schema_for_ollama(schema: Mapping[str, Any]) -> tuple[dict[str, A
     disallowed_root_keys: set[str] = {"$schema", "$id", "$anchor"}
     changed: bool = any(key in schema for key in disallowed_root_keys)
 
+    match schema.get("anyOf"):
+        case [*alternatives] if len(
+            present := [item for item in alternatives if item != {"type": "null"}]
+        ) == 1 and len(present) != len(alternatives):
+            # an optional value is guided by its present type alone, the same as a nullable
+            # scalar collapses to its type
+            optional_schema, _ = _normalize_schema_for_ollama(
+                {
+                    **present[0],
+                    **({"description": schema["description"]} if "description" in schema else {}),
+                }
+            )
+            return optional_schema, True
+
+        case _:
+            pass
+
     schema_type: Any = schema.get("type")
 
     if isinstance(schema_type, Sequence) and not isinstance(schema_type, str | bytes):
@@ -517,7 +535,8 @@ def _normalize_schema_for_ollama(schema: Mapping[str, Any]) -> tuple[dict[str, A
     if schema_type == "array" or "items" in schema or "prefixItems" in schema:
         normalized_schema = {"type": "array"}
 
-        if "items" in schema:
+        # a closed tuple states `items` of `false` next to its `prefixItems`
+        if isinstance(schema.get("items"), Mapping):
             item_schema, item_changed = _normalize_schema_for_ollama(schema["items"])
             if item_schema is not None:
                 normalized_schema["items"] = item_schema
@@ -561,11 +580,29 @@ def _normalize_schema_for_ollama(schema: Mapping[str, Any]) -> tuple[dict[str, A
         if isinstance(enum_value, Sequence) and not isinstance(enum_value, str | bytes):
             normalized_schema["enum"] = list(cast(Sequence[Any], enum_value))
 
+        description: str | None = (
+            schema["description"] if isinstance(schema.get("description"), str) else None
+        )
         if schema_type == "string" and isinstance(schema.get("format"), str):
             normalized_schema["format"] = schema["format"]
 
-        if isinstance(schema.get("description"), str):
-            normalized_schema["description"] = schema["description"]
+        # a pattern is not followed reliably and a complex one fails the request, the spelling
+        # haiway states with it is named instead - as a format where Ollama has one for it
+        if schema_type == "string" and isinstance(pattern := schema.get("pattern"), str):
+            changed = True
+            match written_format(pattern):
+                case "date-time" | "time" as spelling if "format" not in normalized_schema:
+                    normalized_schema["format"] = spelling
+
+                case "duration":
+                    hint: str = "ISO 8601 duration, e.g. PT45M"
+                    description = f"{description} ({hint})" if description else hint
+
+                case _:
+                    pass
+
+        if description:
+            normalized_schema["description"] = description
 
         return normalized_schema, changed
 

@@ -38,9 +38,10 @@ _DROPPED_KEYWORDS: Final[frozenset[str]] = frozenset(
     )
 )
 # Every keyword a model or tool declaration can produce, except the ones strict mode
-# has no equivalent for - `prefixItems`, where a tuple needs `items` of `false`, and
+# has no equivalent for - `prefixItems`, where a tuple needs `items` of `false`,
 # `$anchor`/`$ref`, where a reference resolves only against a `$defs` entry while a
-# recursive type produces an inline anchor. Anything outside of this makes the schema
+# recursive type produces an inline anchor, and `propertyNames` of a mapping keyed by
+# a UUID or an enum. Anything outside of this makes the schema
 # untranslatable instead of being passed through into a rejected request.
 _ALLOWED_KEYWORDS: Final[frozenset[str]] = frozenset(
     (
@@ -50,6 +51,7 @@ _ALLOWED_KEYWORDS: Final[frozenset[str]] = frozenset(
         "enum",
         "format",
         "items",
+        "pattern",
         "properties",
         "required",
         "type",
@@ -66,6 +68,7 @@ def strict_schema(
     /,
     *,
     open_maps: bool = True,
+    patterns: bool = True,
 ) -> Mapping[str, Any] | None:
     """Convert a json schema into its OpenAI strict mode equivalent.
 
@@ -84,6 +87,9 @@ def strict_schema(
         keeps one within a requested output but strips it out of a tool argument
         object, where enforcing the schema would silently drop everything the model
         wanted to put there - a tool argument schema has to be rejected instead.
+    patterns
+        Whether the `pattern` of a string can be part of the result. Strict mode of a
+        fine-tuned model does not support it, a schema holding one is rejected then.
 
     Returns
     -------
@@ -98,6 +104,7 @@ def strict_schema(
             schema,
             nesting=0,
             open_maps=open_maps,
+            patterns=patterns,
         )
 
     except _Unsupported:
@@ -116,11 +123,12 @@ def _converted(
     *,
     nesting: int,
     open_maps: bool,
+    patterns: bool,
 ) -> Mapping[str, Any]:
     if schema.keys() & _DROPPED_KEYWORDS:
         schema = {key: value for key, value in schema.items() if key not in _DROPPED_KEYWORDS}
 
-    if not schema.keys() <= _ALLOWED_KEYWORDS:
+    if not schema.keys() <= _ALLOWED_KEYWORDS or (not patterns and "pattern" in schema):
         raise _Unsupported()
 
     match schema.get("anyOf"):
@@ -135,6 +143,7 @@ def _converted(
                         alternative,
                         nesting=nesting,
                         open_maps=open_maps,
+                        patterns=patterns,
                     )
                     for alternative in alternatives
                 ],
@@ -149,6 +158,7 @@ def _converted(
                 schema,
                 nesting=nesting,
                 open_maps=open_maps,
+                patterns=patterns,
             )
 
         case "array":
@@ -156,6 +166,7 @@ def _converted(
                 schema,
                 nesting=nesting,
                 open_maps=open_maps,
+                patterns=patterns,
             )
 
         case "string":
@@ -189,6 +200,7 @@ def _converted_object(
     *,
     nesting: int,
     open_maps: bool,
+    patterns: bool,
 ) -> Mapping[str, Any]:
     match schema.get("properties"):
         case None:
@@ -204,6 +216,7 @@ def _converted_object(
                     value,
                     nesting=nesting,
                     open_maps=open_maps,
+                    patterns=patterns,
                 )
                 for key, value in properties.items()
             }
@@ -230,6 +243,7 @@ def _converted_object(
                     values,
                     nesting=nesting,
                     open_maps=open_maps,
+                    patterns=patterns,
                 ),
             }
 
@@ -243,6 +257,7 @@ def _converted_array(
     *,
     nesting: int,
     open_maps: bool,
+    patterns: bool,
 ) -> Mapping[str, Any]:
     match schema.get("items"):
         case {**items}:
@@ -253,6 +268,7 @@ def _converted_array(
                     items,
                     nesting=nesting,
                     open_maps=open_maps,
+                    patterns=patterns,
                 ),
             }
 

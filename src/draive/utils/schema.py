@@ -1,10 +1,14 @@
 import json
-from collections.abc import Sequence
-from typing import Any
+from collections.abc import Mapping, Sequence
+from datetime import datetime, time, timedelta
+from typing import Any, Final
 
-from haiway import TypeSpecification
+from haiway import State, TypeSpecification
 
-__all__ = ("simplified_schema",)
+__all__ = (
+    "simplified_schema",
+    "written_format",
+)
 
 
 def simplified_schema(
@@ -75,6 +79,9 @@ def _simplified_inline(
         case {"enum": [*selection]}:
             return _enum_alternatives(selection)
 
+        case {"type": "string", "pattern": str() as pattern} if pattern in _WRITTEN_FORMATS:
+            return _WRITTEN_FORMATS[pattern]
+
         case {"type": "null" | "boolean" | "integer" | "number" | "string" as simple}:
             return simple
 
@@ -132,3 +139,48 @@ def _enum_element(
 
         case other:
             return str(other)
+
+
+def _written_formats() -> Mapping[str, str]:
+    # haiway states the spelling of these values as a pattern, no format fits it - the patterns
+    # are taken from haiway itself and named for the model by what they spell
+    class _Written(State):
+        moment: datetime
+        clock: time
+        duration: timedelta
+
+    properties: Mapping[str, Any] = json.loads(_Written.json_schema())["properties"]
+    names: Mapping[str, str] = {"moment": "date-time", "clock": "time", "duration": "duration"}
+    # a spelling haiway states differently is rendered as its plain type instead
+    return {
+        pattern: name
+        for key, name in names.items()
+        if isinstance(pattern := properties.get(key, {}).get("pattern"), str)
+    }
+
+
+_WRITTEN_FORMATS: Final[Mapping[str, str]] = _written_formats()
+
+
+def written_format(
+    pattern: str,
+    /,
+) -> str | None:
+    """Name the value spelling which a haiway string pattern states.
+
+    haiway states the spelling of a datetime, a time and a timedelta as a ``pattern`` rather
+    than a ``format``. Providers which cannot follow such a pattern can guide the model by
+    the name of the spelling instead.
+
+    Parameters
+    ----------
+    pattern
+        ``pattern`` of a string schema.
+
+    Returns
+    -------
+    str | None
+        ``"date-time"``, ``"time"`` or ``"duration"`` for a pattern haiway uses for that
+        spelling, ``None`` for any other pattern.
+    """
+    return _WRITTEN_FORMATS.get(pattern)

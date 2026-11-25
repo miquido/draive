@@ -1,11 +1,11 @@
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, time, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from haiway import Meta, State, as_dict
+from haiway import Default, Meta, State, as_dict
 
 from draive.openai.schema import strict_schema
 
@@ -177,7 +177,7 @@ class _Item(State, serializable=True):
 class _Order(State, serializable=True):
     reference: str
     items: Sequence[_Item]
-    attributes: Mapping[str, str] = {}
+    attributes: Mapping[str, str] = Default(factory=dict[str, str])
     identifier: UUID | None = None
     moment: datetime | None = None
     total: float | None = None
@@ -233,11 +233,26 @@ def test_keywords_outside_the_specification_vocabulary_are_not_convertible() -> 
         ("not", {"type": "integer"}),
         ("patternProperties", {"^a": {"type": "string"}}),
         ("minLength", 2),
-        ("pattern", "^a+$"),
         ("title", "Name"),
         ("someFutureKeyword", True),
     ):
         assert strict_schema(_object({"p": {"type": "string", keyword: value}})) is None, keyword
+
+
+def test_patterns_of_written_values_stay_strict() -> None:
+    # verified live 2026-11-25: strict mode accepts and follows the patterns haiway states for
+    # datetime, time, timedelta, UUID and bytes
+    class _Written(State):
+        starts: datetime
+        at: time
+        duration: timedelta
+        ref: UUID
+
+    converted = strict_schema(as_dict(_Written.__SPECIFICATION__))
+
+    assert converted is not None
+    for name in ("starts", "at", "duration", "ref"):
+        assert converted["properties"][name]["pattern"].startswith("^"), name
 
 
 def test_declared_descriptions_are_preserved() -> None:
@@ -319,7 +334,7 @@ class _WithAny(State, serializable=True):
 
 class _WithAnyMapping(State, serializable=True):
     name: str
-    attributes: Mapping[str, Any] = {}
+    attributes: Mapping[str, Any] = Default(factory=dict[str, Any])
 
 
 class _Empty(State, serializable=True):
@@ -375,5 +390,30 @@ def test_state_with_bytes_and_set_stays_strict() -> None:
     converted = strict_schema(as_dict(_Binary.__SPECIFICATION__))
 
     assert converted is not None
-    assert converted["properties"]["data"] == {"type": "string"}
+    # the spelling of the bytes stays constrained, their encoding annotation is dropped
+    assert converted["properties"]["data"]["type"] == "string"
+    assert "pattern" in converted["properties"]["data"]
+    assert "contentEncoding" not in converted["properties"]["data"]
     assert "uniqueItems" not in converted["properties"]["tags"]
+
+
+def test_patterns_are_refused_where_strict_mode_does_not_support_them() -> None:
+    # strict mode of a fine-tuned model has no `pattern`, the schema goes unenforced instead
+    class _Nested(State):
+        starts: datetime
+
+    class _Outer(State):
+        nested: _Nested
+        moments: Sequence[datetime]
+
+    schema: Mapping[str, Any] = as_dict(_Outer.__SPECIFICATION__)
+
+    assert strict_schema(schema) is not None
+    assert strict_schema(schema, patterns=False) is None
+
+
+def test_only_fine_tuned_models_drop_patterns() -> None:
+    from draive.openai.responses import _follows_patterns  # pyright: ignore[reportPrivateUsage]
+
+    assert _follows_patterns("gpt-6-luna")
+    assert not _follows_patterns("ft:gpt-6-luna:org::abc")

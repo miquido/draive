@@ -1,8 +1,9 @@
 import json
+from datetime import datetime, time, timedelta
 from typing import Any
 
 import pytest
-from haiway import TypeSpecification
+from haiway import State, TypeSpecification
 
 from draive.utils.schema import simplified_schema
 
@@ -64,3 +65,29 @@ def test_simplified_schema_renders_mapping_of_values() -> None:
     }
 
     assert json.loads(simplified_schema(specification)) == {"labels": {"<key>": "string"}}
+
+
+def test_written_spellings_render_as_their_formats() -> None:
+    # haiway states a pattern for these values, no format - the model reads their names
+    class _Timing(State):
+        moment: datetime
+        clock: time
+        duration: timedelta
+        maybe: datetime | None = None
+
+    assert json.loads(simplified_schema(_Timing.__SPECIFICATION__)) == {  # pyright: ignore[reportArgumentType]
+        "moment": "date-time",
+        "clock": "time",
+        "duration": "duration",
+        "maybe": "date-time|null",
+    }
+
+
+def test_choices_render_before_a_written_spelling() -> None:
+    class _Timing(State):
+        moment: datetime
+
+    pattern: str = json.loads(_Timing.json_schema())["properties"]["moment"]["pattern"]
+    assert _render({"type": "string", "pattern": pattern, "enum": ["2026-01-01T00:00:00"]}) == (
+        "'2026-01-01T00:00:00'"
+    )

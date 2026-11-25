@@ -111,6 +111,7 @@ class OpenAIResponses(OpenAIAPI):
             text_config: ResponseTextConfigParam | Omit = _text_output(
                 output,
                 verbosity=config.verbosity,
+                patterns=_follows_patterns(config.model),
             )
 
             input_context: list[ResponseInputItemParam]
@@ -136,7 +137,10 @@ class OpenAIResponses(OpenAIAPI):
                     instructions=instructions or omit,
                     input=input_context,
                     tool_choice=_tool_choice(tools),
-                    tools=_tools_as_tool_params(tools.specification),
+                    tools=_tools_as_tool_params(
+                        tools.specification,
+                        patterns=_follows_patterns(config.model),
+                    ),
                     parallel_tool_calls=True if tools else omit,
                     text=text_config,
                     reasoning=_reasoning(config),
@@ -394,8 +398,9 @@ def _text_output(
     /,
     *,
     verbosity: Literal["low", "medium", "high"] | Missing = Missing,
+    patterns: bool,
 ) -> ResponseTextConfigParam | Omit:
-    text_format: ResponseFormatTextConfigParam | None = _text_format(output)
+    text_format: ResponseFormatTextConfigParam | None = _text_format(output, patterns=patterns)
     if verbosity is Missing:
         if text_format is None:
             return omit
@@ -414,6 +419,8 @@ def _text_output(
 def _text_format(
     output: ModelOutputSelection,
     /,
+    *,
+    patterns: bool,
 ) -> ResponseFormatTextConfigParam | None:
     if output == "auto":
         return None
@@ -433,7 +440,7 @@ def _text_format(
         schema: Mapping[str, Any] = as_dict(output.__SPECIFICATION__)
         # only strict mode makes the api enforce the schema, without it the model
         # can answer with content which fails decoding
-        strict: Mapping[str, Any] | None = strict_schema(schema)
+        strict: Mapping[str, Any] | None = strict_schema(schema, patterns=patterns)
         if strict is None:
             ctx.log_debug(
                 f"OpenAI strict output is unavailable for {output.__name__},"
@@ -492,13 +499,26 @@ def _tool_choice(
 def _tools_as_tool_params(
     tools: Sequence[ModelToolSpecification],
     /,
+    *,
+    patterns: bool,
 ) -> Sequence[ToolParam]:
-    return [_tool_as_tool_param(tool) for tool in tools]
+    return [_tool_as_tool_param(tool, patterns=patterns) for tool in tools]
+
+
+def _follows_patterns(
+    model: str,
+    /,
+) -> bool:
+    # strict mode of a fine-tuned model does not support `pattern`, a schema holding one goes
+    # unenforced for it instead of failing the request
+    return not model.startswith("ft:")
 
 
 def _tool_as_tool_param(
     tool: ModelToolSpecification,
     /,
+    *,
+    patterns: bool,
 ) -> ToolParam:
     parameters: Mapping[str, Any] = (
         tool.parameters
@@ -521,6 +541,7 @@ def _tool_as_tool_param(
         converted: Mapping[str, Any] | None = strict_schema(
             parameters,
             open_maps=False,
+            patterns=patterns,
         )
         if converted is not None:
             parameters = converted

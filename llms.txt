@@ -33,7 +33,7 @@ from draive.openai import OpenAI, OpenAIResponsesConfig
 async def main() -> None:
     async with ctx.scope(
         "app",
-        OpenAIResponsesConfig(model="gpt-5-mini"),
+        OpenAIResponsesConfig(model="gpt-6-luna"),
         disposables=(OpenAI(),),
     ):
         result: str = await TextGeneration.generate(

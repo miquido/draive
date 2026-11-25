@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from haiway import Meta, State, as_dict, ctx
+from haiway import Default, Meta, State, as_dict, ctx
 from openai import omit
 
 from draive.models import ModelOutputFailed, ModelOutputLimit, ModelTools, ModelToolSpecification
@@ -81,7 +81,7 @@ async def _consume(model: OpenAIResponses) -> list[Any]:
             tools=ModelTools.none,
             context=(),
             output="text",
-            config=OpenAIResponsesConfig(model="gpt-5", max_output_tokens=16),
+            config=OpenAIResponsesConfig(model="gpt-6.2-sol", max_output_tokens=16),
         )
         return [chunk async for chunk in stream]
 
@@ -145,7 +145,7 @@ async def test_requests_are_never_stored_and_carry_encrypted_reasoning() -> None
             tools=ModelTools.none,
             context=(),
             output="text",
-            config=OpenAIResponsesConfig(model="gpt-5"),
+            config=OpenAIResponsesConfig(model="gpt-6.2-sol"),
         ):
             pass
 
@@ -178,7 +178,7 @@ async def test_custom_base_url_omits_unsupported_include() -> None:
             tools=ModelTools.none,
             context=(),
             output="text",
-            config=OpenAIResponsesConfig(model="gpt-5"),
+            config=OpenAIResponsesConfig(model="gpt-6.2-sol"),
         ):
             pass
 
@@ -522,7 +522,7 @@ async def test_strict_tool_parameters_fall_back_for_an_open_mapping() -> None:
 async def test_schema_output_keeps_strict_for_an_open_mapping() -> None:
     class Extracted(State, serializable=True):
         name: str
-        labels: Mapping[str, str] = {}
+        labels: Mapping[str, str] = Default(factory=dict[str, str])
 
     requests: list[dict[str, Any]] = []
     model = _model([_terminal_event(kind="response.completed")], requests=requests)

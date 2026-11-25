@@ -23,7 +23,7 @@ USAGE
 
     uv run tools/evals/verify_evaluator.py \\
         --provider anthropic \\
-        --model claude-sonnet-4-5 \\
+        --model claude-sonnet-5-5 \\
         --baseline path/to/my_relevance_baseline.yaml \\
         --concurrency 8
 
@@ -82,21 +82,21 @@ PROVIDERS: Final[dict[str, ProviderSpec]] = {
     "anthropic": ProviderSpec(
         key="anthropic",
         display_name="Anthropic",
-        default_model="claude-sonnet-4-5",
+        default_model="claude-sonnet-5-5",
         config_factory=lambda model: AnthropicConfig(model=model),
         disposable_factory=Anthropic,
     ),
     "openai": ProviderSpec(
         key="openai",
         display_name="OpenAI",
-        default_model="gpt-5-mini",
+        default_model="gpt-6-luna",
         config_factory=lambda model: OpenAIResponsesConfig(model=model),
         disposable_factory=OpenAI,
     ),
     "gemini": ProviderSpec(
         key="gemini",
         display_name="Gemini",
-        default_model="gemini-3.5-flash",
+        default_model="gemini-3.8-flash",
         config_factory=lambda model: GeminiConfig(model=model),
         disposable_factory=Gemini,
     ),

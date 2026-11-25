@@ -11,7 +11,7 @@ __all__ = (
 
 class BedrockChatConfig(Configuration):
     model: str
-    temperature: float = 1.0
+    temperature: float | Missing = Missing
     top_p: float | Missing = Missing
     max_output_tokens: int | Missing = Missing
     stop_sequences: Sequence[str] | Missing = Missing

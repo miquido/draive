@@ -23,7 +23,7 @@ jobs:
       - name: Install uv and set the python version
         uses: astral-sh/setup-uv@v10.3.3
         with:
-          version: "0.13.9"
+          version: "0.13.10"
           python-version: "3.15"
 
       - name: Install
@@ -53,7 +53,7 @@ jobs:
       - name: Install uv and set the python version
         uses: astral-sh/setup-uv@v10.3.3
         with:
-          version: "0.13.9"
+          version: "0.13.10"
           python-version: "3.15"
 
       - name: Publish

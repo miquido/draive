@@ -452,9 +452,7 @@ def _request_parameters(
     parameters: dict[str, Any] = {
         "modelId": config.model,
         "messages": messages,
-        "inferenceConfig": {
-            "temperature": config.temperature,
-        },
+        "inferenceConfig": {},
     }
     if instructions:
         parameters["system"] = [{"text": instructions}]
@@ -465,13 +463,17 @@ def _request_parameters(
     ):
         parameters["toolConfig"] = tool_config
 
+    if config.temperature is not Missing:
+        parameters["inferenceConfig"]["temperature"] = config.temperature
+
     if config.max_output_tokens is not Missing:
         parameters["inferenceConfig"]["maxTokens"] = config.max_output_tokens
 
     if config.top_p is not Missing:
         parameters["inferenceConfig"]["topP"] = config.top_p
 
-    if config.stop_sequences:
+    # `Missing` is truthy, an unset value would reach the request
+    if config.stop_sequences is not Missing and config.stop_sequences:
         parameters["inferenceConfig"]["stopSequences"] = config.stop_sequences
 
     if config.guardrail_identifier is not Missing and config.guardrail_version is not Missing:

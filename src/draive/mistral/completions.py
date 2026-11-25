@@ -93,6 +93,7 @@ class MistralCompletions(MistralAPI):
                 top_p=config.top_p,
                 seed=config.seed,
                 prompt_mode=config.prompt_mode,
+                reasoning_effort=config.reasoning_effort,
             )
 
             tool_choice: ChatCompletionStreamRequestToolChoiceTypedDict
@@ -133,6 +134,7 @@ class MistralCompletions(MistralAPI):
                     stop=unwrap_missing_list_to_unset(config.stop_sequences),
                     random_seed=unwrap_missing_to_unset(config.seed),
                     prompt_mode=unwrap_missing_to_unset(config.prompt_mode),
+                    reasoning_effort=unwrap_missing_to_unset(config.reasoning_effort),
                     response_format=request_response_format,
                     tools=tools_list,
                     tool_choice=tool_choice,

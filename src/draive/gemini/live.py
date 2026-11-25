@@ -148,7 +148,6 @@ class GeminiLive(GeminiAPI):
                     top_p=config.top_p,
                     top_k=config.top_k,
                     seed=config.seed,
-                    thinking_budget=config.thinking_budget,
                     thinking_level=config.thinking_level,
                 )
 

@@ -270,7 +270,7 @@ async def test_usage_is_recorded_on_response_done(monkeypatch: pytest.MonkeyPatc
     assert usage == [
         {
             "provider": "openai",
-            "model": "gpt-realtime",
+            "model": "gpt-realtime-2.1",
             "input_tokens": 4,
             "cached_input_tokens": 1,
             "output_tokens": 6,

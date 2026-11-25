@@ -56,6 +56,20 @@
 
 ### Changed
 
+- **Breaking:** requires haiway 0.67.0. Its State validation and JSON are stricter: a mutable plain
+  default (`{}`, `[]`, `set()`) of a State attribute raises `TypeError` when the class is created -
+  use `Default(factory=...)` or an immutable value - no string is parsed into a number, and
+  `to_json` writes compact, strict JSON. The JSON schema of a State describes the strict form it
+  writes: `datetime`, `time`, `timedelta`, `UUID` and `bytes` state a `pattern` of their spelling
+  instead of a `format`, enums list their values without the names of their members and a closed
+  tuple states `minItems` and `maxItems`.
+- OpenAI strict structured output and strict tool parameters keep the `pattern` of a string, which
+  strict mode accepts and follows - the spelling of a datetime, time, duration, UUID or bytes value
+  is enforced as well. A fine-tuned model (`ft:`), whose strict mode does not support `pattern`,
+  gets such a schema unenforced instead.
+- The simplified schema injected into a model prompt names a datetime, a time and a duration
+  (`date-time`, `time`, `duration`) by the pattern haiway states for them.
+- Development uses uv 0.13.10.
 - **Breaking:** `claude_code_agent` keeps memory only as `sessions` (`ClaudeCodeSessions`), the
   `memory` argument and `AgentMemory` support are removed - a call without sessions is a fresh
   session.
@@ -92,6 +106,43 @@
   `ClaudeCodeAuthenticationFailed` and `ClaudeCodeLoginUnusable` extend them.
 - `MCP_CONNECTION_NONBLOCKING` is a reserved environment variable of runs, a configuration setting
   it in `env` or `inherit_env` is refused.
+- Provider model support moves to the current generations (OpenAI GPT 5.0+, Claude 5.0+, Gemini 4
+  and `gemini-3.8-flash`): model name `Literal`s of `OpenAIResponsesConfig` (gpt-6.x, gpt-5.4+),
+  `OpenAIRealtimeConfig` and `AnthropicConfig` list the current models only.
+- `OpenAIResponsesConfig.reasoning` accepts `"minimal"`. **Breaking:**
+  `OpenAIImageGenerationConfig.model` defaults to `gpt-image-2.6-sunburst` (the gpt-image-1 family
+  shuts down on 2026-12-01).
+- `AnthropicConfig.thinking` accepts `"between_tools"`.
+- `GeminiConfig.thinking_level` accepts `"xhigh"`. **Breaking:** `GeminiConfig.thinking_budget` is
+  removed, use `thinking_level`.
+- `MistralChatConfig.reasoning_effort` (`none`, `low`, `medium`, `high`) is sent with the request
+  when set.
+- **Breaking:** `BedrockChatConfig.temperature` defaults to `Missing` and is sent only when set
+  (it was always sent as `1.0`).
+- **Breaking:** Anthropic falls back to automatic tool selection, with a warning, when a tool call
+  is required or a specific tool is selected - Claude Fable 5.2, Opus 5.5 and Sonnet 5.5 reject a
+  forced `tool_choice`, the fallback applies to every model alike. A toolbox suggestion no longer
+  guarantees a tool call on Anthropic.
+
+### Fixed
+
+- Ollama structured output names the spelling of a datetime and a time as a `format` and of a
+  timedelta in the field description, instead of dropping haiway's pattern unguided. An optional
+  field (`anyOf` with `null`) no longer turns the whole schema into generic JSON.
+- Ollama structured output accepts closed tuples, haiway 0.67 states them with `items` of `false`
+  which failed schema normalization with a `TypeError`.
+- Completion-based decisions list options as `<option identifier="...">description</option>`, a
+  `- id: description` listing made models answer with the whole line and fail the decision.
+- SurrealDB field definitions keep their types under haiway 0.67.0: they follow the attributes as
+  haiway resolves them - type aliases, forward references and tuples included - instead of the JSON
+  schema of a State, which no longer tells a `datetime` or a `bool` apart. An attribute which can
+  be `Missing` is an `option`, as a missing value is left out of the record.
+- An MCP tool whose input schema has a closed tuple without `minItems` and `maxItems` loads again:
+  the length of the tuple is stated - every position required unless the schema says otherwise, and
+  no more items than positions - after references are inlined and their sibling bounds merged. A
+  closed tuple which requires more items than its positions is refused.
+- Bedrock Converse requests leave out `stopSequences` when none are configured - every request
+  without them carried the unset value and was refused by botocore before it was sent.
 
 ## 0.122.0
 
