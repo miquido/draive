@@ -58,7 +58,8 @@ async with ctx.scope("app", OpenAIResponsesConfig(model="gpt-5.5"), disposables=
 
 A `State` output goes out as a **strict** `json_schema` (`openai/schema.py`): every property
 required, `additionalProperties: false`, the `pattern` haiway states for datetime, time, duration,
-UUID and bytes kept (strict mode follows it), unsupported `format`/`uniqueItems`/`contentEncoding`
+UUID and bytes kept (strict mode follows it; a fine-tuned `ft:` model does not, a schema holding a
+pattern goes out unenforced there), unsupported `format`/`uniqueItems`/`contentEncoding`
 dropped. Tuples, recursive types and objects nested deeper than 10 fall back to an unenforced
 schema (debug log "OpenAI strict output is unavailable"). So: a field that may be absent must be
 `X | None` (strict makes the model fill every field); use `Sequence[T]` not tuples; avoid

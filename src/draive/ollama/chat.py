@@ -535,7 +535,8 @@ def _normalize_schema_for_ollama(schema: Mapping[str, Any]) -> tuple[dict[str, A
     if schema_type == "array" or "items" in schema or "prefixItems" in schema:
         normalized_schema = {"type": "array"}
 
-        if "items" in schema:
+        # a closed tuple states `items` of `false` next to its `prefixItems`
+        if isinstance(schema.get("items"), Mapping):
             item_schema, item_changed = _normalize_schema_for_ollama(schema["items"])
             if item_schema is not None:
                 normalized_schema["items"] = item_schema

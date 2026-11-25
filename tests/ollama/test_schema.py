@@ -30,6 +30,12 @@ class _UnsupportedUnion(State):
     value: str | bool
 
 
+class _Tuples(State):
+    single: tuple[int]
+    pair: tuple[int, str]
+    optional_pair: tuple[int, str] | None
+
+
 class _Written(State):
     start: datetime
     clock: time
@@ -146,3 +152,13 @@ def test_schema_for_ollama_names_written_formats_instead_of_patterns() -> None:
     }
     assert properties["late"]["format"] == "date-time"
     assert all("pattern" not in value for value in properties.values())
+
+
+def test_schema_for_ollama_handles_closed_tuples() -> None:
+    schema = _schema_for_ollama(_Tuples)
+
+    assert schema is not None
+    properties: Mapping[str, Mapping[str, object]] = schema["properties"]
+    assert properties["single"] == {"type": "array", "items": {"type": "integer"}}
+    assert properties["pair"] == {"type": "array"}
+    assert properties["optional_pair"] == {"type": "array"}
