@@ -19,7 +19,9 @@ from draive.claude.config import (
     ClaudeCodeNoClaudeMd,
     ClaudeCodeNoCompaction,
     ClaudeCodeNoConnectors,
+    ClaudeCodeNoSandbox,
     ClaudeCodeProjectClaudeMd,
+    ClaudeCodeSandbox,
     ClaudeCodeSkipAdditionalClaudeMd,
     ClaudeCodeTelemetry,
 )
@@ -318,7 +320,10 @@ class ClaudeCodeLaunch(State):
         The lists ``claudeMdExcludes``, ``allowedMcpServers`` and ``deniedMcpServers`` derived
         from ``claude_md`` and ``connectors`` are not replaced by the configured settings, the
         entries of the configured ones are added to them instead. ``claudeMdExcludes`` always
-        starts with the ``CLAUDE.md`` of the user.
+        starts with the ``CLAUDE.md`` of the user. The ``sandbox`` derived from ``sandbox`` of
+        the configuration, when ``Bash`` is among the tools, is merged with the configured one
+        key by key, the configured keys win - except lists within its ``filesystem`` and
+        ``network``, which the configured entries are added to.
 
         Parameters
         ----------
@@ -358,6 +363,13 @@ class ClaudeCodeLaunch(State):
         )
         for key, value in derived.items():
             settings[key] = _merged_list(value, config.settings.get(key, Missing))
+
+        sandbox: Mapping[str, Any] = _sandbox_settings(config)
+        if sandbox:
+            settings["sandbox"] = _merged_sandbox(
+                sandbox,
+                config.settings.get("sandbox", Missing),
+            )
 
         return json.dumps(settings, separators=(",", ":"), default=_json_value)
 
@@ -805,6 +817,85 @@ def _connector_settings(
                     )
 
             return derived
+
+
+def _sandbox_settings(
+    config: ClaudeCodeConfig,
+    /,
+) -> Mapping[str, Any]:
+    if "Bash" not in config.tools:
+        return {}
+
+    match config.sandbox:
+        case ClaudeCodeSandbox() as sandbox:
+            # strict - nothing runs outside of the sandbox, nor without it
+            settings: dict[str, Any] = {
+                "enabled": True,
+                "allowUnsandboxedCommands": False,
+                "failIfUnavailable": True,
+            }
+            filesystem: dict[str, Any] = {
+                key: tuple(paths)
+                for key, paths in (
+                    ("allowWrite", sandbox.allowed_writes),
+                    ("denyWrite", sandbox.denied_writes),
+                    ("denyRead", sandbox.denied_reads),
+                    ("allowRead", sandbox.allowed_reads),
+                )
+                if paths
+            }
+            if filesystem:
+                settings["filesystem"] = filesystem
+
+            if sandbox.excluded_commands:
+                settings["excludedCommands"] = tuple(sandbox.excluded_commands)
+
+            network: dict[str, Any] = {
+                key: tuple(domains)
+                for key, domains in (
+                    ("allowedDomains", sandbox.allowed_domains),
+                    ("deniedDomains", sandbox.denied_domains),
+                )
+                if domains
+            }
+            if network:
+                settings["network"] = network
+
+            return settings
+
+        case ClaudeCodeNoSandbox():
+            return {}
+
+
+def _merged_sandbox(
+    derived: Mapping[str, Any],
+    configured: object,
+    /,
+) -> Mapping[str, Any]:
+    if configured is Missing:
+        return derived
+
+    # the configuration verifies it is a mapping
+    configured_settings: Mapping[str, Any] = cast(Mapping[str, Any], configured)
+    merged: dict[str, Any] = {**derived, **configured_settings}
+    for key in ("filesystem", "network"):
+        derived_section: object = derived.get(key, Missing)
+        configured_section: object = configured_settings.get(key, Missing)
+        if not isinstance(derived_section, Mapping) or not isinstance(configured_section, Mapping):
+            continue  # nothing to merge, the configured one wins when present
+
+        derived_keys: Mapping[str, Any] = cast(Mapping[str, Any], derived_section)
+        configured_keys: Mapping[str, Any] = cast(Mapping[str, Any], configured_section)
+        section: dict[str, Any] = {**derived_keys, **configured_keys}
+        for name, value in derived_keys.items():
+            added: object = configured_keys.get(name)
+            # a configured list is added to the derived one, anything else replaces it
+            if isinstance(added, Sequence) and not isinstance(added, str | bytes):
+                section[name] = _merged_list(cast(Sequence[Any], value), configured_keys[name])
+
+        merged[key] = section
+
+    return merged
 
 
 def _merged_list(

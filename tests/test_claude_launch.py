@@ -11,9 +11,11 @@ from draive.claude import (
     ClaudeCodeConfig,
     ClaudeCodeNewSession,
     ClaudeCodeNoCompaction,
+    ClaudeCodeNoSandbox,
     ClaudeCodeNoSession,
     ClaudeCodeOAuthToken,
     ClaudeCodeResumedSession,
+    ClaudeCodeSandbox,
     ClaudeCodeTelemetry,
 )
 from draive.claude.launch import ClaudeCodeLaunch
@@ -342,6 +344,8 @@ def test_plugins_known_to_the_settings_are_not_leaked() -> None:
         {"claudeMdExcludes": None},
         {"claudeMdExcludes": "/repo/**"},
         {"claudeMdExcludes": ["/repo/**", 1]},
+        {"sandbox": ["enabled"]},
+        {"sandbox": True},
     ),
 )
 def test_wrong_typed_isolating_settings_are_refused(settings: dict[str, Any]) -> None:
@@ -361,6 +365,143 @@ def test_configured_plugins_extend_the_disabled_ones() -> None:
     assert settings["enabledPlugins"]["mine@local"] is True
     assert settings["enabledPlugins"]["cc-plugin-diff@builtin"] is True  # enabled explicitly
     assert settings["enabledPlugins"]["cc-plugin-tips@builtin"] is False
+
+
+SANDBOX = {
+    "enabled": True,
+    "allowUnsandboxedCommands": False,
+    "failIfUnavailable": True,
+}
+
+
+def test_bash_is_sandboxed_strictly_by_default() -> None:
+    settings = json.loads(ClaudeCodeLaunch.prepare_settings(ClaudeCodeConfig(tools=("Bash",))))
+
+    assert settings["sandbox"] == SANDBOX
+
+
+@pytest.mark.parametrize(
+    "config",
+    (
+        ClaudeCodeConfig(),
+        ClaudeCodeConfig(tools=("Read", "Edit")),
+        ClaudeCodeConfig(tools=("Bash",), sandbox=ClaudeCodeNoSandbox()),
+    ),
+)
+def test_no_sandbox_is_set_without_bash_or_when_opted_out(config: ClaudeCodeConfig) -> None:
+    assert "sandbox" not in json.loads(ClaudeCodeLaunch.prepare_settings(config))
+
+
+def _sandbox(sandbox: ClaudeCodeSandbox) -> Any:
+    return json.loads(
+        ClaudeCodeLaunch.prepare_settings(ClaudeCodeConfig(tools=("Bash",), sandbox=sandbox))
+    )["sandbox"]
+
+
+def test_default_sandbox_is_minimal() -> None:
+    sandbox = _sandbox(ClaudeCodeSandbox())
+
+    assert "autoAllowBashIfSandboxed" not in sandbox
+    assert not {"filesystem", "excludedCommands", "network"} & sandbox.keys()
+
+
+@pytest.mark.parametrize(
+    ("fields", "expected"),
+    (
+        ({"allowed_writes": ("/data",)}, {"filesystem": {"allowWrite": ["/data"]}}),
+        ({"denied_writes": ("/data",)}, {"filesystem": {"denyWrite": ["/data"]}}),
+        ({"denied_reads": ("/secret",)}, {"filesystem": {"denyRead": ["/secret"]}}),
+        ({"allowed_reads": ("/secret/ok",)}, {"filesystem": {"allowRead": ["/secret/ok"]}}),
+        ({"excluded_commands": ("docker:*",)}, {"excludedCommands": ["docker:*"]}),
+        ({"allowed_domains": ("*.x.com",)}, {"network": {"allowedDomains": ["*.x.com"]}}),
+        ({"denied_domains": ("evil.com",)}, {"network": {"deniedDomains": ["evil.com"]}}),
+    ),
+)
+def test_sandbox_field_maps_to_its_key(fields: dict[str, Any], expected: dict[str, Any]) -> None:
+    assert _sandbox(ClaudeCodeSandbox(**fields)) == {**SANDBOX, **expected}
+
+
+@pytest.mark.parametrize(
+    "field",
+    ("allowed_writes", "denied_writes", "denied_reads", "allowed_reads"),
+)
+def test_relative_sandbox_paths_are_refused(field: str) -> None:
+    with pytest.raises(ValidationError):
+        ClaudeCodeSandbox(**{field: ("relative/path",)})
+
+
+def test_configured_sandbox_lists_are_added_to_the_derived_ones() -> None:
+    settings = json.loads(
+        ClaudeCodeLaunch.prepare_settings(
+            ClaudeCodeConfig(
+                tools=("Bash",),
+                sandbox=ClaudeCodeSandbox(
+                    allowed_writes=("/data",),
+                    denied_reads=("/secret",),
+                    allowed_domains=("example.com",),
+                ),
+                settings={
+                    "sandbox": {
+                        "filesystem": {"allowWrite": ["/data", "/other"]},
+                        "network": {"allowedDomains": ["other.com"], "allowLocalBinding": True},
+                    }
+                },
+            )
+        )
+    )
+
+    assert settings["sandbox"]["filesystem"] == {
+        "allowWrite": ["/data", "/other"],
+        "denyRead": ["/secret"],
+    }
+    assert settings["sandbox"]["network"] == {
+        "allowedDomains": ["example.com", "other.com"],
+        "allowLocalBinding": True,
+    }
+
+
+def test_configured_sandbox_sections_are_passed_when_nothing_is_derived() -> None:
+    settings = json.loads(
+        ClaudeCodeLaunch.prepare_settings(
+            ClaudeCodeConfig(
+                tools=("Bash",),
+                settings={"sandbox": {"filesystem": {"allowWrite": ["/data"]}}},
+            )
+        )
+    )
+
+    assert settings["sandbox"]["filesystem"] == {"allowWrite": ["/data"]}
+
+
+def test_configured_sandbox_keys_are_merged_over_the_derived_ones() -> None:
+    settings = json.loads(
+        ClaudeCodeLaunch.prepare_settings(
+            ClaudeCodeConfig(
+                tools=("Bash",),
+                settings={"sandbox": {"network": {"allowedDomains": ["example.com"]}}},
+            )
+        )
+    )
+
+    assert settings["sandbox"] == {**SANDBOX, "network": {"allowedDomains": ["example.com"]}}
+
+
+def test_configured_sandbox_keys_win_over_the_derived_ones() -> None:
+    settings = json.loads(
+        ClaudeCodeLaunch.prepare_settings(
+            ClaudeCodeConfig(tools=("Bash",), settings={"sandbox": {"enabled": False}})
+        )
+    )
+
+    assert settings["sandbox"] == {**SANDBOX, "enabled": False}
+
+
+def test_configured_sandbox_is_passed_without_bash() -> None:
+    settings = json.loads(
+        ClaudeCodeLaunch.prepare_settings(ClaudeCodeConfig(settings={"sandbox": {"enabled": True}}))
+    )
+
+    assert settings["sandbox"] == {"enabled": True}
 
 
 def _workspace(directory: Path) -> ClaudeCodeWorkspace:

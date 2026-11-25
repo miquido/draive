@@ -113,6 +113,13 @@ config, tools: Toolbox | Iterable[Tool] = Toolbox.empty, meta)`.
 - `ClaudeCodeConfig(claude_md=ClaudeCodeProjectClaudeMd(), directory=...)` loads only the
   `CLAUDE.md` of the working directory (no parents, no settings); the ones of `additional_directories`
   are excluded unless `additional_directories=ClaudeCodeLoadAdditionalClaudeMd()`.
+- Sandbox: `ClaudeCodeConfig.sandbox` is `ClaudeCodeSandbox()` by default - with `Bash` in `tools` its
+  commands run in Claude Code's sandbox (writes only in the working/additional directories, strict, Linux
+  needs bubblewrap + socat + user namespaces; commands are still allowed by `allowed_tools` Bash rules, network blocked unless
+  `allowed_domains`; tune with `ClaudeCodeSandbox(allowed_writes, denied_writes, denied_reads, allowed_reads,
+  excluded_commands, allowed_domains, denied_domains)`, absolute paths); `ClaudeCodeNoSandbox()` opts out within a container, extra
+  keys in `settings["sandbox"]`. Unsandboxed `Bash` can call draive tools directly (`disallowed_tools`
+  not enforced against it).
 - Isolation details: configured `enabledPlugins` and `claudeMdExcludes`, `allowedMcpServers` and `deniedMcpServers` in `settings` extend the
   derived ones (lists). `setting_sources=("project",)` loads `CLAUDE.md`/rules of the parents too, except
   the user's (`~/CLAUDE.md`, `~/CLAUDE.local.md`, `~/.claude`); outside a git repo it loads parent

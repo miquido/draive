@@ -61,6 +61,16 @@
   session.
 - **Breaking:** `ClaudeCodeConfig.tools` is empty by default, a run has no built-in tools unless
   they are listed (it was `Read`, `Grep` and `Glob`).
+- **Breaking:** runs with `Bash` among the `tools` are sandboxed by default -
+  `ClaudeCodeConfig.sandbox` is `ClaudeCodeSandbox()`, which confines the commands to the working and
+  additional directories with the sandbox of Claude Code (strict: nothing reruns outside of it, a run
+  fails when the sandbox can not start - Linux needs bubblewrap, socat and unprivileged user
+  namespaces). Commands stay allowed by the `allowed_tools` rules (no auto-approval), network is
+  blocked unless `allowed_domains`; `ClaudeCodeSandbox` takes `allowed_writes`, `denied_writes`,
+  `denied_reads`, `allowed_reads`, `excluded_commands`, `allowed_domains` and `denied_domains`.
+  Use `ClaudeCodeNoSandbox()` within a container which isolates the run, extra keys go to
+  `settings["sandbox"]`. Without the sandbox `Bash` can call draive tools directly, so
+  `disallowed_tools` rules for them are not enforced against it.
 - The `claude` executable is resolved from `binary=`, `CLAUDE_CODE_BINARY` and the `PATH` only.
 - The launch helpers (`build_launch`, `claude_arguments`, `claude_environment`, `claude_settings`,
   `inherited_environment`, `verify_connectors`, `verify_allowed_servers` and `verify_claude_md`)

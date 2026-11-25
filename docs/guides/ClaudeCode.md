@@ -247,6 +247,7 @@ a run never starts with an invalid one:
 | `setting_sources`                                            | none                       | `project` loads the `CLAUDE.md` and `.claude` settings of the working directory                                             |
 | `claude_md`                                                  | `ClaudeCodeNoClaudeMd`     | `ClaudeCodeProjectClaudeMd` loads the `CLAUDE.md` of the working directory without its settings                             |
 | `env`, `inherit_env`                                         | none                       | extra variables, `CLAUDE*`, `ANTHROPIC_*`, `OTEL_*` and similar are reserved                                                |
+| `sandbox`                                                    | `ClaudeCodeSandbox()`      | `ClaudeCodeSandbox(...)` tunes it, `ClaudeCodeNoSandbox()` runs `Bash` unsandboxed, see [Sandboxing](#sandboxing)           |
 | `stream_deltas`                                              | `False`                    | stream the text while it is generated                                                                                       |
 | `system_prompt`                                              | `append`                   | whether instructions append to the system prompt (it keeps the tool guidance) or replace it                                 |
 
@@ -260,43 +261,84 @@ outside of the home.
 
 File tools are confined to the working and the additional directories by default - a symlink or `..`
 leading out of them is refused, so the agent can not read the keys or the files of the user. `Bash`
-is not confined to them, like any tool which is not about files. Use `bypassPermissions` and `Bash`
-only within an environment which is safe to be modified - the agent has no sandbox other than its
-own working directory and the tools you allow.
+is not confined to them by permissions, like any tool which is not about files - its sandbox is (see
+[Sandboxing](#sandboxing)). Use `bypassPermissions` and `Bash` without the sandbox only within an
+environment which is safe to be modified.
 
 ## Sandboxing
 
-`Bash` is not confined to the working directory (see above). The sandbox of Claude Code confines the
-commands of `Bash` at the OS level - Seatbelt on macOS, bubblewrap on Linux. It is enabled through
-`settings` of the configuration, nothing else is needed from draive:
+The sandbox of Claude Code confines the commands of `Bash` at the OS level - Seatbelt on macOS,
+bubblewrap on Linux. It is on by default for runs which have `Bash` among `tools`, nothing has to be
+configured:
+
+```python
+ClaudeCodeConfig(tools=("Bash",))  # sandboxed, same as sandbox=ClaudeCodeSandbox()
+```
+
+The commands themselves are allowed by the permission rules - `allowed_tools` of the config, the
+sandbox does not auto-approve them. Narrow them with Bash rules and the sandbox confines what the
+allowed commands touch:
 
 ```python
 ClaudeCodeConfig(
     tools=("Bash",),
-    settings={
-        "sandbox": {
-            "enabled": True,
-            "autoAllowBashIfSandboxed": True,
-            "allowUnsandboxedCommands": False,
-            "failIfUnavailable": True,
-        },
-    },
+    allowed_tools=("Bash(git:*)", "Bash(uv run:*)"),
 )
 ```
 
-`allowUnsandboxedCommands` set to `False` keeps the model from rerunning a blocked command outside
-of the sandbox. `failIfUnavailable` fails the run when the sandbox can not start, instead of running
-the commands unsandboxed.
+Commands write within the working and the additional directories only - writes to the parent of the
+working directory and to anything else are refused by the OS (`operation not permitted` on macOS,
+`Read-only file system` on Linux), `rm -rf` included. Network is blocked unless `allowed_domains`
+are given. Reads are not confined by default, use `denied_reads` or a container to keep secrets out
+of reach. `ClaudeCodeSandbox` opens up or narrows the defaults, every field is empty by default:
 
-Commands write within the working directory, writes outside of it are refused by the OS
-(`operation not permitted` on macOS, `Read-only file system` on Linux). The draive tools keep
-working - the relay of [draive tools](#draive-tools) is a process of Claude Code outside of the
-sandbox, which confines the commands of `Bash` only.
+```python
+ClaudeCodeConfig(
+    tools=("Bash",),
+    allowed_tools=("Bash(git:*)", "Bash(docker:*)"),
+    sandbox=ClaudeCodeSandbox(
+        allowed_writes=("/var/cache/build",),  # writable besides the working directories
+        denied_reads=("/home/agent/.ssh",),  # not readable (`allowed_reads` re-allows within)
+        allowed_domains=("pypi.org", "*.github.com"),  # the only reachable domains
+        excluded_commands=("docker:*",),  # run outside of the sandbox
+    ),
+)
+```
+
+The paths are absolute, `denied_writes` and `denied_reads` are available as well, and
+`denied_domains` blocks domains. `excluded_commands` is a convenience and not a security boundary:
+the commands still go through the permission rules and have to be allowed by `allowed_tools`.
+
+The sandbox is strict: a blocked command is never rerun outside of it (`allowUnsandboxedCommands` is
+`False`) and a run fails when the sandbox can not start (`failIfUnavailable`) instead of running the
+commands unsandboxed. The draive tools keep working - the relay of [draive tools](#draive-tools) is
+a process of Claude Code outside of the sandbox, which confines the commands of `Bash` only.
 
 Linux needs `bubblewrap` and `socat` (Claude Code uses it for the network proxy of the sandbox)
-installed, and unprivileged user namespaces. Hosts which restrict them, i.e. Ubuntu 23.10 and newer
-with the AppArmor restriction or hardened kernels, can not start the sandbox - with
-`failIfUnavailable` the run fails there.
+installed, and unprivileged user namespaces. Hosts and containers which restrict them, i.e. Ubuntu
+23.10 and newer with the AppArmor restriction or hardened kernels, can not start the sandbox and the
+run fails there. Opt out with `sandbox=ClaudeCodeNoSandbox()` within a container which isolates the
+run already:
+
+```python
+ClaudeCodeConfig(tools=("Bash",), sandbox=ClaudeCodeNoSandbox())
+```
+
+Additional keys of the sandbox are given in `settings["sandbox"]` (a mapping). It is merged over the
+derived keys one by one, the configured ones win - `{"enabled": False}` switches the sandbox off,
+prefer `ClaudeCodeNoSandbox()` for that. Within `filesystem` and `network` the configured lists are
+added to the derived ones:
+
+```python
+ClaudeCodeConfig(
+    tools=("Bash",),
+    settings={"sandbox": {"network": {"allowLocalBinding": True}}},
+)
+```
+
+Without the sandbox, `Bash` commands can reach the Unix socket of the draive tools and call them
+directly, so `disallowed_tools` rules for draive tools are not enforced against `Bash` - pass only
+the tools the run may use. A sandboxed `Bash` is refused the connection (`Operation not permitted`).
 
 The sandbox does not replace a container for agents which must not reach anything else of the
 machine. Run agents which have `Bash` within a container or a disposable environment, as
@@ -325,6 +367,10 @@ the state of the scope is visible to them. They are named `mcp__draive__<tool>` 
 events and allowed automatically, `disallowed_tools` still applies. The name `draive` is reserved
 among `mcp_servers`. A run which reports the `draive` server as not connected fails with
 `ClaudeCodeUnavailable` instead of continuing without the tools.
+
+Without the [sandbox](#sandboxing) `Bash` commands can reach that socket and call the tools
+directly, so `disallowed_tools` rules for draive tools are not enforced against `Bash` - pass only
+the tools the run may use.
 
 Only tools with `response` handling are supported, as only the results returned to the model map to
 MCP - other tools are refused when the agent is created. So are names with characters other than

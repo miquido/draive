@@ -20,7 +20,10 @@ __all__ = (
     "ClaudeCodeNoClaudeMd",
     "ClaudeCodeNoCompaction",
     "ClaudeCodeNoConnectors",
+    "ClaudeCodeNoSandbox",
     "ClaudeCodeProjectClaudeMd",
+    "ClaudeCodeSandbox",
+    "ClaudeCodeSandboxing",
     "ClaudeCodeSkipAdditionalClaudeMd",
     "ClaudeCodeTelemetry",
 )
@@ -70,6 +73,10 @@ def _settings(
             isinstance(enabled, bool) for enabled in plugins.values()
         ):
             raise ValueError("Setting 'enabledPlugins' has to be a mapping of names to booleans")
+
+    sandbox: BasicValue | Missing = value.get("sandbox", Missing)
+    if sandbox is not Missing and not isinstance(sandbox, Mapping):
+        raise ValueError("Setting 'sandbox' has to be a mapping")
 
     return value
 
@@ -374,6 +381,60 @@ type ClaudeCodeClaudeMd = ClaudeCodeNoClaudeMd | ClaudeCodeProjectClaudeMd
 
 
 @final
+class ClaudeCodeSandbox(State, serializable=True):
+    """Claude Code runs the commands of ``Bash`` within its sandbox.
+
+    Commands are confined to the working and the additional directories - writes anywhere else
+    are refused by the operating system. The commands themselves are allowed by the permission
+    rules of ``allowed_tools``, i.e. ``Bash(git:*)`` - the sandbox confines what they touch. Network
+    is blocked unless ``allowed_domains`` are given. Without any field set the sandbox is minimal
+    and restrictive.
+
+    Attributes
+    ----------
+    allowed_writes
+        Absolute paths writable in addition to the working and the additional directories.
+    denied_writes
+        Absolute paths which are not writable.
+    denied_reads
+        Absolute paths which are not readable, reads of them are refused by permission rules too.
+    allowed_reads
+        Absolute paths readable again within ``denied_reads``, takes precedence over them.
+    excluded_commands
+        Command patterns in the syntax of ``Bash`` permission rules, i.e. ``docker:*``, which run
+        outside of the sandbox. It is a convenience and not a security boundary - these commands
+        still need to be allowed by the permission rules.
+    allowed_domains
+        Domains reachable by sandboxed commands, wildcards like ``*.example.com`` are supported.
+        Network is blocked unless the domains are given.
+    denied_domains
+        Domains which are not reachable, even when allowed by a wildcard of ``allowed_domains``.
+    """
+
+    type: Literal["sandbox"] = "sandbox"
+    allowed_writes: Annotated[Sequence[str], Verifier(_absolute_directories)] = ()
+    denied_writes: Annotated[Sequence[str], Verifier(_absolute_directories)] = ()
+    denied_reads: Annotated[Sequence[str], Verifier(_absolute_directories)] = ()
+    allowed_reads: Annotated[Sequence[str], Verifier(_absolute_directories)] = ()
+    excluded_commands: Sequence[str] = ()
+    allowed_domains: Sequence[str] = ()
+    denied_domains: Sequence[str] = ()
+
+
+@final
+class ClaudeCodeNoSandbox(State, serializable=True):
+    """Claude Code runs the commands of ``Bash`` without a sandbox.
+
+    Use it within a container which isolates the run already.
+    """
+
+    type: Literal["none"] = "none"
+
+
+type ClaudeCodeSandboxing = ClaudeCodeSandbox | ClaudeCodeNoSandbox
+
+
+@final
 class ClaudeCodeTelemetry(State, serializable=True):
     """OpenTelemetry export of Claude Code, to the system collecting the telemetry of draive.
 
@@ -526,6 +587,13 @@ class ClaudeCodeConfig(Configuration):
         locale, proxy and certificate ones which are always inherited.
     compaction
         Whether Claude Code compacts the context of a session when it grows, and when.
+    sandbox
+        Whether Claude Code runs the commands of ``Bash`` within its sandbox, confined to the
+        working and the additional directories. Applies when ``Bash`` is among ``tools``. It is
+        strict - a blocked command is never rerun outside of the sandbox and a run fails when the
+        sandbox can not start. Linux needs bubblewrap, socat and unprivileged user namespaces,
+        hosts or containers without them need ``ClaudeCodeNoSandbox()``. Additional keys of the
+        sandbox can be given in ``settings["sandbox"]`` (a mapping), merged over the derived ones.
     telemetry
         Export of the Claude Code telemetry, none when not set.
     """
@@ -554,4 +622,5 @@ class ClaudeCodeConfig(Configuration):
     env: Annotated[Mapping[str, str], Verifier(_unreserved_environment)] = {}
     inherit_env: Annotated[Sequence[str], Verifier(_unreserved_names)] = ()
     compaction: ClaudeCodeAutoCompaction | ClaudeCodeNoCompaction = ClaudeCodeAutoCompaction()
+    sandbox: ClaudeCodeSandbox | ClaudeCodeNoSandbox = ClaudeCodeSandbox()
     telemetry: ClaudeCodeTelemetry | Missing = Missing
