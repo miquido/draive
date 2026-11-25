@@ -56,6 +56,12 @@
 
 ### Changed
 
+- **Breaking:** requires haiway 0.66.0. Its State validation and JSON are stricter: a mutable plain
+  default (`{}`, `[]`, `set()`) of a State attribute raises `TypeError` when the class is created -
+  use `Default(factory=...)` or an immutable value - no string is parsed into a number, and
+  `to_json` writes compact, strict JSON. The JSON schema of a State agrees with its validation: a
+  `bool` accepts `0`, `1` and the words `true` and `false`, `datetime`, `time` and `timedelta` state
+  no `format`, and a closed tuple states `minItems` and `maxItems`.
 - **Breaking:** `claude_code_agent` keeps memory only as `sessions` (`ClaudeCodeSessions`), the
   `memory` argument and `AgentMemory` support are removed - a call without sessions is a fresh
   session.
@@ -92,6 +98,15 @@
   `ClaudeCodeAuthenticationFailed` and `ClaudeCodeLoginUnusable` extend them.
 - `MCP_CONNECTION_NONBLOCKING` is a reserved environment variable of runs, a configuration setting
   it in `env` or `inherit_env` is refused.
+
+### Fixed
+
+- SurrealDB field definitions keep their types under haiway 0.66.0: a `datetime` attribute is a
+  `datetime` field and a `bool` one a `bool` field, also within optionals and sequences, taken from
+  the annotations as the schema of a State no longer tells them apart. An attribute which can be
+  `Missing` is an `option`, as a missing value is left out of the record.
+- An MCP tool whose input schema has a closed tuple without `minItems` and `maxItems` loads again:
+  the length of the tuple is stated, every position required.
 
 ## 0.122.0
 
