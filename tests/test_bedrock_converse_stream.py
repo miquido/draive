@@ -4,7 +4,7 @@ from collections.abc import Iterator, Mapping, Sequence
 from typing import Any
 
 import pytest
-from haiway import ctx
+from haiway import Missing, ctx
 
 from draive.bedrock.config import BedrockChatConfig
 from draive.bedrock.converse import BedrockConverse, _request_parameters
@@ -310,3 +310,25 @@ async def test_bedrock_stream_failure_members_are_translated(
         failure = _stream_failure({member: {"message": "boom"}}, model="test-model")
 
     assert isinstance(failure, expected)
+
+
+@pytest.mark.parametrize(
+    ("stop_sequences", "expected"),
+    [
+        pytest.param(Missing, None, id="unset"),
+        pytest.param((), None, id="empty"),
+        pytest.param(("END",), ("END",), id="given"),
+    ],
+)
+def test_stop_sequences_reach_the_request_only_when_given(
+    stop_sequences: Any,
+    expected: Sequence[str] | None,
+) -> None:
+    parameters = _request_parameters(
+        instructions="system",
+        messages=[],
+        tools=ModelTools.none,
+        config=BedrockChatConfig(model="bedrock-test", stop_sequences=stop_sequences),
+    )
+
+    assert parameters["inferenceConfig"].get("stopSequences") == expected

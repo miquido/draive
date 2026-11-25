@@ -471,7 +471,8 @@ def _request_parameters(
     if config.top_p is not Missing:
         parameters["inferenceConfig"]["topP"] = config.top_p
 
-    if config.stop_sequences:
+    # `Missing` is truthy, an unset value would reach the request
+    if config.stop_sequences is not Missing and config.stop_sequences:
         parameters["inferenceConfig"]["stopSequences"] = config.stop_sequences
 
     if config.guardrail_identifier is not Missing and config.guardrail_version is not Missing:

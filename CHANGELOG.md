@@ -107,6 +107,8 @@
   `Missing` is an `option`, as a missing value is left out of the record.
 - An MCP tool whose input schema has a closed tuple without `minItems` and `maxItems` loads again:
   the length of the tuple is stated, every position required.
+- Bedrock Converse requests leave out `stopSequences` when none are configured - every request
+  without them carried the unset value and was refused by botocore before it was sent.
 
 ## 0.122.0
 
