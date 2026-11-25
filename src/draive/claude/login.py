@@ -42,14 +42,15 @@ _MAX_CREDENTIALS_BYTES: Final[int] = 64 * 1024
 class ClaudeCodeLogins:
     """Resolves local Claude Code logins into access tokens and owns their refreshes.
 
-    Prepared by ``ClaudeCode`` for the scope it enters, which waits for the refreshes still in
+    Prepared by ``ClaudeCode`` for each scope entering it, which waits for the refreshes still in
     flight when it exits. A login has at most one refresh in flight, shared by every run which
     needs it meanwhile, and a refresh which did not help or failed is not attempted again during
-    a cooldown. Refreshes run within the context the instance was made in, so what they report
-    reaches that scope also after the run which started them has ended. Across processes
-    refreshes are serialized with a file lock (``.login-refresh.lock`` in the configuration
-    directory of the login, which has to be writable), which coordinates draive processes only -
-    not an interactive Claude Code of the user.
+    a cooldown while the token is still valid. Refreshes run within the context the instance was
+    made in, so what they report reaches that scope also after the run which started them has
+    ended. Across instances and processes refreshes are serialized with a file lock
+    (``.login-refresh.lock`` in the configuration directory of the login, which has to be
+    writable), which coordinates draive processes only - not an interactive Claude Code of the
+    user.
 
     A refresh runs on its own task: a run which is cancelled, or which stops waiting for it, does
     not stop it, so a rotated refresh token is still written. A run whose token is still valid
@@ -68,10 +69,12 @@ class ClaudeCodeLogins:
         killed - only a refresh which hangs gets there.
     cooldown
         Time in seconds after a refresh which did not extend the token or failed, in which no
-        other refresh of the same login is attempted.
+        other refresh of the same login is attempted while its token is still valid - an expired
+        token is always refreshed.
     """
 
     __slots__ = (
+        "__weakref__",
         "_attempts",
         "_context",
         "_cooldown",
@@ -222,10 +225,12 @@ class ClaudeCodeLogins:
         loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
         task: asyncio.Task[ClaudeCodeAccessToken] | None = self._refreshes.get(key)
         if task is None:
-            if (attempt := self._attempts.get(key)) is not None and (
-                loop.time() - attempt < self._cooldown
+            if (
+                (attempt := self._attempts.get(key)) is not None
+                and loop.time() - attempt < self._cooldown
+                and _remaining(token) > 0
             ):
-                return token  # tried a moment ago, the token is used as it is
+                return token  # tried a moment ago, the token is used while it is valid
 
             # refreshing rotates the refresh token, it is not left half done when the caller is
             # cancelled or stops waiting - the file would not get the new one - so it runs on its

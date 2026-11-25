@@ -137,7 +137,7 @@ hangs.
 Whether `claude auth status` refreshes at a margin as large as 30 minutes is not verified - Claude
 Code may refresh only near the expiry. A refresh which does not extend the token, or which fails, is
 logged, the token is used while it is valid, with a warning, and the refresh is retried after the
-cooldown of a minute.
+cooldown of a minute - a run whose token has already expired tries it again right away.
 
 A run holds an access token and can not refresh it, so a run which outlives its token fails. A
 refresh may also revoke the access tokens other processes still hold. Keep `refresh_margin` above

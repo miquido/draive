@@ -713,7 +713,7 @@ async def test_the_scope_waits_for_a_refresh_its_cancelled_run_left(tmp_path: Pa
 
 
 @pytest.mark.asyncio
-async def test_every_entry_of_the_scope_drains_the_shared_logins(
+async def test_each_entry_gets_its_own_logins_and_every_exit_drains_the_live_ones(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -734,13 +734,92 @@ async def test_every_entry_of_the_scope_drains_the_shared_logins(
     async with ctx.scope("outer", disposables=(client,)):
         outer = ctx.state(ClaudeCodeRunner).resolving
         async with ctx.scope("inner", disposables=(client,)):
-            assert ctx.state(ClaudeCodeRunner).resolving == outer
+            inner = ctx.state(ClaudeCodeRunner).resolving
+            assert inner != outer
 
-        assert [logins.resolve for logins in drained] == [outer]
+        # exits can not be told apart, the inner one waits for the outer refreshes too
+        assert {logins.resolve for logins in drained} == {outer, inner}
 
-    assert [logins.resolve for logins in drained] == [outer, outer]
-    async with ctx.scope("again", disposables=(client,)):
-        assert ctx.state(ClaudeCodeRunner).resolving != outer  # a fresh one after the last exit
+
+@pytest.mark.asyncio
+async def test_refreshes_report_to_their_entry_after_an_earlier_entry_exited(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    directory = _login_directory(tmp_path, expires_in_ms=HOUR_MS)
+    (directory / "mode").write_text("nothing")
+    login = ClaudeCodeLocalLogin(config_directory=str(directory), refresh_margin=7200)
+    binary = _fake_binary(tmp_path)
+    client = ClaudeCode(binary=binary, credential=login)
+    first_entered = asyncio.Event()
+    second_entered = asyncio.Event()
+    first_exited = asyncio.Event()
+
+    async def first() -> None:
+        async with ctx.scope("first", disposables=(client,)):
+            first_entered.set()
+            await second_entered.wait()
+
+        first_exited.set()
+
+    async def second() -> None:
+        await first_entered.wait()
+        async with ctx.scope("second", disposables=(client,)):
+            second_entered.set()
+            await first_exited.wait()
+            token = await ctx.state(ClaudeCodeRunner).resolving(login, binary=binary)
+            assert isinstance(token, ClaudeCodeAccessToken)
+            assert token.value == TOKEN
+
+    async with ctx.scope("test"):
+        await asyncio.gather(first(), second())
+
+    assert len(_invocations(directory)) == 1
+    assert "Refreshing the Claude Code login did not extend its token" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_a_failed_entry_leaves_nothing_to_later_entries(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    directory = _login_directory(tmp_path, expires_in_ms=HOUR_MS)
+    (directory / "mode").write_text("nothing")
+    login = ClaudeCodeLocalLogin(config_directory=str(directory), refresh_margin=7200)
+    binary = tmp_path / "claude-refresh"  # missing until the second entry
+    client = ClaudeCode(binary=str(binary), credential=login)
+
+    with pytest.raises(ClaudeCodeUnavailable, match="executable was not found"):
+        async with ctx.scope("failed", disposables=(client,)):
+            pass
+
+    assert _fake_binary(tmp_path) == str(binary)
+    async with ctx.scope("entered", disposables=(client,)):
+        await ctx.state(ClaudeCodeRunner).resolving(login, binary=str(binary))
+
+    assert len(_invocations(directory)) == 1
+    assert "Refreshing the Claude Code login did not extend its token" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_an_expired_token_is_refreshed_again_during_the_cooldown(tmp_path: Path) -> None:
+    directory = _login_directory(tmp_path, expires_in_ms=-60_000)
+    (directory / "mode").write_text("nothing")
+    login = ClaudeCodeLocalLogin(config_directory=str(directory))
+    logins = ClaudeCodeLogins()
+    binary = _fake_binary(tmp_path)
+
+    async with ctx.scope("test"):
+        for _ in range(2):
+            with pytest.raises(ClaudeCodeUnavailable, match="has expired"):
+                await logins.resolve(login, binary=binary)
+
+        (directory / "mode").write_text("refresh")
+        token = await logins.resolve(login, binary=binary)
+
+    assert isinstance(token, ClaudeCodeAccessToken)
+    assert token.value == REFRESHED
+    assert len(_invocations(directory)) == 3
 
 
 @pytest.mark.asyncio
