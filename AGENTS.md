@@ -3,7 +3,7 @@ Draive is a python framework helping to build high-quality Gen-AI applications. 
 ## Development Toolchain
 
 - Python: 3.15 or newer (`.python-version`, `requires-python`) - ruff and pyright target 3.15, CI tests 3.15. Pin the interpreter with `UV_PYTHON` (environment or `.env`) if needed, every uv command and make target honors it
-- uv: pinned to 0.13.9 (`[tool.uv] required-version`, `UV_VERSION` in `Makefile`)
+- uv: pinned to 0.13.10 (`[tool.uv] required-version`, `UV_VERSION` in `Makefile`)
 - Virtualenv: managed by uv at `./.venv`; `uv sync` installs every dependency group and integration extra it needs. Run tools through make targets or `uv run`, no activation required
 - Formatting: Ruff formatter (`make format`), no other formatter
 - Linters/Type-checkers: Ruff, Bandit, Pyright (strict). Run via `make lint`
