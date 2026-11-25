@@ -71,8 +71,7 @@ them on per run, so the same application can have them on for some runs and off 
 
 Nothing allows the tools of connectors for you - add them to `allowed_tools`, i.e.
 `mcp__claude_ai_Slack__*`. Connectors the account never authenticated are reported by Claude Code as
-`needs-auth` and are not counted as MCP servers which failed to connect, so they raise no warning; a
-connector which failed does.
+`needs-auth` and are not counted as MCP servers which failed to connect, so they raise no warning.
 
 Connectors need a token with the `user:mcp_servers` scope. API keys and `claude setup-token` tokens
 never have it, so a run which asks for connectors with them fails with `ClaudeCodeUnavailable`
@@ -146,15 +145,89 @@ your longest run - `timeout` of the configuration is its upper bound, and a run 
 above the longest run unless raised. A token which is shorter than the margin but still valid is
 used, with a warning.
 
+### Filtering connectors
+
+A run can use a part of the connectors only. `ClaudeCodeAccountConnectors` takes:
+
+- `excluded` - display names as the account shows them (`"Slack"`, not `"claude.ai Slack"`), sent as
+    `deniedMcpServers` entries named `claude.ai <name>` (Claude Code matches connectors by that name
+    only),
+- `excluded_urls` - URL patterns of connectors to remove, i.e. `https://mcp.atlassian.com/*`,
+- `allowed` - `ClaudeCodeAllConnectors()` (default), or `ClaudeCodeConnectorsAt(urls=...)` with at
+    least one URL pattern, the only connectors which are loaded.
+
+```python
+ClaudeCodeConfig(
+    connectors=ClaudeCodeAccountConnectors(
+        allowed=ClaudeCodeConnectorsAt(urls=("https://mcp.slack.com/*",)),
+    ),
+    mcp_servers={"docs": {"type": "http", "url": "https://docs.example"}},
+)
+```
+
+An allowlist keeps only the connectors matching it and the servers of `mcp_servers`. It drops every
+other MCP server - including the ones brought by plugins or subagents, which draive does not look
+for. A connector can not be allowed by its name: an `allowedMcpServers` entry by `serverName` makes
+Claude Code drop every connector. Hence the allowlist is by URL, and the servers of `mcp_servers`
+are added to it by their names automatically, so a name has to be made of letters, digits, `_` and
+`-` (the run fails with `ClaudeCodeUnavailable` otherwise). A list of URL patterns and names
+together keeps both the matching connectors and the named servers - verified with Claude Code
+2.1.331, while a list of URLs only drops the configured servers too. Claude Code prints a harmless
+"blocked by enterprise policy" warning on its error output for every connector the filters remove.
+Entries of `allowedMcpServers` and `deniedMcpServers` within `settings` are added to the derived
+ones and have to be lists.
+
+A connector which fails to connect or needs an authorization does not fail the run, and its tools
+are missing. Both are recorded as the `claude_code.connectors_unavailable` attribute (naming at most
+ten of them), and only the ones which failed raise a warning (`ClaudeCodeStarted.failed_connectors`)
+\- most connectors which need an authorization were never authorized by the account, so a warning
+about them would come with every run, while an expired grant of the account shows in the attribute.
+Connectors removed by the filters are not reported by Claude Code at all, so they are not among
+them.
+
+## CLAUDE.md of the working directory
+
+A run loads no `CLAUDE.md` by default - not the one of the working directory, nor the user's.
+`setting_sources=("project",)` loads it together with the project settings, which can add hooks and
+MCP servers. `claude_md=ClaudeCodeProjectClaudeMd()` loads the file without them:
+
+```python
+ClaudeCodeConfig(
+    directory="/srv/project",
+    claude_md=ClaudeCodeProjectClaudeMd(),
+)
+```
+
+It reads `<directory>/CLAUDE.md` and `<directory>/.claude/CLAUDE.md` of the working directory. The
+`directory` of the configuration is required - a temporary one holds no files, and a run without it
+fails with `ClaudeCodeUnavailable`. It is done by passing the working directory as an additional one
+with `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1`, which makes Claude Code read the files of
+additional directories - nothing of `.claude/settings.json` is applied. It does not load the
+`CLAUDE.md` of the directories above the working one, `CLAUDE.local.md`, the user's memory and files
+in subdirectories (not even once the agent reads a file of one). The file permissions of the run are
+not changed, the working directory is not added twice when it is among `additional_directories`.
+Directories are compared as given and never resolved, so pass real paths - a symlink to the working
+directory would be added again.
+
+The same variable makes the files of every additional directory load, so they are excluded by
+default (`additional_directories=ClaudeCodeSkipAdditionalClaudeMd()`) through `claudeMdExcludes` of
+the settings, listing `CLAUDE.md` and `.claude/CLAUDE.md` of each by absolute path. How glob
+characters within those paths are escaped is not verified, so a run with an additional directory
+containing `*?[]{}` fails with `ClaudeCodeUnavailable` - its file would load. Whether
+`.claude/rules/*.md` or `CLAUDE.local.md` of additional directories load with that variable as well
+is not verified. Use `ClaudeCodeLoadAdditionalClaudeMd()` to load the files of additional
+directories. Entries of `claudeMdExcludes` within `settings` are added to the derived ones (it has
+to be a list).
+
 ## Isolation and permissions
 
 A run is isolated by default and read-only. It has no user, project or local settings (and no
-`CLAUDE.md` of the working directory, `setting_sources=("project",)` opts in), no auto memory,
-plugins or skills of the installation, no MCP servers beyond the configured ones (unless account
-connectors are on), and only `Read`, `Grep` and `Glob` available. The environment is built from
-scratch - only `PATH`, locale, proxy and certificate variables are inherited, anything else of the
-parent process (especially the markers of a Claude Code running the parent) is left out. Claude Code
-never asks for a permission: what is not allowed is denied.
+`CLAUDE.md` of the working directory, `claude_md` or `setting_sources=("project",)` opts in), no
+auto memory, plugins or skills of the installation, no MCP servers beyond the configured ones
+(unless account connectors are on), and only `Read`, `Grep` and `Glob` available. The environment is
+built from scratch - only `PATH`, locale, proxy and certificate variables are inherited, anything
+else of the parent process (especially the markers of a Claude Code running the parent) is left out.
+Claude Code never asks for a permission: what is not allowed is denied.
 
 `ClaudeCodeConfig` is a regular configuration state. It refuses what can not work when it is created
 (`ValidationError`) - non-positive limits, relative directories, reserved environment variables - so
@@ -171,6 +244,7 @@ a run never starts with an invalid one:
 | `mcp_servers`, `subagents`, `plugin_directories`, `settings` | none                       | what Claude Code is given, nothing else is loaded (unless account connectors are on)                                        |
 | `connectors`                                                 | `ClaudeCodeNoConnectors()` | account connectors, see [Account connectors and local login](#account-connectors-and-local-login)                           |
 | `setting_sources`                                            | none                       | `project` loads the `CLAUDE.md` and `.claude` settings of the working directory                                             |
+| `claude_md`                                                  | `ClaudeCodeNoClaudeMd`     | `ClaudeCodeProjectClaudeMd` loads the `CLAUDE.md` of the working directory without its settings                             |
 | `env`, `inherit_env`                                         | none                       | extra variables, `CLAUDE*`, `ANTHROPIC_*`, `OTEL_*` and similar are reserved                                                |
 | `stream_deltas`                                              | `False`                    | stream the text while it is generated                                                                                       |
 | `system_prompt`                                              | `append`                   | whether instructions append to the system prompt (it keeps the tool guidance) or replace it                                 |
@@ -208,12 +282,18 @@ The text of the agent is streamed as text parts. Everything else is reported as 
 `claude_code.tool_use` and `claude_code.tool_result` for each tool use, `claude_code.subagent_text`
 for the subagents and `claude_code.result` at the end, with the cost, turns and duration. A failed
 run raises a variant of `ClaudeCodeFailed`, while a run which can not start - authentication,
-connectors, login resolution - raises `ClaudeCodeUnavailable` instead. Each variant carries only
-what is known of its kind: `ClaudeCodeErrored` for an error the run reported - an API failure, an
-exhausted limit - with its `failure` (`reason`, `api_error_status`, `terminal_reason`),
-`ClaudeCodeTimedOut`, `ClaudeCodeEnded` for a process which ended without a result (`exit_code` and
-a redacted tail of the error output) and `ClaudeCodeOutputTooLarge`. All have the `session_id` when
-the run reported one. Text and images are accepted as input.
+connectors, login resolution - raises `ClaudeCodeUnavailable` instead, and its variant
+`ClaudeCodeLoginUnusable` when a `ClaudeCodeLocalLogin` gives no valid token - its credentials file
+is missing, unreadable or malformed, or its token has expired and could not be refreshed - so
+logging in again (`claude /login` as the user of the login) is what helps. Each variant of
+`ClaudeCodeFailed` carries only what is known of its kind: `ClaudeCodeErrored` for an error the run
+reported - an API failure, an exhausted limit - with its `failure` (`reason`, `api_error_status`,
+`api_error_type`, `terminal_reason`) and its variant `ClaudeCodeAuthenticationFailed` when the API
+rejected the credential (HTTP 401 or `authentication_error`) - a `ClaudeCodeLocalLogin` token which
+was revoked or rotated by another process fails like that, and refreshing the login and running
+again may help, `ClaudeCodeTimedOut`, `ClaudeCodeEnded` for a process which ended without a result
+(`exit_code` and a redacted tail of the error output) and `ClaudeCodeOutputTooLarge`. All have the
+`session_id` when the run reported one. Text and images are accepted as input.
 
 ## Context and memory
 

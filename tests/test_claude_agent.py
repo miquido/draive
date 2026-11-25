@@ -23,10 +23,12 @@ from draive import (
 from draive.claude import (
     ClaudeCode,
     ClaudeCodeApiKey,
+    ClaudeCodeAuthenticationFailed,
     ClaudeCodeConfig,
     ClaudeCodeEnded,
     ClaudeCodeErrored,
     ClaudeCodeFailed,
+    ClaudeCodeFailure,
     ClaudeCodeOAuthToken,
     ClaudeCodeResult,
     ClaudeCodeRunner,
@@ -191,6 +193,45 @@ async def test_failed_runs_raise_with_the_reason_reported_by_the_run(tmp_path: P
     assert raised.value.api_error_status == 401
     assert raised.value.terminal_reason == "api_error"
     assert raised.value.session_id
+
+
+@pytest.mark.asyncio
+async def test_a_rejected_credential_raises_the_authentication_failure(tmp_path: Path) -> None:
+    setup = _Setup(tmp_path, scenario="error401")
+
+    async with setup.scope():
+        # still an errored run for whoever catches it
+        with pytest.raises(ClaudeCodeErrored) as raised:
+            await _call(claude_code_agent("coder"))
+
+    assert isinstance(raised.value, ClaudeCodeAuthenticationFailed)
+    assert raised.value.api_error_status == 401
+    assert raised.value.session_id
+    assert SECRET not in str(raised.value)
+
+
+def test_the_factory_picks_the_variant_of_the_failure() -> None:
+    rejected = ClaudeCodeErrored.of(
+        ClaudeCodeFailure(reason="no", api_error_type="authentication_error"), session_id="s"
+    )
+    plain = ClaudeCodeErrored.of(ClaudeCodeFailure(reason="busy", api_error_status=529))
+
+    assert isinstance(rejected, ClaudeCodeAuthenticationFailed)
+    assert rejected.session_id == "s"
+    assert type(plain) is ClaudeCodeErrored
+    assert plain.session_id is None
+
+
+@pytest.mark.asyncio
+async def test_other_api_errors_stay_plain_errored_runs(tmp_path: Path) -> None:
+    setup = _Setup(tmp_path, scenario="overloaded")
+
+    async with setup.scope():
+        with pytest.raises(ClaudeCodeErrored, match="Overloaded") as raised:
+            await _call(claude_code_agent("coder"))
+
+    assert not isinstance(raised.value, ClaudeCodeAuthenticationFailed)
+    assert raised.value.api_error_status == 529
 
 
 @pytest.mark.asyncio

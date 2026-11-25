@@ -35,7 +35,7 @@ def test_init_is_parsed_into_started() -> None:
                 "tools": ["Read", "Grep"],
                 "mcp_servers": [
                     {"name": "docs", "status": "connected"},
-                    {"name": "broken", "status": "failed"},
+                    {"name": "broken", "status": "failed", "source": "claudeai"},
                     {"name": "unknown"},
                     {"name": "claude.ai Slack", "status": "needs-auth", "source": "claudeai"},
                 ],
@@ -52,8 +52,8 @@ def test_init_is_parsed_into_started() -> None:
         api_key_source="ANTHROPIC_API_KEY",
         tools=("Read", "Grep"),
         mcp_servers=(
-            ClaudeCodeMCPServer(name="docs"),
-            ClaudeCodeMCPServer(name="broken", status="failed"),
+            ClaudeCodeMCPServer(name="docs", status="connected"),
+            ClaudeCodeMCPServer(name="broken", status="failed", source="claudeai"),
             ClaudeCodeMCPServer(name="unknown"),  # no status is reported by every version
             ClaudeCodeMCPServer(name="claude.ai Slack", status="needs-auth", source="claudeai"),
         ),
@@ -295,7 +295,9 @@ def test_started_derives_its_failed_servers_from_their_status() -> None:
     )
 
     assert isinstance(event, ClaudeCodeStarted)
-    assert event.failed_mcp_servers == ("b", "claude.ai Drive")
+    assert event.failed_mcp_servers == ("b",)  # connectors are reported apart
+    assert event.unavailable_connectors == ("claude.ai Slack", "claude.ai Drive")
+    assert event.failed_connectors == ("claude.ai Drive",)
 
 
 def test_malformed_result_fields_fall_back_to_defaults() -> None:
@@ -316,3 +318,86 @@ def test_malformed_result_fields_fall_back_to_defaults() -> None:
     assert (event.turns, event.duration_ms) == (0, 0)
     assert (event.cost_usd, event.permission_denials) == (None, 0)
     assert [(usage.model, usage.input_tokens) for usage in event.usage] == [("n", 0)]
+
+
+def test_started_separates_unavailable_connectors_from_failed_servers() -> None:
+    (event,) = parse_events(
+        _line(
+            {
+                "type": "system",
+                "subtype": "init",
+                "session_id": "s",
+                "mcp_servers": [
+                    {"name": "claude.ai A", "status": "connected", "source": "claudeai"},
+                    {"name": "claude.ai B", "status": "failed", "source": "claudeai"},
+                    {"name": "claude.ai C", "status": "needs-auth", "source": "claudeai"},
+                    {"name": "claude.ai D", "status": "pending", "source": "claudeai"},
+                    {"name": "local", "status": "failed", "source": "project"},
+                ],
+            }
+        )
+    )
+
+    assert isinstance(event, ClaudeCodeStarted)
+    assert event.unavailable_connectors == ("claude.ai B", "claude.ai C")
+    assert event.failed_mcp_servers == ("local",)
+
+
+@pytest.mark.parametrize(
+    ("fields", "authentication"),
+    [
+        ({"api_error_status": 401}, True),
+        ({"api_error_type": "authentication_error"}, True),
+        ({"api_error_status": 401, "api_error_type": "authentication_error"}, True),
+        ({"api_error_status": 429, "api_error_type": "rate_limit_error"}, False),
+        ({"api_error_status": 500}, False),
+        ({}, False),
+    ],
+)
+def test_failure_knows_whether_the_credential_was_rejected(
+    fields: dict[str, Any],
+    authentication: bool,
+) -> None:
+    (event,) = parse_events(
+        _line({"type": "result", "subtype": "success", "is_error": True, **fields})
+    )
+
+    assert isinstance(event, ClaudeCodeResult)
+    assert isinstance(event.outcome, ClaudeCodeFailure)
+    assert event.outcome.authentication_failed is authentication
+    assert event.outcome.api_error_type == fields.get("api_error_type")
+
+
+@pytest.mark.parametrize(
+    ("status", "expected", "connected"),
+    [
+        ("connected", "connected", True),
+        ("failed", "failed", False),
+        ("needs-auth", "needs-auth", False),
+        ("pending", "pending", False),
+        ("disabled", "disabled", False),
+        ("something-new", "unknown", False),
+        (5, None, True),
+        (None, None, True),
+    ],
+)
+def test_the_status_of_a_server_is_closed_and_decides_whether_it_is_connected(
+    status: Any,
+    expected: str | None,
+    connected: bool,
+) -> None:
+    (event,) = parse_events(
+        _line(
+            {
+                "type": "system",
+                "subtype": "init",
+                "session_id": "s",
+                "mcp_servers": [{"name": "a", "status": status}],
+            }
+        )
+    )
+
+    assert isinstance(event, ClaudeCodeStarted)
+    (server,) = event.mcp_servers
+    assert server.status == expected
+    assert server.connected is connected

@@ -7,12 +7,21 @@ from haiway import BasicValue, Configuration, Missing, Sensitive, State, Verifie
 __all__ = (
     "RUN_MARKER_VARIABLE",
     "ClaudeCodeAccountConnectors",
+    "ClaudeCodeAdditionalClaudeMd",
+    "ClaudeCodeAllConnectors",
+    "ClaudeCodeAllowedConnectors",
     "ClaudeCodeAutoCompaction",
+    "ClaudeCodeClaudeMd",
     "ClaudeCodeCompaction",
     "ClaudeCodeConfig",
     "ClaudeCodeConnectors",
+    "ClaudeCodeConnectorsAt",
+    "ClaudeCodeLoadAdditionalClaudeMd",
+    "ClaudeCodeNoClaudeMd",
     "ClaudeCodeNoCompaction",
     "ClaudeCodeNoConnectors",
+    "ClaudeCodeProjectClaudeMd",
+    "ClaudeCodeSkipAdditionalClaudeMd",
     "ClaudeCodeTelemetry",
 )
 
@@ -28,6 +37,14 @@ _RESERVED_ENV_NAMES: Final[tuple[str, ...]] = (
     "TRACESTATE",
     "DO_NOT_TRACK",
     "NODE_OPTIONS",
+    "MCP_CONNECTION_NONBLOCKING",
+)
+_CONNECTOR_PREFIX: Final[str] = "claude.ai "
+# settings which are lists, merged with the ones derived from the configuration
+_MERGED_SETTINGS: Final[tuple[str, ...]] = (
+    "claudeMdExcludes",
+    "allowedMcpServers",
+    "deniedMcpServers",
 )
 _MAXIMAL_PERCENT: Final[int] = 100
 _MINIMAL_COMPACTION_WINDOW: Final[int] = 100_000
@@ -113,6 +130,40 @@ def _unreserved_environment(
     return value
 
 
+def _connector_names(
+    value: Sequence[str],
+) -> Sequence[str]:
+    for name in value:
+        if name.startswith(_CONNECTOR_PREFIX):
+            raise ValueError(
+                f"Connector '{name}' is named by its display name without '{_CONNECTOR_PREFIX}'"
+            )
+
+    return value
+
+
+def _not_empty_urls(
+    value: Sequence[str],
+) -> Sequence[str]:
+    if not value:
+        raise ValueError("Allowed connectors need at least one URL pattern")
+
+    return value
+
+
+def _list_settings(
+    value: Mapping[str, BasicValue],
+) -> Mapping[str, BasicValue]:
+    for key in _MERGED_SETTINGS:
+        configured: BasicValue | Missing = value.get(key, Missing)
+        if configured is not Missing and (
+            not isinstance(configured, Sequence) or isinstance(configured, str | bytes)
+        ):
+            raise ValueError(f"Setting '{key}' has to be a list")
+
+    return value
+
+
 def _signals(
     value: Set[Literal["metrics", "logs", "traces"]],
 ) -> Set[Literal["metrics", "logs", "traces"]]:
@@ -172,6 +223,35 @@ class ClaudeCodeNoConnectors(State, serializable=True):
 
 
 @final
+class ClaudeCodeAllConnectors(State, serializable=True):
+    """Every connector of the account is loaded, besides the excluded ones."""
+
+    type: Literal["all"] = "all"
+
+
+@final
+class ClaudeCodeConnectorsAt(State, serializable=True):
+    """Only the connectors at the given URLs are loaded.
+
+    A connector can not be allowed by its name - Claude Code then drops every connector, as their
+    names never match the allowed ones.
+
+    Attributes
+    ----------
+    urls
+        URL patterns (``*`` matches any text) of the allowed connectors, i.e.
+        ``https://mcp.slack.com/*``. Sent as ``allowedMcpServers`` entries by ``serverUrl``, at
+        least one.
+    """
+
+    urls: Annotated[Sequence[str], Verifier(_not_empty_urls)]
+    type: Literal["at"] = "at"
+
+
+type ClaudeCodeAllowedConnectors = ClaudeCodeAllConnectors | ClaudeCodeConnectorsAt
+
+
+@final
 class ClaudeCodeAccountConnectors(State, serializable=True):
     """Runs use the connectors of the claude.ai account - its cloud MCP servers.
 
@@ -187,13 +267,99 @@ class ClaudeCodeAccountConnectors(State, serializable=True):
         Whether Claude Code waits (for a limited time, which it caps) for the connectors to
         connect before the model starts. Without it the tools of connectors which are not
         connected yet are not seen by the model.
+    excluded
+        Display names of connectors which are not loaded, as the account shows them (``Slack``,
+        not ``claude_ai_Slack`` nor ``claude.ai Slack``, which would exclude nothing). Sent as
+        ``deniedMcpServers`` entries by the name ``claude.ai <name>``, which is the only name
+        Claude Code matches connectors by.
+    excluded_urls
+        URL patterns (``*`` matches any text) of connectors which are not loaded, i.e.
+        ``https://mcp.atlassian.com/*``. Sent as ``deniedMcpServers`` entries by ``serverUrl``.
+    allowed
+        Which connectors are loaded - all of them, or only the ones at the given URLs. An allowlist
+        keeps only the connectors matching it and the servers of ``mcp_servers`` of the
+        configuration (allowed by their names automatically, which have to be made of letters,
+        digits, ``_`` and ``-``), and drops every other MCP server - the ones brought by plugins
+        and subagents too. Entries of ``allowedMcpServers`` and ``deniedMcpServers`` within
+        ``settings`` of the configuration are added to the ones derived here.
+
+    Connectors removed by the filters are not reported by Claude Code at all, they are not among the
+    unavailable or failed ones. Claude Code prints a warning for every one of them, it is harmless.
     """
 
     wait: bool = True
+    excluded: Annotated[Sequence[str], Verifier(_connector_names)] = ()
+    excluded_urls: Sequence[str] = ()
+    allowed: ClaudeCodeAllowedConnectors = ClaudeCodeAllConnectors()
     type: Literal["account"] = "account"
 
 
 type ClaudeCodeConnectors = ClaudeCodeNoConnectors | ClaudeCodeAccountConnectors
+
+
+@final
+class ClaudeCodeNoClaudeMd(State, serializable=True):
+    """Runs load no ``CLAUDE.md`` at all - not the one of the working directory, nor the user's."""
+
+    type: Literal["none"] = "none"
+
+
+@final
+class ClaudeCodeLoadAdditionalClaudeMd(State, serializable=True):
+    """The ``CLAUDE.md`` of every additional directory is loaded as well."""
+
+    type: Literal["load"] = "load"
+
+
+@final
+class ClaudeCodeSkipAdditionalClaudeMd(State, serializable=True):
+    """The ``CLAUDE.md`` of the additional directories is not loaded, only the working one."""
+
+    type: Literal["skip"] = "skip"
+
+
+type ClaudeCodeAdditionalClaudeMd = (
+    ClaudeCodeLoadAdditionalClaudeMd | ClaudeCodeSkipAdditionalClaudeMd
+)
+
+
+@final
+class ClaudeCodeProjectClaudeMd(State, serializable=True):
+    """Runs load the ``CLAUDE.md`` of the working directory, without loading its settings.
+
+    Loads ``<directory>/CLAUDE.md`` and ``<directory>/.claude/CLAUDE.md`` - the working directory
+    is passed as an additional one with ``CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD`` set, which
+    makes Claude Code read the files of additional directories. Nothing of ``.claude/settings.json``
+    of the directory is applied, so its hooks and MCP servers stay off, unlike with
+    ``setting_sources=("project",)``.
+
+    Not loaded: the ``CLAUDE.md`` of the directories above the working one, ``CLAUDE.local.md``,
+    the user's memory and files nested in subdirectories (not even once the agent reads a file of
+    one). The working directory is the ``directory`` of the configuration, which is required - a
+    temporary one has no files, and a run without it fails with ``ClaudeCodeUnavailable``. It is
+    not added twice when it is among the additional directories, and the permissions of the file
+    tools stay what they are without this. Directories are compared as given, not resolved - pass
+    real paths, a symlink to the working directory is added again.
+
+    Attributes
+    ----------
+    additional_directories
+        Whether the ``CLAUDE.md`` of the additional directories is loaded as well. Claude Code
+        loads the files of every additional directory with this enabled, so they are excluded
+        by default - ``claudeMdExcludes`` of the settings lists each additional directory's
+        ``CLAUDE.md`` and ``.claude/CLAUDE.md`` by their absolute paths. Escaping glob characters
+        within those is not verified, so a run with a directory containing ``*?[]{}`` fails with
+        ``ClaudeCodeUnavailable`` instead of loading its file. Whether ``.claude/rules/*.md`` or
+        ``CLAUDE.local.md`` of additional directories load as well is not verified either.
+        Entries of ``claudeMdExcludes`` within ``settings`` of the configuration are added to
+        them.
+    """
+
+    additional_directories: ClaudeCodeAdditionalClaudeMd = ClaudeCodeSkipAdditionalClaudeMd()
+    type: Literal["project"] = "project"
+
+
+type ClaudeCodeClaudeMd = ClaudeCodeNoClaudeMd | ClaudeCodeProjectClaudeMd
 
 
 @final
@@ -314,12 +480,17 @@ class ClaudeCodeConfig(Configuration):
         ``{"type": "http", "url": ...}``, nothing else is loaded unless ``connectors`` are used.
     connectors
         Whether runs use the connectors of the claude.ai account, none by default.
+    claude_md
+        Whether runs load the ``CLAUDE.md`` of the working directory, none by default.
     subagents
         Subagents by name, with ``description`` and ``prompt`` at least.
     plugin_directories
         Absolute directories of plugins to load, skills and commands are disabled without them.
     settings
-        Additional settings of Claude Code, merged over the isolating ones.
+        Additional settings of Claude Code, merged over the isolating ones. The lists
+        ``claudeMdExcludes``, ``allowedMcpServers`` and ``deniedMcpServers`` are the exception -
+        they are added to the entries derived from ``claude_md`` and ``connectors``, so a filter of
+        the configuration is never silently replaced. They have to be lists then.
     setting_sources
         Settings Claude Code loads besides the given ones, none by default. ``project`` loads
         the ``CLAUDE.md`` and the ``.claude`` settings of the working directory - use it when
@@ -356,9 +527,10 @@ class ClaudeCodeConfig(Configuration):
     system_prompt: Literal["append", "replace"] = "append"
     mcp_servers: Mapping[str, Mapping[str, BasicValue]] = {}
     connectors: ClaudeCodeConnectors = ClaudeCodeNoConnectors()
+    claude_md: ClaudeCodeClaudeMd = ClaudeCodeNoClaudeMd()
     subagents: Mapping[str, Mapping[str, BasicValue]] = {}
     plugin_directories: Annotated[Sequence[str], Verifier(_absolute_directories)] = ()
-    settings: Mapping[str, BasicValue] = {}
+    settings: Annotated[Mapping[str, BasicValue], Verifier(_list_settings)] = {}
     setting_sources: Sequence[Literal["user", "project", "local"]] = ()
     directory: Annotated[str, Verifier(_absolute)] | Missing = Missing
     additional_directories: Annotated[Sequence[str], Verifier(_absolute_directories)] = ()

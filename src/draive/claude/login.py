@@ -20,7 +20,7 @@ from draive.claude.credentials import (
     ClaudeCodeOAuthToken,
     ClaudeCodeResolvedCredential,
 )
-from draive.claude.exceptions import ClaudeCodeUnavailable
+from draive.claude.exceptions import ClaudeCodeLoginUnusable, ClaudeCodeUnavailable
 from draive.claude.launch import inherited_environment
 
 __all__ = ("ClaudeCodeLogins",)
@@ -124,7 +124,7 @@ class ClaudeCodeLogins:
 
         Raises
         ------
-        ClaudeCodeUnavailable
+        ClaudeCodeLoginUnusable
             When the file of a login is missing or malformed, or on macOS already expired - there
             it is a leftover of a login which lives in the keychain.
         """
@@ -133,7 +133,7 @@ class ClaudeCodeLogins:
                 path: str = _credentials_path(login)
                 token: ClaudeCodeAccessToken = await asyncio.to_thread(_read_login, path)
                 if _keychain_platform() and _remaining(token) <= 0:
-                    raise ClaudeCodeUnavailable(
+                    raise ClaudeCodeLoginUnusable(
                         f"the credentials file of the login ({path}) has expired{_KEYCHAIN_HINT}"
                     )
 
@@ -173,7 +173,7 @@ class ClaudeCodeLogins:
 
         Raises
         ------
-        ClaudeCodeUnavailable
+        ClaudeCodeLoginUnusable
             When the login has no usable credentials, or its token has expired and could not be
             refreshed.
         """
@@ -194,15 +194,19 @@ class ClaudeCodeLogins:
         path: str = _credentials_path(login)
         token: ClaudeCodeAccessToken = await asyncio.to_thread(_read_login, path)
         if _remaining(token) < login.refresh_margin:
-            token = await self._refreshing(login, token, path=path, binary=binary)
+            try:
+                token = await self._refreshing(login, token, path=path, binary=binary)
+
+            except ClaudeCodeLoginUnusable:
+                raise
+
+            # only a run whose token has expired gets the failure of the refresh, i.e. the lock
+            except ClaudeCodeUnavailable as exc:
+                raise ClaudeCodeLoginUnusable(_expired(exc.reason)) from exc
 
         remaining: float = _remaining(token)
         if remaining <= 0:
-            raise ClaudeCodeUnavailable(
-                "the access token of the login has expired and could not be refreshed,"
-                " log in again with `claude /login` as the user of the login"
-                + (_KEYCHAIN_HINT if _keychain_platform() else "")
-            )
+            raise ClaudeCodeLoginUnusable(_expired(None))
 
         if remaining < login.refresh_margin:
             ctx.log_warning(
@@ -494,9 +498,21 @@ def _read_login(
     if isinstance(outcome, str):
         # raised outside of everything which holds the content of the file - neither the
         # exception it was loaded with nor the frames parsing it are a part of this one
-        raise ClaudeCodeUnavailable(outcome)
+        raise ClaudeCodeLoginUnusable(outcome)
 
     return outcome
+
+
+def _expired(
+    cause: str | None,
+    /,
+) -> str:
+    return (
+        "the access token of the login has expired and could not be refreshed"
+        + (f" ({cause})" if cause else "")
+        + ", log in again with `claude /login` as the user of the login"
+        + (_KEYCHAIN_HINT if _keychain_platform() else "")
+    )
 
 
 def _load(

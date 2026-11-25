@@ -22,9 +22,11 @@ from draive.claude import (
     ClaudeCodeAccountConnectors,
     ClaudeCodeApiKey,
     ClaudeCodeConfig,
+    ClaudeCodeConnectorsAt,
     ClaudeCodeEvent,
     ClaudeCodeLaunch,
     ClaudeCodeLocalLogin,
+    ClaudeCodeLoginUnusable,
     ClaudeCodeResolving,
     ClaudeCodeRunner,
     ClaudeCodeUnavailable,
@@ -1117,3 +1119,271 @@ async def test_access_tokens_are_verified_by_the_none_source(
         else:
             with pytest.raises(ClaudeCodeUnavailable, match="access token of a login"):
                 _ = [chunk async for chunk in claude_code_agent("coder").call(input="hello")]
+
+
+_CONNECTORS = json.dumps(
+    [
+        {"name": "claude.ai Fine", "status": "connected", "source": "claudeai"},
+        {"name": "claude.ai Broken", "status": "failed", "source": "claudeai"},
+        {"name": "claude.ai Login", "status": "needs-auth", "source": "claudeai"},
+        {"name": "claude.ai Slow", "status": "pending", "source": "claudeai"},
+        {"name": "local", "status": "failed", "source": "project"},
+    ]
+)
+
+
+def _captured_warnings(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    warnings: list[str] = []
+
+    def log_warning(message: str, *_: Any, **__: Any) -> None:
+        warnings.append(message)
+
+    monkeypatch.setattr(ctx, "log_warning", log_warning)
+    return warnings
+
+
+def _captured_records(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+
+    def record_info(**kwargs: Any) -> None:
+        records.append(kwargs)
+
+    monkeypatch.setattr(ctx, "record_info", record_info)
+    return records
+
+
+async def _run_with_login(tmp_path: Path, **config: Any) -> None:
+    binary = write_fake_claude(tmp_path)
+    directory = _login_directory(tmp_path)
+    async with ctx.scope(
+        "test",
+        ClaudeCodeConfig(
+            timeout=30,
+            stop_grace=2,
+            env={"FAKE_CLAUDE_MCP": _CONNECTORS},
+            **config,
+        ),
+        disposables=(
+            ClaudeCode(
+                binary=binary,
+                credential=ClaudeCodeLocalLogin(config_directory=str(directory)),
+            ),
+        ),
+    ):
+        _ = [chunk async for chunk in claude_code_agent("coder").call(input="hello")]
+
+
+@pytest.mark.asyncio
+async def test_only_connectors_which_failed_are_warned_about(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    warnings = _captured_warnings(monkeypatch)
+
+    await _run_with_login(tmp_path, connectors=ClaudeCodeAccountConnectors())
+
+    (reported,) = [warning for warning in warnings if "connectors" in warning]
+    assert "claude.ai Broken" in reported
+    assert "claude.ai Login" not in reported  # needs an authorization, only recorded
+    assert "claude.ai Fine" not in reported
+    assert "claude.ai Slow" not in reported
+    assert TOKEN not in reported
+    # the failed server which is not a connector has its own warning
+    assert any("local" in warning and "Broken" not in warning for warning in warnings)
+
+
+@pytest.mark.asyncio
+async def test_unavailable_connectors_are_recorded_as_an_attribute(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    records = _captured_records(monkeypatch)
+
+    await _run_with_login(tmp_path, connectors=ClaudeCodeAccountConnectors())
+
+    started = next(
+        record
+        for record in records
+        if "claude_code.connectors_unavailable" in record.get("attributes", {})
+    )
+    assert started["attributes"]["claude_code.connectors_unavailable"] == [
+        "claude.ai Broken",
+        "claude.ai Login",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_recorded_unavailable_connectors_are_bounded_and_empty_without_connectors(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    records = _captured_records(monkeypatch)
+
+    await _run_with_login(tmp_path)
+
+    started = next(
+        record
+        for record in records
+        if "claude_code.connectors_unavailable" in record.get("attributes", {})
+    )
+    assert started["attributes"]["claude_code.connectors_unavailable"] == []
+
+
+@pytest.mark.asyncio
+async def test_reported_connectors_are_bounded(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    warnings = _captured_warnings(monkeypatch)
+    many = json.dumps(
+        [
+            {"name": f"claude.ai C{index}", "status": "failed", "source": "claudeai"}
+            for index in range(25)
+        ]
+    )
+    binary = write_fake_claude(tmp_path)
+    directory = _login_directory(tmp_path)
+
+    async with ctx.scope(
+        "test",
+        ClaudeCodeConfig(
+            timeout=30,
+            stop_grace=2,
+            connectors=ClaudeCodeAccountConnectors(),
+            env={"FAKE_CLAUDE_MCP": many},
+        ),
+        disposables=(
+            ClaudeCode(
+                binary=binary,
+                credential=ClaudeCodeLocalLogin(config_directory=str(directory)),
+            ),
+        ),
+    ):
+        _ = [chunk async for chunk in claude_code_agent("coder").call(input="hello")]
+
+    (reported,) = [warning for warning in warnings if "connectors" in warning]
+    assert "claude.ai C9" in reported
+    assert "claude.ai C10" not in reported
+    assert reported.endswith("and 15 more")
+
+
+@pytest.mark.asyncio
+async def test_connectors_are_not_reported_unless_they_are_used(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    warnings = _captured_warnings(monkeypatch)
+
+    await _run_with_login(tmp_path)
+
+    assert not any("connectors" in warning for warning in warnings)
+
+
+@pytest.mark.asyncio
+async def test_the_filters_of_connectors_reach_the_run_with_the_configured_servers(
+    tmp_path: Path,
+) -> None:
+    record = tmp_path / "record.json"
+    binary = write_fake_claude(tmp_path)
+    directory = _login_directory(tmp_path)
+
+    async with ctx.scope(
+        "test",
+        ClaudeCodeConfig(
+            timeout=30,
+            stop_grace=2,
+            connectors=ClaudeCodeAccountConnectors(
+                allowed=ClaudeCodeConnectorsAt(urls=("https://mcp.slack.com/*",))
+            ),
+            mcp_servers={"docs": {"type": "http", "url": "https://docs.example"}},
+            env={"FAKE_CLAUDE_RECORD": str(record)},
+        ),
+        disposables=(
+            ClaudeCode(
+                binary=binary,
+                credential=ClaudeCodeLocalLogin(config_directory=str(directory)),
+            ),
+        ),
+    ):
+        _ = [chunk async for chunk in claude_code_agent("coder").call(input="hello")]
+
+    arguments = json.loads(record.read_text())["arguments"]
+    settings = json.loads(arguments[arguments.index("--settings") + 1])
+    assert settings["allowedMcpServers"] == [
+        {"serverUrl": "https://mcp.slack.com/*"},
+        {"serverName": "docs"},
+    ]
+    assert "docs" in arguments[arguments.index("--mcp-config") + 1]
+
+
+@pytest.mark.asyncio
+async def test_a_missing_credentials_file_makes_the_login_unusable(tmp_path: Path) -> None:
+    async with ctx.scope("test"):
+        with pytest.raises(ClaudeCodeLoginUnusable, match="has no credentials file"):
+            await ClaudeCodeLogins.verify(ClaudeCodeLocalLogin(config_directory=str(tmp_path)))
+
+
+@pytest.mark.asyncio
+async def test_a_malformed_credentials_file_makes_the_login_unusable(tmp_path: Path) -> None:
+    directory = _login_directory(tmp_path)
+    (directory / ".credentials.json").write_text("{")
+
+    async with ctx.scope("test"):
+        with pytest.raises(ClaudeCodeLoginUnusable, match="malformed"):
+            await ClaudeCodeLogins().resolve(
+                ClaudeCodeLocalLogin(config_directory=str(directory)),
+                binary=_fake_binary(tmp_path),
+            )
+
+
+@pytest.mark.asyncio
+async def test_an_expired_token_whose_refresh_fails_makes_the_login_unusable(
+    tmp_path: Path,
+) -> None:
+    directory = _login_directory(tmp_path, expires_in_ms=-60_000)
+    holder = _hold_lock(directory, 3)
+
+    try:
+        async with ctx.scope("test"):
+            with pytest.raises(ClaudeCodeLoginUnusable) as failure:
+                await ClaudeCodeLogins(lock_timeout=0.2).resolve(
+                    ClaudeCodeLocalLogin(config_directory=str(directory)),
+                    binary=_fake_binary(tmp_path),
+                )
+
+    finally:
+        holder.kill()
+        holder.wait()
+
+    assert "has expired and could not be refreshed" in failure.value.reason
+    assert "another process is refreshing the login for too long" in failure.value.reason
+    assert not _invocations(directory)
+
+
+@pytest.mark.asyncio
+async def test_an_expired_token_the_refresh_did_not_extend_makes_the_login_unusable(
+    tmp_path: Path,
+) -> None:
+    directory = _login_directory(tmp_path, expires_in_ms=-60_000)
+    (directory / "mode").write_text("nothing")
+
+    async with ctx.scope("test"):
+        with pytest.raises(ClaudeCodeLoginUnusable, match="has expired and could not be refreshed"):
+            await ClaudeCodeLogins().resolve(
+                ClaudeCodeLocalLogin(config_directory=str(directory)),
+                binary=_fake_binary(tmp_path),
+            )
+
+
+@pytest.mark.asyncio
+async def test_a_missing_binary_is_not_an_unusable_login(tmp_path: Path) -> None:
+    client = ClaudeCode(
+        binary=str(tmp_path / "missing"),
+        credential=ClaudeCodeLocalLogin(config_directory=str(_login_directory(tmp_path))),
+    )
+
+    with pytest.raises(ClaudeCodeUnavailable) as failure:
+        async with ctx.scope("test", disposables=(client,)):
+            pass
+
+    assert not isinstance(failure.value, ClaudeCodeLoginUnusable)

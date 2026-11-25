@@ -1,6 +1,8 @@
 import json
 import os
+import re
 from collections.abc import Mapping, Sequence
+from os.path import join, normpath
 from typing import Annotated, Any, Final, cast, final
 from urllib.parse import quote
 from uuid import uuid4
@@ -9,10 +11,16 @@ from haiway import Missing, Sensitive, State, Verifier
 
 from draive.claude.config import (
     ClaudeCodeAccountConnectors,
+    ClaudeCodeAllConnectors,
     ClaudeCodeAutoCompaction,
     ClaudeCodeConfig,
+    ClaudeCodeConnectorsAt,
+    ClaudeCodeLoadAdditionalClaudeMd,
+    ClaudeCodeNoClaudeMd,
     ClaudeCodeNoCompaction,
     ClaudeCodeNoConnectors,
+    ClaudeCodeProjectClaudeMd,
+    ClaudeCodeSkipAdditionalClaudeMd,
     ClaudeCodeTelemetry,
 )
 from draive.claude.credentials import (
@@ -37,10 +45,16 @@ __all__ = (
     "claude_environment",
     "claude_settings",
     "inherited_environment",
+    "verify_allowed_servers",
+    "verify_claude_md",
     "verify_connectors",
 )
 
 _CONNECTORS_SCOPE: Final[str] = "user:mcp_servers"
+# what an allowlist of Claude Code accepts as the name of a server
+_ALLOWED_SERVER_NAME: Final[re.Pattern[str]] = re.compile(r"^[a-zA-Z0-9_-]+$")
+# not escaped within `claudeMdExcludes`, as escaping is not verified
+_GLOB_CHARACTERS: Final[str] = "*?[]{}"
 
 _NO_SESSION: Final[ClaudeCodeNoSession] = ClaudeCodeNoSession()
 
@@ -157,8 +171,32 @@ class ClaudeCodeLaunch(State):
 def claude_settings(
     config: ClaudeCodeConfig,
     /,
+    *,
+    directory: str | None = None,
 ) -> str:
-    """Prepare the isolating ``--settings`` JSON, configured settings are merged over it."""
+    """Prepare the isolating ``--settings`` JSON, configured settings are merged over it.
+
+    The lists ``claudeMdExcludes``, ``allowedMcpServers`` and ``deniedMcpServers`` derived from
+    ``claude_md`` and ``connectors`` are not replaced by the configured settings, the entries of
+    the configured ones are added to them instead.
+
+    Parameters
+    ----------
+    config
+        Configuration of the run.
+    directory
+        Working directory of the run, ``directory`` of the configuration when not given.
+
+    Returns
+    -------
+    str
+        The JSON of the settings.
+
+    Raises
+    ------
+    ValueError
+        When ``CLAUDE.md`` is loaded without a working directory.
+    """
     settings: dict[str, Any] = {
         "enabledPlugins": dict.fromkeys(_BUILTIN_PLUGINS, False),
         "autoMemoryEnabled": False,
@@ -167,7 +205,121 @@ def claude_settings(
         settings["autoCompactEnabled"] = False
 
     settings.update(config.settings)
+    for key, derived in _derived_settings(config, directory).items():
+        settings[key] = _merged_list(derived, config.settings.get(key, Missing))
+
     return json.dumps(settings, separators=(",", ":"), default=_json_value)
+
+
+def _working_directory(
+    config: ClaudeCodeConfig,
+    directory: str | None,
+    /,
+) -> str:
+    if directory is not None:
+        return directory
+
+    if config.directory is not Missing:
+        return config.directory
+
+    raise ValueError("Loading CLAUDE.md of the working directory needs the working directory")
+
+
+def _derived_settings(
+    config: ClaudeCodeConfig,
+    directory: str | None,
+    /,
+) -> Mapping[str, Sequence[Any]]:
+    return {
+        **_claude_md_settings(config, directory),
+        **_connector_settings(config),
+    }
+
+
+def _claude_md_settings(
+    config: ClaudeCodeConfig,
+    directory: str | None,
+    /,
+) -> Mapping[str, Sequence[Any]]:
+    match config.claude_md:
+        case ClaudeCodeNoClaudeMd():
+            return {}
+
+        case ClaudeCodeProjectClaudeMd(additional_directories=additional):
+            match additional:
+                case ClaudeCodeLoadAdditionalClaudeMd():
+                    return {}
+
+                case ClaudeCodeSkipAdditionalClaudeMd():
+                    excluded: Sequence[str] = tuple(
+                        path
+                        for other in _other_directories(
+                            config, _working_directory(config, directory)
+                        )
+                        for path in (join(other, "CLAUDE.md"), join(other, ".claude", "CLAUDE.md"))
+                    )
+                    return {"claudeMdExcludes": excluded} if excluded else {}
+
+
+def _connector_settings(
+    config: ClaudeCodeConfig,
+    /,
+) -> Mapping[str, Sequence[Any]]:
+    match config.connectors:
+        case ClaudeCodeNoConnectors():
+            return {}
+
+        case ClaudeCodeAccountConnectors(
+            excluded=excluded_names,
+            excluded_urls=excluded_urls,
+            allowed=allowed,
+        ):
+            derived: dict[str, Sequence[Any]] = {}
+            denied: Sequence[Mapping[str, str]] = (
+                *({"serverName": f"claude.ai {name}"} for name in excluded_names),
+                *({"serverUrl": url} for url in excluded_urls),
+            )
+            if denied:
+                derived["deniedMcpServers"] = denied
+
+            match allowed:
+                case ClaudeCodeAllConnectors():
+                    pass
+
+                case ClaudeCodeConnectorsAt(urls=urls):
+                    # an allowlist drops every server it does not match, the configured ones too
+                    derived["allowedMcpServers"] = (
+                        *({"serverUrl": url} for url in urls),
+                        *({"serverName": name} for name in config.mcp_servers),
+                    )
+
+            return derived
+
+
+def _merged_list(
+    derived: Sequence[Any],
+    configured: object,
+    /,
+) -> Sequence[Any]:
+    if configured is Missing:
+        return derived
+
+    # the configuration verifies it is a list
+    return (*derived, *(item for item in cast(Sequence[Any], configured) if item not in derived))
+
+
+def _other_directories(
+    config: ClaudeCodeConfig,
+    working: str,
+    /,
+) -> Sequence[str]:
+    return tuple(
+        dict.fromkeys(
+            normpath(other)
+            for other in config.additional_directories
+            if normpath(other) != normpath(working)
+        )
+    )
 
 
 def _json_value(
@@ -189,6 +341,7 @@ def claude_arguments(
     *,
     instructions: str = "",
     session: ClaudeCodeSession = _NO_SESSION,
+    directory: str | None = None,
 ) -> Sequence[str]:
     """Prepare the arguments running Claude Code headless within the given configuration.
 
@@ -200,11 +353,19 @@ def claude_arguments(
         Instructions of the agent, added to or replacing the system prompt.
     session
         Persistence of the run within Claude Code sessions.
+    directory
+        Working directory of the run, ``directory`` of the configuration when not given. Needed
+        only when the ``CLAUDE.md`` of the working directory is loaded.
 
     Returns
     -------
     Sequence[str]
         Arguments of the executable. The prompt is not among them, it is sent to the input.
+
+    Raises
+    ------
+    ValueError
+        When ``CLAUDE.md`` is loaded without a working directory.
     """
     arguments: list[str] = [
         "-p",
@@ -216,7 +377,7 @@ def claude_arguments(
         "--setting-sources",
         ",".join(config.setting_sources),
         "--settings",
-        claude_settings(config),
+        claude_settings(config, directory=directory),
         *_connector_arguments(config),
         "--no-chrome",
         "--permission-prompts",
@@ -229,7 +390,7 @@ def claude_arguments(
         ",".join(config.tools),
         *_plugin_arguments(config),
         *_permission_arguments(config),
-        *_extension_arguments(config),
+        *_extension_arguments(config, directory),
         *_session_arguments(session),
     ]
     if instructions:
@@ -296,6 +457,7 @@ def _permission_arguments(
 
 def _extension_arguments(
     config: ClaudeCodeConfig,
+    directory: str | None,
     /,
 ) -> Sequence[str]:
     arguments: list[str] = []
@@ -316,8 +478,18 @@ def _extension_arguments(
             ("--agents", json.dumps(config.subagents, separators=(",", ":"), default=_json_value))
         )
 
-    for directory in config.additional_directories:
-        arguments.extend(("--add-dir", directory))
+    for additional in config.additional_directories:
+        arguments.extend(("--add-dir", additional))
+
+    match config.claude_md:
+        case ClaudeCodeNoClaudeMd():
+            pass
+
+        case ClaudeCodeProjectClaudeMd():
+            working: str = _working_directory(config, directory)
+            # passed on its own, the permissions derived from the additional ones stay as they are
+            if normpath(working) not in map(normpath, config.additional_directories):
+                arguments.extend(("--add-dir", working))
 
     return tuple(arguments)
 
@@ -442,6 +614,83 @@ def verify_connectors(
             )
 
 
+def verify_claude_md(
+    config: ClaudeCodeConfig,
+    /,
+) -> None:
+    """Refuse loading ``CLAUDE.md`` which can not work with the rest of the configuration.
+
+    Parameters
+    ----------
+    config
+        Configuration of the run.
+
+    Raises
+    ------
+    ClaudeCodeUnavailable
+        When ``CLAUDE.md`` of the working directory is loaded without the ``directory`` of the
+        configuration, or the additional directories are excluded and one has glob characters.
+    """
+    match config.claude_md:
+        case ClaudeCodeNoClaudeMd():
+            return
+
+        case ClaudeCodeProjectClaudeMd(additional_directories=additional):
+            if config.directory is Missing:
+                raise ClaudeCodeUnavailable(
+                    "loading CLAUDE.md of the working directory needs the directory of the"
+                    " configuration"
+                )
+
+            match additional:
+                case ClaudeCodeLoadAdditionalClaudeMd():
+                    return
+
+                case ClaudeCodeSkipAdditionalClaudeMd():
+                    for other in config.additional_directories:
+                        if any(char in other for char in _GLOB_CHARACTERS):
+                            raise ClaudeCodeUnavailable(
+                                f"additional directory '{other}' has glob characters, its CLAUDE.md"
+                                " can not be excluded"
+                            )
+
+
+def verify_allowed_servers(
+    config: ClaudeCodeConfig,
+    /,
+) -> None:
+    """Refuse an allowlist of connectors which can not allow the configured MCP servers.
+
+    Parameters
+    ----------
+    config
+        Configuration of the run.
+
+    Raises
+    ------
+    ClaudeCodeUnavailable
+        When connectors are allowed by URLs and a configured MCP server has a name which an
+        allowlist can not match.
+    """
+    match config.connectors:
+        case ClaudeCodeNoConnectors():
+            return
+
+        case ClaudeCodeAccountConnectors(allowed=allowed):
+            match allowed:
+                case ClaudeCodeAllConnectors():
+                    return
+
+                case ClaudeCodeConnectorsAt():
+                    for name in config.mcp_servers:
+                        if _ALLOWED_SERVER_NAME.fullmatch(name) is None:
+                            raise ClaudeCodeUnavailable(
+                                f"MCP server '{name}' can not be allowed next to the allowed"
+                                " connectors, its name has to be made of letters, digits, '_' and"
+                                " '-'"
+                            )
+
+
 def _credential_environment(
     credential: ClaudeCodeResolvedCredential | Missing,
     /,
@@ -469,6 +718,18 @@ def _connector_environment(
             return {"MCP_CONNECTION_NONBLOCKING": "0"} if wait else {}
 
         case ClaudeCodeNoConnectors():
+            return {}
+
+
+def _claude_md_environment(
+    config: ClaudeCodeConfig,
+    /,
+) -> Mapping[str, str]:
+    match config.claude_md:
+        case ClaudeCodeProjectClaudeMd():
+            return {"CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD": "1"}
+
+        case ClaudeCodeNoClaudeMd():
             return {}
 
 
@@ -528,6 +789,7 @@ def claude_environment(
 
     environment.update(_credential_environment(credential))
     environment.update(_connector_environment(config))
+    environment.update(_claude_md_environment(config))
 
     match config.compaction:
         case ClaudeCodeAutoCompaction(percent=percent, window=window):
@@ -650,12 +912,20 @@ def build_launch(
     Raises
     ------
     ClaudeCodeUnavailable
-        When account connectors are enabled and the credential can not use them.
+        When account connectors are enabled and the credential can not use them, or the
+        configuration of connectors or ``CLAUDE.md`` can not work.
     """
     verify_connectors(config, credential)
+    verify_allowed_servers(config)
+    verify_claude_md(config)
     return ClaudeCodeLaunch(
         binary=binary,
-        arguments=claude_arguments(config, instructions=instructions, session=session),
+        arguments=claude_arguments(
+            config,
+            instructions=instructions,
+            session=session,
+            directory=workspace.directory,
+        ),
         environment=claude_environment(
             config,
             workspace=workspace,

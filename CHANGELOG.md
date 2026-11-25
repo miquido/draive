@@ -16,6 +16,33 @@
   `ClaudeCodeAccessToken` and can not refresh it, so `refresh_margin` has to be longer than the
   longest run. A run whose token is still valid waits for a refresh at most `refresh_timeout` and
   goes on with its token, the `ClaudeCode` scope waits for refreshes still in flight when it exits.
+- `ClaudeCodeLoginUnusable`, a `ClaudeCodeUnavailable` raised when a `ClaudeCodeLocalLogin` gives no
+  valid token - its credentials file is missing, unreadable or malformed, or its token has expired
+  and could not be refreshed - so a caller can tell that logging in again is needed.
+- `ClaudeCodeConfig.claude_md` loads the `CLAUDE.md` of the working directory per run without
+  enabling the project settings: `ClaudeCodeProjectClaudeMd()` (default `ClaudeCodeNoClaudeMd()`).
+  It reads `<directory>/CLAUDE.md` and `<directory>/.claude/CLAUDE.md` only - no ancestors, no
+  `CLAUDE.local.md`, no nested files - and the hooks and settings of the project stay off. The
+  `CLAUDE.md` of additional directories is excluded unless
+  `additional_directories=ClaudeCodeLoadAdditionalClaudeMd()`.
+- `ClaudeCodeAccountConnectors` filters connectors: `excluded` (display names, never prefixed with
+  `claude.ai `), `excluded_urls` (URL patterns) and `allowed`, `ClaudeCodeAllConnectors()` by
+  default or `ClaudeCodeConnectorsAt(urls=...)`, which loads only the connectors at the URLs. An
+  allowlist keeps the configured `mcp_servers` (allowed by their names automatically, a run fails
+  with `ClaudeCodeUnavailable` when a name has other characters than letters, digits, `_` and `-`)
+  and drops every other MCP server, the ones of plugins included. `claudeMdExcludes`,
+  `allowedMcpServers` and `deniedMcpServers` of `ClaudeCodeConfig.settings` have to be lists and are
+  added to the derived entries instead of replacing them.
+- `ClaudeCodeAuthenticationFailed`, a `ClaudeCodeErrored` raised when the API rejected the
+  credential of a run (HTTP 401 or an `authentication_error`), so a caller using
+  `ClaudeCodeLocalLogin` can tell it and run again. `ClaudeCodeFailure.api_error_type`,
+  `ClaudeCodeMCPServer.status` (`ClaudeCodeMCPStatus`) and `.source` are reported from the stream.
+- A run with account connectors records the connectors which failed or need an authorization as
+  `claude_code.connectors_unavailable` (names only, at most ten) -
+  `ClaudeCodeStarted.unavailable_connectors` - and warns only about the ones which failed
+  (`ClaudeCodeStarted.failed_connectors`): most connectors which need an authorization were never
+  authorized by the account. `ClaudeCodeStarted.failed_mcp_servers` lists the other servers which
+  did not connect. Connectors removed by the filters are not reported by Claude Code at all.
 
 ### Changed
 
@@ -24,8 +51,11 @@
   `ClaudeCodeAccessToken`, `ClaudeCodeResolvedCredential`, `ClaudeCodeResolving` and
   `ClaudeCodeConnectors`.
 - `ClaudeCodeMCPServer` keeps the `status` and `source` Claude Code reports, `connected` is derived
-  from the status. Account connectors which were never authenticated (`needs-auth`) are no longer
-  among `failed_mcp_servers` and raise no warning.
+  from the status and it is no longer a constructor argument.
+- `ClaudeCodeErrored` and `ClaudeCodeUnavailable` are not `final` anymore,
+  `ClaudeCodeAuthenticationFailed` and `ClaudeCodeLoginUnusable` extend them.
+- `MCP_CONNECTION_NONBLOCKING` is a reserved environment variable of runs, a configuration setting
+  it in `env` or `inherit_env` is refused.
 
 ## 0.122.0
 

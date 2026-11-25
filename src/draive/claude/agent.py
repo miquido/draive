@@ -6,7 +6,12 @@ from urllib.parse import quote
 from haiway import Meta, MetaValues, Missing, State, ctx
 
 from draive.agents import Agent, AgentIdentity, AgentMemory, AgentMessage, AgentThread
-from draive.claude.config import ClaudeCodeConfig
+from draive.claude.config import (
+    ClaudeCodeAccountConnectors,
+    ClaudeCodeConfig,
+    ClaudeCodeConnectors,
+    ClaudeCodeNoConnectors,
+)
 from draive.claude.credentials import ClaudeCodeResolvedCredential
 from draive.claude.events import (
     ClaudeCodeDelta,
@@ -53,6 +58,8 @@ __all__ = ("claude_code_agent",)
 _PROVIDER: Final[str] = "claude_code"
 # built-in plugins which an organization enforces for its accounts, no setting disables them
 _ENFORCED_PLUGINS: Final[Sequence[str]] = ("cc-plugin-sec-default",)
+# connectors named by the record and the warning, the rest is counted
+_REPORTED_CONNECTORS: Final[int] = 10
 
 type _Chunk = MultimodalContentPart | ProcessingEvent
 
@@ -204,7 +211,7 @@ def claude_code_agent(
                     async for event in stream:
                         if isinstance(event, ClaudeCodeStarted):
                             _verify_authentication(event, credential)
-                            _report_started(event)
+                            _report_started(event, resolved.connectors)
 
                         for chunk in _chunks(event, streamed):
                             yield chunk
@@ -217,7 +224,7 @@ def claude_code_agent(
                 result: ClaudeCodeResult = _concluded(streamed)
                 match result.outcome:
                     case ClaudeCodeFailure() as failure:
-                        raise ClaudeCodeErrored(failure=failure, session_id=result.session_id)
+                        raise ClaudeCodeErrored.of(failure, session_id=result.session_id)
 
                     case ClaudeCodeSuccess(text=answer):
                         if not streamed.answer and answer:
@@ -390,10 +397,36 @@ def _verify_authentication(
         )
 
 
+def _connectors_of(
+    started: ClaudeCodeStarted,
+    connectors: ClaudeCodeConnectors,
+    /,
+) -> tuple[Sequence[str], Sequence[str]]:
+    match connectors:
+        case ClaudeCodeNoConnectors():
+            return (), ()
+
+        case ClaudeCodeAccountConnectors():
+            # connectors removed by the filters are not reported by Claude Code at all
+            return started.unavailable_connectors, started.failed_connectors
+
+
+def _named(
+    names: Sequence[str],
+    /,
+) -> str:
+    more: int = len(names) - _REPORTED_CONNECTORS
+    return ", ".join(names[:_REPORTED_CONNECTORS]) + (f" and {more} more" if more > 0 else "")
+
+
 def _report_started(
     started: ClaudeCodeStarted,
+    connectors: ClaudeCodeConnectors,
     /,
 ) -> None:
+    unavailable: Sequence[str]
+    failed: Sequence[str]
+    unavailable, failed = _connectors_of(started, connectors)
     ctx.record_info(
         attributes={
             "claude_code.session": started.session_id,
@@ -403,12 +436,18 @@ def _report_started(
             "claude_code.tools": list(started.tools),
             "claude_code.mcp_servers": [server.name for server in started.mcp_servers],
             "claude_code.mcp_failed": list(started.failed_mcp_servers),
+            "claude_code.connectors_unavailable": list(unavailable[:_REPORTED_CONNECTORS]),
         },
     )
     if started.failed_mcp_servers:
         ctx.log_warning(
             f"Claude Code could not connect MCP servers: {', '.join(started.failed_mcp_servers)}"
         )
+
+    # connectors which need an authorization are only recorded - most were never authorized by
+    # the account, a warning about them would come with every run
+    if failed:
+        ctx.log_warning(f"Claude Code could not connect connectors: {_named(failed)}")
 
     if leaked := [
         name
