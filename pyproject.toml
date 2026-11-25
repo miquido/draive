@@ -24,7 +24,7 @@ classifiers = [
 ]
 license = "MIT"
 license-files = ["LICENSE"]
-dependencies = ["numpy~=2.5", "haiway~=0.66.0", "pyyaml~=6.0"]
+dependencies = ["numpy~=2.5", "haiway~=0.67.0", "pyyaml~=6.0"]
 
 [project.urls]
 Homepage = "https://miquido.com"
