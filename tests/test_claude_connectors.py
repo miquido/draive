@@ -16,14 +16,7 @@ from draive.claude import (
     ClaudeCodeOAuthToken,
     ClaudeCodeUnavailable,
 )
-from draive.claude.launch import (
-    build_launch,
-    claude_arguments,
-    claude_environment,
-    claude_settings,
-    verify_allowed_servers,
-    verify_connectors,
-)
+from draive.claude.launch import ClaudeCodeLaunch
 from draive.claude.workspace import ClaudeCodeWorkspace
 
 WORKSPACE = ClaudeCodeWorkspace(root="/private", directory="/private/work")
@@ -42,12 +35,14 @@ def _environment(
     config: ClaudeCodeConfig,
     credential: Any = Missing,
 ) -> Any:
-    return claude_environment(config, workspace=WORKSPACE, parent={}, credential=credential)
+    return ClaudeCodeLaunch.prepare_environment(
+        config, workspace=WORKSPACE, parent={}, credential=credential
+    )
 
 
 def test_connectors_are_off_by_default() -> None:
     assert ClaudeCodeConfig().connectors == ClaudeCodeNoConnectors()
-    assert "--strict-mcp-config" in claude_arguments(ClaudeCodeConfig())
+    assert "--strict-mcp-config" in ClaudeCodeLaunch.prepare_arguments(ClaudeCodeConfig())
     assert "MCP_CONNECTION_NONBLOCKING" not in _environment(ClaudeCodeConfig())
 
 
@@ -61,7 +56,7 @@ def test_account_connectors_are_not_strict(
 ) -> None:
     config = ClaudeCodeConfig(connectors=connectors)
 
-    assert "--strict-mcp-config" not in claude_arguments(config)
+    assert "--strict-mcp-config" not in ClaudeCodeLaunch.prepare_arguments(config)
     environment = _environment(config)
     assert environment.get("MCP_CONNECTION_NONBLOCKING") == ("0" if waiting else None)
 
@@ -72,7 +67,7 @@ def test_account_connectors_keep_the_configured_servers() -> None:
         mcp_servers={"docs": {"type": "http", "url": "https://docs.example"}},
     )
 
-    arguments = claude_arguments(config)
+    arguments = ClaudeCodeLaunch.prepare_arguments(config)
 
     assert "--strict-mcp-config" not in arguments
     assert "docs" in arguments[arguments.index("--mcp-config") + 1]
@@ -82,7 +77,7 @@ def test_access_tokens_declare_their_scopes_and_never_leak() -> None:
     token = _access_token("user:inference", "user:mcp_servers")
     config = ClaudeCodeConfig(connectors=ClaudeCodeAccountConnectors())
 
-    launch = build_launch(
+    launch = ClaudeCodeLaunch.of(
         config,
         binary="/bin/claude",
         prompt=[{"type": "text", "text": "hello"}],
@@ -111,11 +106,13 @@ def test_access_tokens_declare_their_scopes_and_never_leak() -> None:
 )
 def test_account_connectors_refuse_credentials_without_the_scope(credential: Any) -> None:
     with pytest.raises(ClaudeCodeUnavailable):
-        verify_connectors(ClaudeCodeConfig(connectors=ClaudeCodeAccountConnectors()), credential)
+        ClaudeCodeLaunch.verify_connectors(
+            ClaudeCodeConfig(connectors=ClaudeCodeAccountConnectors()), credential
+        )
 
 
 def test_connectors_are_accepted_with_the_scope() -> None:
-    verify_connectors(
+    ClaudeCodeLaunch.verify_connectors(
         ClaudeCodeConfig(connectors=ClaudeCodeAccountConnectors()),
         _access_token("user:inference", "user:mcp_servers"),
     )
@@ -126,7 +123,7 @@ def test_connectors_are_accepted_with_the_scope() -> None:
     [ClaudeCodeApiKey(value="sk-ant-api03-key"), _access_token("user:inference"), Missing],
 )
 def test_no_connectors_accept_any_credential(credential: Any) -> None:
-    verify_connectors(ClaudeCodeConfig(), credential)
+    ClaudeCodeLaunch.verify_connectors(ClaudeCodeConfig(), credential)
 
 
 @pytest.mark.asyncio
@@ -137,7 +134,7 @@ async def test_connectors_are_a_part_of_the_scoped_configuration() -> None:
 
 def test_launches_refuse_connectors_with_credentials_without_the_scope() -> None:
     with pytest.raises(ClaudeCodeUnavailable):
-        build_launch(
+        ClaudeCodeLaunch.of(
             ClaudeCodeConfig(connectors=ClaudeCodeAccountConnectors()),
             binary="/bin/claude",
             prompt=[],
@@ -147,7 +144,7 @@ def test_launches_refuse_connectors_with_credentials_without_the_scope() -> None
 
 
 def _settings(config: ClaudeCodeConfig) -> Any:
-    return json.loads(claude_settings(config))
+    return json.loads(ClaudeCodeLaunch.prepare_settings(config))
 
 
 def test_connectors_have_no_filters_by_default() -> None:
@@ -193,6 +190,32 @@ def test_allowed_connectors_are_matched_by_urls_and_the_configured_servers_are_k
         {"serverName": "docs"},
         {"serverName": "local"},
     ]
+
+
+def test_the_tools_server_is_allowed_next_to_the_allowed_connectors() -> None:
+    config = ClaudeCodeConfig(
+        connectors=ClaudeCodeAccountConnectors(
+            allowed=ClaudeCodeConnectorsAt(urls=("https://mcp.slack.com/*",))
+        ),
+        mcp_servers={"docs": {"command": "docs"}},
+    )
+    tools_server = {"type": "http", "url": "http://127.0.0.1:1/mcp"}
+
+    allowed = json.loads(ClaudeCodeLaunch.prepare_settings(config, tools_server=tools_server))[
+        "allowedMcpServers"
+    ]
+    arguments = ClaudeCodeLaunch.prepare_arguments(config, tools_server=tools_server)
+    servers = json.loads(arguments[arguments.index("--mcp-config") + 1])["mcpServers"]
+
+    assert allowed == [
+        {"serverUrl": "https://mcp.slack.com/*"},
+        {"serverName": "docs"},
+        {"serverName": "draive"},
+    ]
+    assert set(servers) == {"docs", "draive"}
+    assert "mcp__draive" in arguments[arguments.index("--allowedTools") + 1].split(",")
+    # nothing to allow without the tools
+    assert {"serverName": "draive"} not in _settings(config)["allowedMcpServers"]
 
 
 def test_configured_filters_are_added_to_the_derived_ones() -> None:
@@ -274,10 +297,10 @@ def test_servers_which_an_allowlist_can_not_name_are_refused_with_allowed_connec
     )
 
     with pytest.raises(ClaudeCodeUnavailable, match="can not be allowed"):
-        verify_allowed_servers(config)
+        ClaudeCodeLaunch.verify_allowed_servers(config)
 
     with pytest.raises(ClaudeCodeUnavailable, match="can not be allowed"):
-        build_launch(
+        ClaudeCodeLaunch.of(
             config,
             binary="/bin/claude",
             prompt=[],
@@ -287,13 +310,15 @@ def test_servers_which_an_allowlist_can_not_name_are_refused_with_allowed_connec
 
 
 def test_any_server_name_is_fine_without_an_allowlist() -> None:
-    verify_allowed_servers(
+    ClaudeCodeLaunch.verify_allowed_servers(
         ClaudeCodeConfig(
             connectors=ClaudeCodeAccountConnectors(),
             mcp_servers={"my server": {"command": "x"}},
         )
     )
-    verify_allowed_servers(ClaudeCodeConfig(mcp_servers={"my server": {"command": "x"}}))
+    ClaudeCodeLaunch.verify_allowed_servers(
+        ClaudeCodeConfig(mcp_servers={"my server": {"command": "x"}})
+    )
 
 
 def test_connector_filters_survive_serialization() -> None:

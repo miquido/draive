@@ -19,7 +19,6 @@ from draive.claude.types import ClaudeCodeRunner, ClaudeCodeUnavailable
 
 __all__ = ("ClaudeCode",)
 
-_DEFAULT_BINARY: Final[str] = "~/.local/bin/claude"
 _API_KEY_PREFIX: Final[str] = "sk-ant-api"
 _OAUTH_TOKEN_PREFIX: Final[str] = "sk-ant-oat"
 
@@ -48,8 +47,8 @@ class ClaudeCode:
         ``ANTHROPIC_API_KEY`` or ``CLAUDE_CODE_OAUTH_TOKEN`` when not set. A key given as the
         token or the other way is refused unless a custom endpoint is used.
     binary
-        Path of the ``claude`` executable. Resolved from ``CLAUDE_CODE_BINARY``, the
-        ``PATH`` and ``~/.local/bin/claude`` when not set.
+        Path of the ``claude`` executable. Resolved from ``CLAUDE_CODE_BINARY`` and the
+        ``PATH`` when not set.
     base_url
         Custom API endpoint, i.e. a gateway.
 
@@ -179,7 +178,6 @@ def _resolved_binary(
         binary,
         getenv_str("CLAUDE_CODE_BINARY"),
         shutil.which("claude"),
-        os.path.expanduser(_DEFAULT_BINARY),
     ]
     for candidate in candidates:
         if not candidate:

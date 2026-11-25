@@ -100,6 +100,7 @@ def test_assistant_message_carries_text_and_tool_use_in_order() -> None:
 
     assert events == (
         ClaudeCodeText(text="reading"),
+        ClaudeCodeText(text="   "),  # its deltas were streamed, the agent has to match them
         ClaudeCodeToolUse(identifier="t1", tool="Read", arguments={"path": "a"}),
     )
 
@@ -401,3 +402,27 @@ def test_the_status_of_a_server_is_closed_and_decides_whether_it_is_connected(
     (server,) = event.mcp_servers
     assert server.status == expected
     assert server.connected is connected
+
+
+def test_a_run_which_did_not_start_reports_its_errors() -> None:
+    events = parse_events(
+        _line(
+            {
+                "type": "result",
+                "subtype": "error_during_execution",
+                "is_error": True,
+                "num_turns": 0,
+                "errors": ["Sandbox required but unavailable: bubblewrap (bwrap) not installed", 3],
+                "startup_failure_reason": "sandbox_required_unavailable",
+            }
+        )
+    )
+
+    assert len(events) == 1
+    result = events[0]
+    assert isinstance(result, ClaudeCodeResult)
+    assert isinstance(result.outcome, ClaudeCodeFailure)
+    assert result.outcome.reason == (
+        "Sandbox required but unavailable: bubblewrap (bwrap) not installed"
+    )
+    assert result.outcome.startup_failure == "sandbox_required_unavailable"

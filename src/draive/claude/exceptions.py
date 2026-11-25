@@ -14,6 +14,7 @@ __all__ = (
     "ClaudeCodeOutputTooLarge",
     "ClaudeCodeTimedOut",
     "ClaudeCodeUnavailable",
+    "ClaudeCodeUnfinished",
 )
 
 
@@ -63,7 +64,10 @@ class ClaudeCodeLoginUnusable(ClaudeCodeUnavailable):
 
 
 class ClaudeCodeFailed(ClaudeCodeException, ABC):
-    """Raised when a Claude Code run failed, one of the variants below.
+    """Base of the failures of Claude Code runs, raised as one of its subclasses.
+
+    ``ClaudeCodeErrored``, ``ClaudeCodeTimedOut``, ``ClaudeCodeEnded``, ``ClaudeCodeUnfinished``
+    and ``ClaudeCodeOutputTooLarge`` carry what is known of their kind.
 
     Parameters
     ----------
@@ -125,7 +129,7 @@ class ClaudeCodeEnded(ClaudeCodeFailed):
     Parameters
     ----------
     exit_code
-        Exit code of the process, when it was available.
+        Exit code of the process.
     stderr
         Tail of the process error output with credentials redacted.
     session_id
@@ -137,17 +141,49 @@ class ClaudeCodeEnded(ClaudeCodeFailed):
     def __init__(
         self,
         *,
-        exit_code: int | None = None,
+        exit_code: int,
         stderr: str = "",
         session_id: str | None = None,
     ) -> None:
         super().__init__(session_id=session_id)
-        self.exit_code: int | None = exit_code
+        self.exit_code: int = exit_code
         self.stderr: str = stderr
 
     @property
     def reason(self) -> str:
         return "the process ended without a result"
+
+
+@final
+class ClaudeCodeUnfinished(ClaudeCodeFailed):
+    """The output of the run ended without a result, and no exit of its process is known.
+
+    The process closed its output and kept running, or a custom runner ended its stream
+    without reporting a result.
+
+    Parameters
+    ----------
+    stderr
+        Tail of the process error output with credentials redacted, ``None`` when a custom
+        runner had no process output to read.
+    session_id
+        Claude Code session of the run, when it got to report one.
+    """
+
+    __slots__ = ("stderr",)
+
+    def __init__(
+        self,
+        *,
+        stderr: str | None = None,
+        session_id: str | None = None,
+    ) -> None:
+        super().__init__(session_id=session_id)
+        self.stderr: str | None = stderr
+
+    @property
+    def reason(self) -> str:
+        return "the output ended without a result"
 
 
 class ClaudeCodeErrored(ClaudeCodeFailed):

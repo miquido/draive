@@ -66,8 +66,8 @@ that schema unenforced.
 
 ## Claude Code agent - `draive.claude`
 
-Needs no extra, only the `claude` executable. It runs Claude Code as a fully managed process and
-exposes it as an `Agent`.
+Needs no extra, only the `claude` executable (the `mcp` extra for `tools=`). It runs Claude Code as a
+fully managed process and exposes it as an `Agent`.
 
 ```python
 from draive.claude import (
@@ -80,35 +80,73 @@ async with ctx.scope(
                      telemetry=ClaudeCodeTelemetry.from_env(signals={"metrics", "logs", "traces"})),
     disposables=(ClaudeCode(credential=ClaudeCodeApiKey("sk-ant-api...")),),   # or ClaudeCodeOAuthToken, env
 ):
-    coder = claude_code_agent("coder", instructions="Fix bugs.", memory=AgentMemory.volatile())
+    coder = claude_code_agent("coder", instructions="Fix bugs.",
+                              sessions=ClaudeCodeSessions(state_directory="/var/lib/agent"))
     async for chunk in coder.call(input="Fix the failing test"): ...   # text + ProcessingEvents
 ```
 
+`claude_code_agent(agent, *, description, instructions, sessions: ClaudeCodeSessions | None = None,
+config, tools: Toolbox | Iterable[Tool] = Toolbox.empty, meta)`.
+
 - Invalid states do not exist: `ClaudeCodeConfig` refuses non-positive limits, relative directories and
   reserved environment variables when created (`ValidationError`); a credential is one of
-  `ClaudeCodeApiKey`/`ClaudeCodeOAuthToken` (1-4096 bytes); `compaction` is `ClaudeCodeAutoCompaction(percent=,
-  window=)` or `ClaudeCodeNoCompaction()`; telemetry `signals` are a non-empty set.
+  `ClaudeCodeApiKey`/`ClaudeCodeOAuthToken`/`ClaudeCodeLocalLogin` (keys and tokens 1-4096 bytes);
+  `compaction` is `ClaudeCodeAutoCompaction(percent=, window=)` or `ClaudeCodeNoCompaction()`;
+  telemetry `signals` are a non-empty set.
 - Authentication is only the given credential (handed over through a file descriptor, kept out of
   arguments, environment and reprs). Nothing of the user's login is reachable: private home, an
   environment built from scratch, and the run is stopped if Claude Code reports another
-  authentication source. No credential means entering the scope fails.
-- File tools (`Read`, `Grep`, `Glob`, `Edit`, `Write`) are confined to the working and additional
-  directories by default (no symlink or `..` escape), `Bash` is not confined - disposable environments only.
-- Isolated and deny-by-default: no user/project settings (nor the working directory `CLAUDE.md`,
-  `setting_sources=("project",)` opts in), no plugins/skills/auto memory, no MCP
-  except `mcp_servers`, tools `Read`, `Grep`, `Glob`, `permission_mode="dontAsk"`. `Bash` and
-  `bypassPermissions` only in a disposable environment.
-- Output: text parts + `ProcessingEvent`s (`claude_code.tool_use`, `.tool_result`, `.subagent_text`,
+  authentication source. No credential means entering the scope fails. `ClaudeCodeLocalLogin` hands
+  over the access token of a file based `claude /login` login (refreshed through Claude Code),
+  `ClaudeCodeConfig(connectors=ClaudeCodeAccountConnectors())` turns on claude.ai connectors
+  (`mcp__claude_ai_<Name>__*`, need that login and `allowed_tools`). Connectors are filtered by
+  `ClaudeCodeAccountConnectors(excluded=("Slack",), excluded_urls=..., allowed=ClaudeCodeConnectorsAt(urls=...))`
+  - an allowlist keeps `mcp_servers` (and the `draive` tools server) by name, so those names need
+  letters, digits, `_` and `-` (else `ClaudeCodeUnavailable`) - and failed connectors are warned
+  about, the ones needing authorization only recorded (`claude_code.connectors_unavailable`).
+- The executable is resolved from `binary=` of `ClaudeCode`, `CLAUDE_CODE_BINARY` and `PATH` only.
+- Isolated and deny-by-default: no built-in tools unless `tools=` of the config (file tools you add
+  are scoped to the working and additional directories - no symlink or `..` escape - `Bash` is not
+  confined, disposable environments only), `permission_mode="dontAsk"`, no setting sources (nor the
+  working directory `CLAUDE.md`), no plugins/skills/auto memory, no MCP except `mcp_servers`. `Bash`
+  and `bypassPermissions` only in a disposable environment.
+- `ClaudeCodeConfig(claude_md=ClaudeCodeProjectClaudeMd(), directory=...)` loads only the
+  `CLAUDE.md` of the working directory (no parents, no settings); the ones of `additional_directories`
+  are excluded unless `additional_directories=ClaudeCodeLoadAdditionalClaudeMd()`.
+- Sandbox: `ClaudeCodeConfig.sandbox` is `ClaudeCodeSandbox()` by default - with `Bash` in `tools` its
+  commands run in Claude Code's sandbox (writes only in the working/additional directories, strict, Linux
+  needs bubblewrap + socat + user namespaces; commands are still allowed by `allowed_tools` Bash rules, network blocked unless
+  `allowed_domains`; tune with `ClaudeCodeSandbox(allowed_writes, denied_writes, denied_reads, allowed_reads,
+  excluded_commands, allowed_domains, denied_domains)`, absolute paths); `ClaudeCodeNoSandbox()` opts out within a container, extra
+  keys in `settings["sandbox"]`. Unsandboxed `Bash` can call draive tools directly (`disallowed_tools`
+  not enforced against it).
+- Isolation details: configured `enabledPlugins` and `claudeMdExcludes`, `allowedMcpServers` and `deniedMcpServers` in `settings` extend the
+  derived ones (lists). `setting_sources=("project",)` loads `CLAUDE.md`/rules of the parents too, except
+  the user's (`~/CLAUDE.md`, `~/CLAUDE.local.md`, `~/.claude`); outside a git repo it loads parent
+  `.claude/agents` as well, the user's too under home (logged as a warning). Unknown built-in plugins
+  are warned about, organization-enforced ones logged as info.
+- draive tools: `tools=` of `claude_code_agent` serves a draive `Toolbox` to the run as the MCP server
+  `draive` (tools `mcp__draive__<name>`, allowed automatically, run in the agent process with its
+  `ctx` state) through a per-run private Unix socket and a stdlib relay started by Claude Code. Needs
+  the `mcp` extra, only `response` handling, names up to 115 characters of `[A-Za-z0-9_-]` - refused
+  at agent creation otherwise (`ValueError`). `draive` is a reserved `mcp_servers` key. Distinct from
+  `ClaudeCodeConfig.tools` (built-in tools).
+- Memory: only Claude Code sessions - `sessions=ClaudeCodeSessions(state_directory=)` resumes the
+  session of each thread with the full context, also of an interrupted run; without it every call is
+  fresh. `AgentMemory` is not supported. The state directory must be stable and persistent (a shared
+  volume with replicas). Context injection and usage reading are not possible with Claude Code.
+- Output: text blocks of the main agent are streamed as paragraphs (deltas are not repeated by their
+  complete block) + `ProcessingEvent`s (`claude_code.tool_use`, `.tool_result`, `.subagent_text`,
   `.result`). Failures are variants of `ClaudeCodeFailed`: `ClaudeCodeErrored` (`failure.reason`,
-  `api_error_status`, `terminal_reason`), `ClaudeCodeTimedOut`, `ClaudeCodeEnded` (`exit_code`,
-  redacted `stderr`), `ClaudeCodeOutputTooLarge`; a missing binary/credential is `ClaudeCodeUnavailable`. Limits: `max_turns`,
+  `api_error_status`, `api_error_type`, `terminal_reason`; `ClaudeCodeAuthenticationFailed` when the API
+  rejected the credential, i.e. a revoked login token), `ClaudeCodeTimedOut`, `ClaudeCodeEnded` (`exit_code`,
+  redacted `stderr`), `ClaudeCodeUnfinished` (output ended without a result while no process exit is
+  known; `stderr` is `None` for a custom runner), `ClaudeCodeOutputTooLarge`; a missing
+  binary/credential is `ClaudeCodeUnavailable` (`ClaudeCodeLoginUnusable` when a `ClaudeCodeLocalLogin`
+  gives no valid token - log in again). Limits: `max_turns`,
   `max_budget_usd`, `timeout` (terminated gracefully so Claude Code stops its own commands, killed
   after `stop_grace`; on Linux detached commands which keep the run marker of their environment are
   stopped too, elsewhere they can outlive the run), `stop_grace`.
-- `memory=` is one choice: `AgentMemory` (history replayed into a fresh session, any backend) or
-  `ClaudeCodeSessions(state_directory=)` (Claude Code resumes the session of each thread, full
-  context, also of an interrupted run) - they can not be combined. Default is stateless. Context
-  injection and usage reading are not possible with Claude Code.
 - Telemetry: `ClaudeCodeTelemetry` exports Claude Code's OTLP metrics/events (traces are beta) and
   continues the trace of the calling agent (`TRACEPARENT`); draive also records `model.*` usage
   (provider `claude_code`) and `agent.claude_code.cost`.

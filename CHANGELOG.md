@@ -43,9 +43,45 @@
   (`ClaudeCodeStarted.failed_connectors`): most connectors which need an authorization were never
   authorized by the account. `ClaudeCodeStarted.failed_mcp_servers` lists the other servers which
   did not connect. Connectors removed by the filters are not reported by Claude Code at all.
+- `claude_code_agent(tools=...)` exposes draive tools to Claude Code over MCP, as the `draive` server
+  (reserved name, allowed automatically, also next to an allowlist of connectors). Only tools with
+  the `response` handling are accepted, a run fails with `ClaudeCodeUnavailable` when that server
+  does not connect.
+- `ClaudeCodeUnfinished`, a `ClaudeCodeFailed` raised when the output of a run ended without a
+  result while no exit of the process is known (it kept running, or a custom runner ended its
+  stream).
+- A run logs the built-in plugins of Claude Code which the isolating settings do not know (warning)
+  and the ones an organization enforces despite being disabled (info), with
+  `ClaudeCodeLaunch.leaked_plugins` and `ClaudeCodeLaunch.enforced_plugins`.
 
 ### Changed
 
+- **Breaking:** `claude_code_agent` keeps memory only as `sessions` (`ClaudeCodeSessions`), the
+  `memory` argument and `AgentMemory` support are removed - a call without sessions is a fresh
+  session.
+- **Breaking:** `ClaudeCodeConfig.tools` is empty by default, a run has no built-in tools unless
+  they are listed (it was `Read`, `Grep` and `Glob`).
+- **Breaking:** runs with `Bash` among the `tools` are sandboxed by default -
+  `ClaudeCodeConfig.sandbox` is `ClaudeCodeSandbox()`, which confines the commands to the working and
+  additional directories with the sandbox of Claude Code (strict: nothing reruns outside of it, a run
+  fails when the sandbox can not start - Linux needs bubblewrap, socat and unprivileged user
+  namespaces). Commands stay allowed by the `allowed_tools` rules (no auto-approval), network is
+  blocked unless `allowed_domains`; `ClaudeCodeSandbox` takes `allowed_writes`, `denied_writes`,
+  `denied_reads`, `allowed_reads`, `excluded_commands`, `allowed_domains` and `denied_domains`.
+  Use `ClaudeCodeNoSandbox()` within a container which isolates the run, extra keys go to
+  `settings["sandbox"]`. Without the sandbox `Bash` can call draive tools directly, so
+  `disallowed_tools` rules for them are not enforced against it.
+- The `claude` executable is resolved from `binary=`, `CLAUDE_CODE_BINARY` and the `PATH` only.
+- The launch helpers (`build_launch`, `claude_arguments`, `claude_environment`, `claude_settings`,
+  `inherited_environment`, `verify_connectors`, `verify_allowed_servers` and `verify_claude_md`)
+  are no longer module functions of `draive.claude.launch`, they are `ClaudeCodeLaunch.of`,
+  `prepare_arguments`, `prepare_environment`, `prepare_settings`, `inherited_environment`,
+  `verify_connectors`, `verify_allowed_servers` and `verify_claude_md`. The plugin which an
+  organization enforces is no longer hardcoded.
+- Runs always exclude the private `CLAUDE.md` of the user (`~/CLAUDE.md`, `~/CLAUDE.local.md`,
+  `~/.claude/CLAUDE.md` and `~/.claude/**`) through `claudeMdExcludes`, configured exclusions
+  are added to them.
+- The text blocks of the agent are streamed apart as paragraphs.
 - `ClaudeCodeLaunch.credential` is now a `ClaudeCodeResolvedCredential`, and `ClaudeCodeRunner`
   has a `resolving` (`ClaudeCodeResolving`) of the credential of each run. New exports:
   `ClaudeCodeAccessToken`, `ClaudeCodeResolvedCredential`, `ClaudeCodeResolving` and

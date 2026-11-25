@@ -15,7 +15,10 @@ from draive.claude.config import (
     ClaudeCodeNoClaudeMd,
     ClaudeCodeNoCompaction,
     ClaudeCodeNoConnectors,
+    ClaudeCodeNoSandbox,
     ClaudeCodeProjectClaudeMd,
+    ClaudeCodeSandbox,
+    ClaudeCodeSandboxing,
     ClaudeCodeSkipAdditionalClaudeMd,
     ClaudeCodeTelemetry,
 )
@@ -62,6 +65,7 @@ from draive.claude.types import (
     ClaudeCodeRunning,
     ClaudeCodeTimedOut,
     ClaudeCodeUnavailable,
+    ClaudeCodeUnfinished,
 )
 
 __all__ = (
@@ -97,6 +101,7 @@ __all__ = (
     "ClaudeCodeNoClaudeMd",
     "ClaudeCodeNoCompaction",
     "ClaudeCodeNoConnectors",
+    "ClaudeCodeNoSandbox",
     "ClaudeCodeNoSession",
     "ClaudeCodeOAuthToken",
     "ClaudeCodeOutputTooLarge",
@@ -107,6 +112,8 @@ __all__ = (
     "ClaudeCodeResumedSession",
     "ClaudeCodeRunner",
     "ClaudeCodeRunning",
+    "ClaudeCodeSandbox",
+    "ClaudeCodeSandboxing",
     "ClaudeCodeSession",
     "ClaudeCodeSessions",
     "ClaudeCodeSkipAdditionalClaudeMd",
@@ -118,6 +125,7 @@ __all__ = (
     "ClaudeCodeToolResult",
     "ClaudeCodeToolUse",
     "ClaudeCodeUnavailable",
+    "ClaudeCodeUnfinished",
     "ClaudeCodeUsage",
     "claude_code_agent",
 )

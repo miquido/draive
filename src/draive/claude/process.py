@@ -22,6 +22,7 @@ from draive.claude.types import (
     ClaudeCodeOutputTooLarge,
     ClaudeCodeTimedOut,
     ClaudeCodeUnavailable,
+    ClaudeCodeUnfinished,
 )
 
 __all__ = (
@@ -197,8 +198,10 @@ async def _exit_code(
     grace: float,
     /,
 ) -> int | None:
+    # a process which closed its output exits right after, unless it is stuck - which is not to
+    # hold the run back until its deadline, also when there is no grace to stop it
     try:
-        return await asyncio.wait_for(process.wait(), grace or None)
+        return await asyncio.wait_for(process.wait(), max(grace, _OUTPUT_DRAIN))
 
     except TimeoutError:
         return None  # the cleanup kills it
@@ -215,6 +218,12 @@ async def _ended(
 ) -> ClaudeCodeFailed:
     if deadline.expired:
         return ClaudeCodeTimedOut(timeout=launch.timeout, session_id=observed.session_id)
+
+    if exit_code is None:  # the output was closed but the process kept running
+        return ClaudeCodeUnfinished(
+            stderr=stderr_tail.decode(errors="replace").strip(),
+            session_id=observed.session_id,
+        )
 
     # the error output has ended with the process, let the tail be complete
     try:

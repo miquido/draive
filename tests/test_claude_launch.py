@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -10,17 +11,14 @@ from draive.claude import (
     ClaudeCodeConfig,
     ClaudeCodeNewSession,
     ClaudeCodeNoCompaction,
+    ClaudeCodeNoSandbox,
     ClaudeCodeNoSession,
     ClaudeCodeOAuthToken,
     ClaudeCodeResumedSession,
+    ClaudeCodeSandbox,
     ClaudeCodeTelemetry,
 )
-from draive.claude.launch import (
-    build_launch,
-    claude_arguments,
-    claude_environment,
-    claude_settings,
-)
+from draive.claude.launch import ClaudeCodeLaunch
 from draive.claude.workspace import ClaudeCodeWorkspace
 
 SESSION = "0a3b6f2e-1c9d-5e4a-8b7f-2d6c4e8a9b01"
@@ -32,7 +30,7 @@ def _value(arguments: Any, flag: str) -> str:
 
 
 def test_default_arguments_isolate_and_deny_by_default() -> None:
-    arguments = claude_arguments(ClaudeCodeConfig())
+    arguments = ClaudeCodeLaunch.prepare_arguments(ClaudeCodeConfig())
 
     assert arguments[:7] == (
         "-p",
@@ -48,9 +46,7 @@ def test_default_arguments_isolate_and_deny_by_default() -> None:
     assert "--no-chrome" in arguments
     assert _value(arguments, "--permission-prompts") == "none"
     assert _value(arguments, "--permission-mode") == "dontAsk"
-    assert _value(arguments, "--tools") == "Read,Grep,Glob"
-    # file tools are allowed within the directories of the run only
-    assert _value(arguments, "--allowedTools") == "Read(./**),Grep(./**),Glob(./**)"
+    assert _value(arguments, "--tools") == ""  # no built-in tools unless configured
     assert "--disable-slash-commands" in arguments
     assert "--no-session-persistence" in arguments
     for absent in (
@@ -65,15 +61,25 @@ def test_default_arguments_isolate_and_deny_by_default() -> None:
         "--add-dir",
         "--disallowedTools",
         "--plugin-dir",
+        "--allowedTools",
     ):
         assert absent not in arguments
 
 
+def test_file_tools_are_allowed_within_the_directories_of_the_run_only() -> None:
+    arguments = ClaudeCodeLaunch.prepare_arguments(ClaudeCodeConfig(tools=("Read", "Grep", "Glob")))
+
+    assert _value(arguments, "--tools") == "Read,Grep,Glob"
+    assert _value(arguments, "--allowedTools") == "Read(./**),Grep(./**),Glob(./**)"
+
+
 def test_setting_sources_are_empty_unless_configured() -> None:
-    assert _value(claude_arguments(ClaudeCodeConfig()), "--setting-sources") == ""
+    assert _value(ClaudeCodeLaunch.prepare_arguments(ClaudeCodeConfig()), "--setting-sources") == ""
     assert (
         _value(
-            claude_arguments(ClaudeCodeConfig(setting_sources=("project", "local"))),
+            ClaudeCodeLaunch.prepare_arguments(
+                ClaudeCodeConfig(setting_sources=("project", "local"))
+            ),
             "--setting-sources",
         )
         == "project,local"
@@ -81,7 +87,7 @@ def test_setting_sources_are_empty_unless_configured() -> None:
 
 
 def test_file_tools_are_scoped_to_the_directories_of_the_run_by_default() -> None:
-    arguments = claude_arguments(
+    arguments = ClaudeCodeLaunch.prepare_arguments(
         ClaudeCodeConfig(
             tools=("Read", "Edit", "Bash", "WebFetch"),
             additional_directories=("/data/a", "/data/b"),
@@ -102,7 +108,7 @@ def test_file_tools_are_scoped_to_the_directories_of_the_run_by_default() -> Non
 
 def test_tools_changing_files_are_allowed_by_edit_rules() -> None:
     # `Write(path)` rules never match, permissions of every tool changing files are `Edit` ones
-    arguments = claude_arguments(
+    arguments = ClaudeCodeLaunch.prepare_arguments(
         ClaudeCodeConfig(tools=("Write", "Edit", "NotebookEdit", "Grep", "Glob"))
     )
 
@@ -114,7 +120,7 @@ def test_tools_changing_files_are_allowed_by_edit_rules() -> None:
 
 
 def test_additional_directories_are_escaped_within_rules() -> None:
-    arguments = claude_arguments(
+    arguments = ClaudeCodeLaunch.prepare_arguments(
         ClaudeCodeConfig(
             tools=("Read",),
             additional_directories=("/data/project[12]", "/data/a*b?c", "/data/back\\slash"),
@@ -130,18 +136,18 @@ def test_additional_directories_are_escaped_within_rules() -> None:
 
 
 def test_resumed_sessions_do_not_keep_the_instructions_of_their_first_request() -> None:
-    resumed = claude_arguments(
+    resumed = ClaudeCodeLaunch.prepare_arguments(
         ClaudeCodeConfig(), session=ClaudeCodeResumedSession(identifier=SESSION)
     )
 
     assert _value(resumed, "--system-prompt-snapshot") == "off"
     for session in (ClaudeCodeNoSession(), ClaudeCodeNewSession(identifier=SESSION)):
-        arguments = claude_arguments(ClaudeCodeConfig(), session=session)
+        arguments = ClaudeCodeLaunch.prepare_arguments(ClaudeCodeConfig(), session=session)
         assert "--system-prompt-snapshot" not in arguments
 
 
 def test_explicit_allowed_tools_are_used_as_they_are() -> None:
-    arguments = claude_arguments(
+    arguments = ClaudeCodeLaunch.prepare_arguments(
         ClaudeCodeConfig(tools=("Read", "Bash"), allowed_tools=("Read", "Bash(ls:*)"))
     )
 
@@ -149,14 +155,14 @@ def test_explicit_allowed_tools_are_used_as_they_are() -> None:
 
 
 def test_no_tools_is_an_explicit_empty_argument() -> None:
-    arguments = claude_arguments(ClaudeCodeConfig(tools=()))
+    arguments = ClaudeCodeLaunch.prepare_arguments(ClaudeCodeConfig(tools=()))
 
     assert _value(arguments, "--tools") == ""
     assert "--allowedTools" not in arguments
 
 
 def test_configured_options_become_arguments() -> None:
-    arguments = claude_arguments(
+    arguments = ClaudeCodeLaunch.prepare_arguments(
         ClaudeCodeConfig(
             model="opus",
             effort="high",
@@ -200,7 +206,9 @@ def test_configured_options_become_arguments() -> None:
 
 
 def test_instructions_replace_the_system_prompt_on_request() -> None:
-    arguments = claude_arguments(ClaudeCodeConfig(system_prompt="replace"), instructions="only me")
+    arguments = ClaudeCodeLaunch.prepare_arguments(
+        ClaudeCodeConfig(system_prompt="replace"), instructions="only me"
+    )
 
     assert _value(arguments, "--system-prompt") == "only me"
     assert "--append-system-prompt" not in arguments
@@ -208,7 +216,7 @@ def test_instructions_replace_the_system_prompt_on_request() -> None:
 
 def test_new_sessions_are_started_by_their_identifier() -> None:
     session = ClaudeCodeNewSession(identifier=SESSION)
-    arguments = claude_arguments(ClaudeCodeConfig(), session=session)
+    arguments = ClaudeCodeLaunch.prepare_arguments(ClaudeCodeConfig(), session=session)
 
     assert _value(arguments, "--session-id") == SESSION
     assert "--no-session-persistence" not in arguments
@@ -216,7 +224,7 @@ def test_new_sessions_are_started_by_their_identifier() -> None:
 
 
 def test_resumed_sessions_are_continued_by_their_identifier() -> None:
-    arguments = claude_arguments(
+    arguments = ClaudeCodeLaunch.prepare_arguments(
         ClaudeCodeConfig(), session=ClaudeCodeResumedSession(identifier=SESSION)
     )
 
@@ -226,7 +234,9 @@ def test_resumed_sessions_are_continued_by_their_identifier() -> None:
 
 
 def test_runs_without_a_session_leave_none() -> None:
-    arguments = claude_arguments(ClaudeCodeConfig(), session=ClaudeCodeNoSession())
+    arguments = ClaudeCodeLaunch.prepare_arguments(
+        ClaudeCodeConfig(), session=ClaudeCodeNoSession()
+    )
 
     assert "--no-session-persistence" in arguments
     assert "--session-id" not in arguments
@@ -242,7 +252,7 @@ def test_sessions_without_a_valid_identifier_can_not_exist(session: Any, identif
 
 def test_settings_disable_builtin_plugins_and_memory_and_merge_configured_ones() -> None:
     settings = json.loads(
-        claude_settings(
+        ClaudeCodeLaunch.prepare_settings(
             ClaudeCodeConfig(
                 compaction=ClaudeCodeNoCompaction(),
                 settings={"autoMemoryEnabled": True, "custom": {"nested": ["a"]}},
@@ -255,11 +265,287 @@ def test_settings_disable_builtin_plugins_and_memory_and_merge_configured_ones()
     assert settings["autoCompactEnabled"] is False
     assert settings["autoMemoryEnabled"] is True  # the configured one wins
     assert settings["custom"] == {"nested": ["a"]}
-    assert "autoCompactEnabled" not in json.loads(claude_settings(ClaudeCodeConfig()))
+    assert "autoCompactEnabled" not in json.loads(
+        ClaudeCodeLaunch.prepare_settings(ClaudeCodeConfig())
+    )
+
+
+def _user_memory(home: Path) -> list[str]:
+    resolved = home.resolve()
+    return [
+        f"{resolved}/CLAUDE.md",
+        f"{resolved}/CLAUDE.local.md",
+        f"{resolved}/.claude/CLAUDE.md",
+        f"{resolved}/.claude/**",
+    ]
+
+
+def test_settings_exclude_the_claude_md_of_the_user_home(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # written as they are, an escaped character would keep the exclusion from matching
+    home = tmp_path / "us[e]r(1)"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+
+    settings = json.loads(
+        ClaudeCodeLaunch.prepare_settings(ClaudeCodeConfig(setting_sources=("project",)))
+    )
+
+    assert settings["claudeMdExcludes"] == _user_memory(home)
+
+
+def test_configured_claude_md_excludes_extend_the_isolating_ones(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    settings = json.loads(
+        ClaudeCodeLaunch.prepare_settings(
+            ClaudeCodeConfig(settings={"claudeMdExcludes": ["/repo/vendor/**"]})
+        )
+    )
+
+    assert settings["claudeMdExcludes"] == [*_user_memory(tmp_path), "/repo/vendor/**"]
+
+
+def test_builtin_plugins_unknown_to_the_settings_are_leaks() -> None:
+    plugins = ("cc-plugin-tips", "user-plugin", "cc-plugin-new")
+    config = ClaudeCodeConfig()
+
+    assert ClaudeCodeLaunch.leaked_plugins(config, plugins) == ("cc-plugin-new",)
+    # disabled and loaded anyway, enforced by the organization of the account
+    assert ClaudeCodeLaunch.enforced_plugins(config, plugins) == ("cc-plugin-tips",)
+
+
+def test_plugins_enabled_by_the_settings_are_neither_leaked_nor_enforced() -> None:
+    plugins = ("cc-plugin-diff", "cc-plugin-tips", "cc-plugin-new")
+    config = ClaudeCodeConfig(settings={"enabledPlugins": {"cc-plugin-diff@builtin": True}})
+
+    assert ClaudeCodeLaunch.leaked_plugins(config, plugins) == ("cc-plugin-new",)
+    assert ClaudeCodeLaunch.enforced_plugins(config, plugins) == ("cc-plugin-tips",)
+
+
+def test_plugins_known_to_the_settings_are_not_leaked() -> None:
+    config = ClaudeCodeConfig(settings={"enabledPlugins": {"cc-plugin-new@builtin": False}})
+
+    assert ClaudeCodeLaunch.leaked_plugins(config, ("cc-plugin-new",)) == ()
+    assert ClaudeCodeLaunch.enforced_plugins(config, ("cc-plugin-new",)) == ("cc-plugin-new",)
+
+
+@pytest.mark.parametrize(
+    "settings",
+    (
+        {"enabledPlugins": None},
+        {"enabledPlugins": ["cc-plugin-diff@builtin"]},
+        {"enabledPlugins": {"mine@local": "yes"}},
+        {"claudeMdExcludes": None},
+        {"claudeMdExcludes": "/repo/**"},
+        {"claudeMdExcludes": ["/repo/**", 1]},
+        {"sandbox": ["enabled"]},
+        {"sandbox": True},
+    ),
+)
+def test_wrong_typed_isolating_settings_are_refused(settings: dict[str, Any]) -> None:
+    with pytest.raises(ValidationError):
+        ClaudeCodeConfig(settings=settings)
+
+
+def test_configured_plugins_extend_the_disabled_ones() -> None:
+    settings = json.loads(
+        ClaudeCodeLaunch.prepare_settings(
+            ClaudeCodeConfig(
+                settings={"enabledPlugins": {"mine@local": True, "cc-plugin-diff@builtin": True}}
+            )
+        )
+    )
+
+    assert settings["enabledPlugins"]["mine@local"] is True
+    assert settings["enabledPlugins"]["cc-plugin-diff@builtin"] is True  # enabled explicitly
+    assert settings["enabledPlugins"]["cc-plugin-tips@builtin"] is False
+
+
+SANDBOX = {
+    "enabled": True,
+    "allowUnsandboxedCommands": False,
+    "failIfUnavailable": True,
+}
+
+
+def test_bash_is_sandboxed_strictly_by_default() -> None:
+    settings = json.loads(ClaudeCodeLaunch.prepare_settings(ClaudeCodeConfig(tools=("Bash",))))
+
+    assert settings["sandbox"] == SANDBOX
+
+
+@pytest.mark.parametrize(
+    "config",
+    (
+        ClaudeCodeConfig(),
+        ClaudeCodeConfig(tools=("Read", "Edit")),
+        ClaudeCodeConfig(tools=("Bash",), sandbox=ClaudeCodeNoSandbox()),
+    ),
+)
+def test_no_sandbox_is_set_without_bash_or_when_opted_out(config: ClaudeCodeConfig) -> None:
+    assert "sandbox" not in json.loads(ClaudeCodeLaunch.prepare_settings(config))
+
+
+def _sandbox(sandbox: ClaudeCodeSandbox) -> Any:
+    return json.loads(
+        ClaudeCodeLaunch.prepare_settings(ClaudeCodeConfig(tools=("Bash",), sandbox=sandbox))
+    )["sandbox"]
+
+
+def test_default_sandbox_is_minimal() -> None:
+    sandbox = _sandbox(ClaudeCodeSandbox())
+
+    assert "autoAllowBashIfSandboxed" not in sandbox
+    assert not {"filesystem", "excludedCommands", "network"} & sandbox.keys()
+
+
+@pytest.mark.parametrize(
+    ("fields", "expected"),
+    (
+        ({"allowed_writes": ("/data",)}, {"filesystem": {"allowWrite": ["/data"]}}),
+        ({"denied_writes": ("/data",)}, {"filesystem": {"denyWrite": ["/data"]}}),
+        ({"denied_reads": ("/secret",)}, {"filesystem": {"denyRead": ["/secret"]}}),
+        ({"allowed_reads": ("/secret/ok",)}, {"filesystem": {"allowRead": ["/secret/ok"]}}),
+        ({"excluded_commands": ("docker:*",)}, {"excludedCommands": ["docker:*"]}),
+        ({"allowed_domains": ("*.x.com",)}, {"network": {"allowedDomains": ["*.x.com"]}}),
+        ({"denied_domains": ("evil.com",)}, {"network": {"deniedDomains": ["evil.com"]}}),
+    ),
+)
+def test_sandbox_field_maps_to_its_key(fields: dict[str, Any], expected: dict[str, Any]) -> None:
+    assert _sandbox(ClaudeCodeSandbox(**fields)) == {**SANDBOX, **expected}
+
+
+@pytest.mark.parametrize(
+    "field",
+    ("allowed_writes", "denied_writes", "denied_reads", "allowed_reads"),
+)
+def test_relative_sandbox_paths_are_refused(field: str) -> None:
+    with pytest.raises(ValidationError):
+        ClaudeCodeSandbox(**{field: ("relative/path",)})
+
+
+def test_configured_sandbox_lists_are_added_to_the_derived_ones() -> None:
+    settings = json.loads(
+        ClaudeCodeLaunch.prepare_settings(
+            ClaudeCodeConfig(
+                tools=("Bash",),
+                sandbox=ClaudeCodeSandbox(
+                    allowed_writes=("/data",),
+                    denied_reads=("/secret",),
+                    allowed_domains=("example.com",),
+                ),
+                settings={
+                    "sandbox": {
+                        "filesystem": {"allowWrite": ["/data", "/other"]},
+                        "network": {"allowedDomains": ["other.com"], "allowLocalBinding": True},
+                    }
+                },
+            )
+        )
+    )
+
+    assert settings["sandbox"]["filesystem"] == {
+        "allowWrite": ["/data", "/other"],
+        "denyRead": ["/secret"],
+    }
+    assert settings["sandbox"]["network"] == {
+        "allowedDomains": ["example.com", "other.com"],
+        "allowLocalBinding": True,
+    }
+
+
+def test_configured_sandbox_sections_are_passed_when_nothing_is_derived() -> None:
+    settings = json.loads(
+        ClaudeCodeLaunch.prepare_settings(
+            ClaudeCodeConfig(
+                tools=("Bash",),
+                settings={"sandbox": {"filesystem": {"allowWrite": ["/data"]}}},
+            )
+        )
+    )
+
+    assert settings["sandbox"]["filesystem"] == {"allowWrite": ["/data"]}
+
+
+def test_configured_sandbox_keys_are_merged_over_the_derived_ones() -> None:
+    settings = json.loads(
+        ClaudeCodeLaunch.prepare_settings(
+            ClaudeCodeConfig(
+                tools=("Bash",),
+                settings={"sandbox": {"network": {"allowedDomains": ["example.com"]}}},
+            )
+        )
+    )
+
+    assert settings["sandbox"] == {**SANDBOX, "network": {"allowedDomains": ["example.com"]}}
+
+
+def test_configured_sandbox_keys_win_over_the_derived_ones() -> None:
+    settings = json.loads(
+        ClaudeCodeLaunch.prepare_settings(
+            ClaudeCodeConfig(tools=("Bash",), settings={"sandbox": {"enabled": False}})
+        )
+    )
+
+    assert settings["sandbox"] == {**SANDBOX, "enabled": False}
+
+
+def test_configured_sandbox_is_passed_without_bash() -> None:
+    settings = json.loads(
+        ClaudeCodeLaunch.prepare_settings(ClaudeCodeConfig(settings={"sandbox": {"enabled": True}}))
+    )
+
+    assert settings["sandbox"] == {"enabled": True}
+
+
+def _workspace(directory: Path) -> ClaudeCodeWorkspace:
+    return ClaudeCodeWorkspace(root=str(directory.parent), directory=str(directory))
+
+
+@pytest.mark.parametrize(
+    ("layout", "reaches"),
+    [
+        pytest.param("plain", True, id="within_home"),
+        pytest.param("repository", False, id="within_repository"),
+        pytest.param("home_repository", True, id="home_is_repository"),
+        pytest.param("no_agents", False, id="user_without_agents"),
+        pytest.param("outside", False, id="outside_home"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_workspace_knows_when_project_settings_reach_user_agents(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    layout: str,
+    reaches: bool,
+) -> None:
+    home = tmp_path / "home"
+    project = home / "projects" / "app"
+    project.mkdir(parents=True)
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    if layout != "no_agents":
+        (home / ".claude" / "agents").mkdir(parents=True)
+
+    if layout == "repository":
+        (home / "projects" / ".git").mkdir()
+
+    if layout == "home_repository":
+        (home / ".git").mkdir()
+
+    directory = outside if layout == "outside" else project
+    assert await _workspace(directory).reaches_user_agents() is reaches
 
 
 def _environment(config: ClaudeCodeConfig | None = None, **arguments: Any) -> Any:
-    return claude_environment(
+    return ClaudeCodeLaunch.prepare_environment(
         config or ClaudeCodeConfig(),
         workspace=WORKSPACE,
         parent={
@@ -541,7 +827,7 @@ def test_variants_of_compaction_are_distinct_after_serialization() -> None:
 
 
 def _launch(**arguments: Any) -> Any:
-    return build_launch(
+    return ClaudeCodeLaunch.of(
         arguments.pop("config", ClaudeCodeConfig()),
         binary="/bin/claude",
         prompt=({"type": "text", "text": "hello"},),
@@ -624,3 +910,90 @@ def test_credentials_which_can_not_be_handed_over_can_not_exist(
 def test_credentials_never_show_their_value(credential: Any) -> None:
     assert "very-secret" not in repr(credential(value="very-secret"))
     assert "very-secret" not in str(credential(value="very-secret"))
+
+
+_TOOLS_SERVER = {"command": "/usr/bin/python", "args": ["-I", "/relay.py", "/tmp/mcp.sock"]}
+
+
+def test_tools_server_is_added_to_the_mcp_config_and_allowed() -> None:
+    arguments = ClaudeCodeLaunch.prepare_arguments(
+        ClaudeCodeConfig(mcp_servers={"docs": {"command": "docs-server"}}),
+        tools_server=_TOOLS_SERVER,
+    )
+
+    assert json.loads(_value(arguments, "--mcp-config")) == {
+        "mcpServers": {"docs": {"command": "docs-server"}, "draive": _TOOLS_SERVER}
+    }
+    assert _value(arguments, "--allowedTools") == "mcp__draive"
+
+
+def test_tools_server_is_allowed_next_to_scoped_file_tools() -> None:
+    arguments = ClaudeCodeLaunch.prepare_arguments(
+        ClaudeCodeConfig(tools=("Read", "Grep", "Glob")),
+        tools_server=_TOOLS_SERVER,
+    )
+
+    assert _value(arguments, "--allowedTools") == "Read(./**),Grep(./**),Glob(./**),mcp__draive"
+
+
+def test_tools_server_is_allowed_next_to_explicit_allowed_tools() -> None:
+    arguments = ClaudeCodeLaunch.prepare_arguments(
+        ClaudeCodeConfig(
+            tools=("Read", "Bash"),
+            allowed_tools=("Read", "Bash(ls:*)"),
+            disallowed_tools=("Bash(rm:*)",),
+        ),
+        tools_server=_TOOLS_SERVER,
+    )
+
+    assert _value(arguments, "--allowedTools") == "Read,Bash(ls:*),mcp__draive"
+    assert _value(arguments, "--disallowedTools") == "Bash(rm:*)"
+    assert json.loads(_value(arguments, "--mcp-config")) == {
+        "mcpServers": {"draive": _TOOLS_SERVER}
+    }
+
+
+def test_tools_server_is_allowed_without_built_in_tools() -> None:
+    arguments = ClaudeCodeLaunch.prepare_arguments(
+        ClaudeCodeConfig(tools=()),
+        tools_server=_TOOLS_SERVER,
+    )
+
+    assert _value(arguments, "--allowedTools") == "mcp__draive"
+
+
+def test_tools_server_is_added_to_a_configured_allowlist() -> None:
+    settings = json.loads(
+        ClaudeCodeLaunch.prepare_settings(
+            ClaudeCodeConfig(settings={"allowedMcpServers": [{"serverName": "docs"}]}),
+            tools_server=_TOOLS_SERVER,
+        )
+    )
+
+    assert {"serverName": "draive"} in settings["allowedMcpServers"]
+    assert {"serverName": "docs"} in settings["allowedMcpServers"]
+    # without the tools the configured allowlist is left as it is
+    assert json.loads(
+        ClaudeCodeLaunch.prepare_settings(
+            ClaudeCodeConfig(settings={"allowedMcpServers": [{"serverName": "docs"}]})
+        )
+    )["allowedMcpServers"] == [{"serverName": "docs"}]
+
+
+def test_tools_server_name_is_reserved() -> None:
+    with pytest.raises(ValueError, match="reserved"):
+        ClaudeCodeLaunch.prepare_arguments(
+            ClaudeCodeConfig(mcp_servers={"draive": {"command": "other"}}),
+            tools_server=_TOOLS_SERVER,
+        )
+
+
+def test_configured_draive_server_is_kept_without_tools_server() -> None:
+    arguments = ClaudeCodeLaunch.prepare_arguments(
+        ClaudeCodeConfig(mcp_servers={"draive": {"command": "other"}}),
+    )
+
+    assert json.loads(_value(arguments, "--mcp-config")) == {
+        "mcpServers": {"draive": {"command": "other"}}
+    }
+    assert "--allowedTools" not in arguments
