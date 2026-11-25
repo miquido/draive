@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from haiway import Meta, State, as_dict
+from haiway import Default, Meta, State, as_dict
 
 from draive.openai.schema import strict_schema
 
@@ -177,7 +177,7 @@ class _Item(State, serializable=True):
 class _Order(State, serializable=True):
     reference: str
     items: Sequence[_Item]
-    attributes: Mapping[str, str] = {}
+    attributes: Mapping[str, str] = Default(factory=dict)
     identifier: UUID | None = None
     moment: datetime | None = None
     total: float | None = None
@@ -319,7 +319,7 @@ class _WithAny(State, serializable=True):
 
 class _WithAnyMapping(State, serializable=True):
     name: str
-    attributes: Mapping[str, Any] = {}
+    attributes: Mapping[str, Any] = Default(factory=dict)
 
 
 class _Empty(State, serializable=True):

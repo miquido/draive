@@ -2,7 +2,16 @@ from collections.abc import Mapping, Sequence, Set
 from os.path import isabs
 from typing import Annotated, Final, Literal, Self, final
 
-from haiway import BasicValue, Configuration, Missing, Sensitive, State, Verifier, getenv_str
+from haiway import (
+    BasicValue,
+    Configuration,
+    Default,
+    Missing,
+    Sensitive,
+    State,
+    Verifier,
+    getenv_str,
+)
 
 __all__ = (
     "RUN_MARKER_VARIABLE",
@@ -499,7 +508,7 @@ class ClaudeCodeTelemetry(State, serializable=True):
         ("metrics", "logs")
     )
     export_interval_ms: Annotated[int, Verifier(_positive_integer)] = 2000
-    resource_attributes: Mapping[str, str] = {}
+    resource_attributes: Mapping[str, str] = Default(factory=dict)
     log_prompts: bool = False
     log_tool_details: bool = False
     log_tool_content: bool = False
@@ -610,16 +619,16 @@ class ClaudeCodeConfig(Configuration):
     stop_grace: Annotated[float, Verifier(_not_negative_number)] = 10.0
     stream_deltas: bool = False
     system_prompt: Literal["append", "replace"] = "append"
-    mcp_servers: Mapping[str, Mapping[str, BasicValue]] = {}
+    mcp_servers: Mapping[str, Mapping[str, BasicValue]] = Default(factory=dict)
     connectors: ClaudeCodeConnectors = ClaudeCodeNoConnectors()
     claude_md: ClaudeCodeClaudeMd = ClaudeCodeNoClaudeMd()
-    subagents: Mapping[str, Mapping[str, BasicValue]] = {}
+    subagents: Mapping[str, Mapping[str, BasicValue]] = Default(factory=dict)
     plugin_directories: Annotated[Sequence[str], Verifier(_absolute_directories)] = ()
-    settings: Annotated[Mapping[str, BasicValue], Verifier(_settings)] = {}
+    settings: Annotated[Mapping[str, BasicValue], Verifier(_settings)] = Default(factory=dict)
     setting_sources: Sequence[Literal["user", "project", "local"]] = ()
     directory: Annotated[str, Verifier(_absolute)] | Missing = Missing
     additional_directories: Annotated[Sequence[str], Verifier(_absolute_directories)] = ()
-    env: Annotated[Mapping[str, str], Verifier(_unreserved_environment)] = {}
+    env: Annotated[Mapping[str, str], Verifier(_unreserved_environment)] = Default(factory=dict)
     inherit_env: Annotated[Sequence[str], Verifier(_unreserved_names)] = ()
     compaction: ClaudeCodeAutoCompaction | ClaudeCodeNoCompaction = ClaudeCodeAutoCompaction()
     sandbox: ClaudeCodeSandbox | ClaudeCodeNoSandbox = ClaudeCodeSandbox()

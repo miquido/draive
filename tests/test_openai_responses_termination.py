@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from haiway import Meta, State, as_dict, ctx
+from haiway import Default, Meta, State, as_dict, ctx
 from openai import omit
 
 from draive.models import ModelOutputFailed, ModelOutputLimit, ModelTools, ModelToolSpecification
@@ -522,7 +522,7 @@ async def test_strict_tool_parameters_fall_back_for_an_open_mapping() -> None:
 async def test_schema_output_keeps_strict_for_an_open_mapping() -> None:
     class Extracted(State, serializable=True):
         name: str
-        labels: Mapping[str, str] = {}
+        labels: Mapping[str, str] = Default(factory=dict)
 
     requests: list[dict[str, Any]] = []
     model = _model([_terminal_event(kind="response.completed")], requests=requests)
