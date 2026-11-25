@@ -65,7 +65,8 @@
   tuple states `minItems` and `maxItems`.
 - OpenAI strict structured output and strict tool parameters keep the `pattern` of a string, which
   strict mode accepts and follows - the spelling of a datetime, time, duration, UUID or bytes value
-  is enforced as well.
+  is enforced as well. A fine-tuned model (`ft:`), whose strict mode does not support `pattern`,
+  gets such a schema unenforced instead.
 - The simplified schema injected into a model prompt names a datetime, a time and a duration
   (`date-time`, `time`, `duration`) by the pattern haiway states for them.
 - Development uses uv 0.13.10.
@@ -114,7 +115,8 @@
   be `Missing` is an `option`, as a missing value is left out of the record.
 - An MCP tool whose input schema has a closed tuple without `minItems` and `maxItems` loads again:
   the length of the tuple is stated - every position required unless the schema says otherwise, and
-  no more items than positions.
+  no more items than positions - after references are inlined and their sibling bounds merged. A
+  closed tuple which requires more items than its positions is refused.
 - Bedrock Converse requests leave out `stopSequences` when none are configured - every request
   without them carried the unset value and was refused by botocore before it was sent.
 

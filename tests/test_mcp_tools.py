@@ -353,6 +353,29 @@ def test_mcp_tool_parameters_state_the_length_of_closed_tuples(
     assert (pair["minItems"], pair["maxItems"]) == expected
 
 
+def test_mcp_tool_parameters_count_referenced_tuples_after_composition() -> None:
+    # the bounds stated next to a reference apply to the referenced tuple as well
+    parameters = _tool_parameters(  # pyright: ignore[reportPrivateUsage]
+        "tool",
+        {
+            "type": "object",
+            "$defs": {
+                "Pair": {
+                    "type": "array",
+                    "prefixItems": [{"type": "integer"}, {"type": "string"}],
+                    "items": False,
+                    "minItems": 0,
+                }
+            },
+            "properties": {"pair": {"$ref": "#/$defs/Pair", "maxItems": 1}},
+            "required": ["pair"],
+        },
+    )
+
+    pair: Any = parameters["properties"]["pair"]
+    assert (pair["minItems"], pair["maxItems"]) == (0, 1)
+
+
 def test_mcp_tool_parameters_merge_root_composition_arguments() -> None:
     assert _converted_parameters(
         {
@@ -451,6 +474,18 @@ def test_mcp_tool_parameters_keep_every_alternative_of_root_branches() -> None:
 @pytest.mark.parametrize(
     "schema",
     [
+        # a closed tuple requiring more items than its positions accepts no array
+        {
+            "type": "object",
+            "properties": {
+                "pair": {
+                    "type": "array",
+                    "prefixItems": [{"type": "integer"}, {"type": "string"}],
+                    "items": False,
+                    "minItems": 3,
+                }
+            },
+        },
         # references which do not resolve to a definition
         {"type": "object", "properties": {"a": {"$ref": "#/$defs/Missing"}}, "$defs": {}},
         {

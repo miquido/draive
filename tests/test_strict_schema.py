@@ -395,3 +395,25 @@ def test_state_with_bytes_and_set_stays_strict() -> None:
     assert "pattern" in converted["properties"]["data"]
     assert "contentEncoding" not in converted["properties"]["data"]
     assert "uniqueItems" not in converted["properties"]["tags"]
+
+
+def test_patterns_are_refused_where_strict_mode_does_not_support_them() -> None:
+    # strict mode of a fine-tuned model has no `pattern`, the schema goes unenforced instead
+    class _Nested(State):
+        starts: datetime
+
+    class _Outer(State):
+        nested: _Nested
+        moments: Sequence[datetime]
+
+    schema: Mapping[str, Any] = as_dict(_Outer.__SPECIFICATION__)
+
+    assert strict_schema(schema) is not None
+    assert strict_schema(schema, patterns=False) is None
+
+
+def test_only_fine_tuned_models_drop_patterns() -> None:
+    from draive.openai.responses import _follows_patterns  # pyright: ignore[reportPrivateUsage]
+
+    assert _follows_patterns("gpt-5-nano")
+    assert not _follows_patterns("ft:gpt-5-nano:org::abc")

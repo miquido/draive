@@ -73,11 +73,11 @@ def _simplified_inline(
         case {"type": "string", "format": str() as format}:
             return format
 
-        case {"type": "string", "pattern": str() as pattern} if pattern in _WRITTEN_FORMATS:
-            return _WRITTEN_FORMATS[pattern]
-
         case {"enum": [*selection]}:
             return _enum_alternatives(selection)
+
+        case {"type": "string", "pattern": str() as pattern} if pattern in _WRITTEN_FORMATS:
+            return _WRITTEN_FORMATS[pattern]
 
         case {"type": "null" | "boolean" | "integer" | "number" | "string" as simple}:
             return simple
