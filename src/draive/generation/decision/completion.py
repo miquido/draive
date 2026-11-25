@@ -228,10 +228,12 @@ def _listed(
     options: Sequence[DecisionOption],
     /,
 ) -> str:
+    # the identifier stands apart from its description, a listing like `- id: description`
+    # makes models answer with the whole line instead of the identifier alone
     return "\n".join(
-        f"- {option.identifier}: {option.description}"
+        f'<option identifier="{option.identifier}">{option.description}</option>'
         if option.description
-        else f"- {option.identifier}"
+        else f'<option identifier="{option.identifier}"/>'
         for option in options
     )
 

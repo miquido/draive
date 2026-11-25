@@ -275,8 +275,15 @@ async def test_default_decisions_use_generative_model_without_probabilities() ->
             meta={"page": True, "reasoning": "-"},
         ),
     )
-    assert any("- billing: payments\n- shipping" in element for element in instructions)
-    assert any("- can wait\n- today\n- right now" in element for element in instructions)
+    assert any(
+        '<option identifier="billing">payments</option>\n<option identifier="shipping"/>' in element
+        for element in instructions
+    )
+    assert any(
+        '<option identifier="can wait"/>\n<option identifier="today"/>\n'
+        '<option identifier="right now"/>' in element
+        for element in instructions
+    )
 
 
 @pytest.mark.asyncio
