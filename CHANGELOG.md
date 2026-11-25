@@ -126,6 +126,9 @@
 
 ### Fixed
 
+- Ollama structured output names the spelling of a datetime and a time as a `format` and of a
+  timedelta in the field description, instead of dropping haiway's pattern unguided. An optional
+  field (`anyOf` with `null`) no longer turns the whole schema into generic JSON.
 - Completion-based decisions list options as `<option identifier="...">description</option>`, a
   `- id: description` listing made models answer with the whole line and fail the decision.
 - SurrealDB field definitions keep their types under haiway 0.67.0: they follow the attributes as

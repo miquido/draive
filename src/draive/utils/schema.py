@@ -5,7 +5,10 @@ from typing import Any, Final
 
 from haiway import State, TypeSpecification
 
-__all__ = ("simplified_schema",)
+__all__ = (
+    "simplified_schema",
+    "written_format",
+)
 
 
 def simplified_schema(
@@ -157,3 +160,27 @@ def _written_formats() -> Mapping[str, str]:
 
 
 _WRITTEN_FORMATS: Final[Mapping[str, str]] = _written_formats()
+
+
+def written_format(
+    pattern: str,
+    /,
+) -> str | None:
+    """Name the value spelling which a haiway string pattern states.
+
+    haiway states the spelling of a datetime, a time and a timedelta as a ``pattern`` rather
+    than a ``format``. Providers which cannot follow such a pattern can guide the model by
+    the name of the spelling instead.
+
+    Parameters
+    ----------
+    pattern
+        ``pattern`` of a string schema.
+
+    Returns
+    -------
+    str | None
+        ``"date-time"``, ``"time"`` or ``"duration"`` for a pattern haiway uses for that
+        spelling, ``None`` for any other pattern.
+    """
+    return _WRITTEN_FORMATS.get(pattern)

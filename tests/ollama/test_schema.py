@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from datetime import datetime, time, timedelta
 
 import pytest
 from haiway import State
@@ -27,6 +28,13 @@ class _OptionalString(State):
 
 class _UnsupportedUnion(State):
     value: str | bool
+
+
+class _Written(State):
+    start: datetime
+    clock: time
+    duration: timedelta
+    late: datetime | None
 
 
 def test_schema_for_ollama_preserves_supported_constructs() -> None:
@@ -123,3 +131,18 @@ def test_response_format_returns_plain_schema() -> None:
 
     assert isinstance(schema, Mapping)
     assert schema["type"] == "object"
+
+
+def test_schema_for_ollama_names_written_formats_instead_of_patterns() -> None:
+    schema = _schema_for_ollama(_Written)
+
+    assert schema is not None
+    properties: Mapping[str, Mapping[str, object]] = schema["properties"]
+    assert properties["start"] == {"type": "string", "format": "date-time"}
+    assert properties["clock"] == {"type": "string", "format": "time"}
+    assert properties["duration"] == {
+        "type": "string",
+        "description": "ISO 8601 duration, e.g. PT45M",
+    }
+    assert properties["late"]["format"] == "date-time"
+    assert all("pattern" not in value for value in properties.values())
