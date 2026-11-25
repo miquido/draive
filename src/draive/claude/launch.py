@@ -3,11 +3,11 @@ import os
 import re
 from collections.abc import Mapping, Sequence
 from os.path import join, normpath
-from typing import Annotated, Any, Final, cast, final
+from typing import Annotated, Any, Final, Self, cast, final
 from urllib.parse import quote
 from uuid import uuid4
 
-from haiway import Missing, Sensitive, State, Verifier
+from haiway import BasicValue, Missing, Sensitive, State, Verifier
 
 from draive.claude.config import (
     ClaudeCodeAccountConnectors,
@@ -36,19 +36,10 @@ from draive.claude.sessions import (
     ClaudeCodeResumedSession,
     ClaudeCodeSession,
 )
+from draive.claude.tools import TOOLS_SERVER_KEY, TOOLS_SERVER_RULE
 from draive.claude.workspace import ClaudeCodeWorkspace
 
-__all__ = (
-    "ClaudeCodeLaunch",
-    "build_launch",
-    "claude_arguments",
-    "claude_environment",
-    "claude_settings",
-    "inherited_environment",
-    "verify_allowed_servers",
-    "verify_claude_md",
-    "verify_connectors",
-)
+__all__ = ("ClaudeCodeLaunch",)
 
 _CONNECTORS_SCOPE: Final[str] = "user:mcp_servers"
 # what an allowlist of Claude Code accepts as the name of a server
@@ -60,21 +51,22 @@ _NO_SESSION: Final[ClaudeCodeNoSession] = ClaudeCodeNoSession()
 
 # Claude Code registers these plugins on its own - each is disabled, a later version might add
 # more which are reported by the started run
+_BUILTIN_PLUGIN_PREFIX: Final[str] = "cc-plugin-"
 _BUILTIN_PLUGINS: Final[Sequence[str]] = (
-    "cc-plugin-agents-md@builtin",
-    "cc-plugin-claude-platform@builtin",
-    "cc-plugin-claude-test@builtin",
-    "cc-plugin-diff@builtin",
-    "cc-plugin-easel@builtin",
-    "cc-plugin-mermaid@builtin",
-    "cc-plugin-mods-guide@builtin",
-    "cc-plugin-plugin-authoring@builtin",
-    "cc-plugin-privacy@builtin",
-    "cc-plugin-responsive-mode@builtin",
-    "cc-plugin-sec-default@builtin",
-    "cc-plugin-telemetry@builtin",
-    "cc-plugin-tips@builtin",
-    "cc-plugin-you-should-know@builtin",
+    "cc-plugin-agents-md",
+    "cc-plugin-claude-platform",
+    "cc-plugin-claude-test",
+    "cc-plugin-diff",
+    "cc-plugin-easel",
+    "cc-plugin-mermaid",
+    "cc-plugin-mods-guide",
+    "cc-plugin-plugin-authoring",
+    "cc-plugin-privacy",
+    "cc-plugin-responsive-mode",
+    "cc-plugin-sec-default",
+    "cc-plugin-telemetry",
+    "cc-plugin-tips",
+    "cc-plugin-you-should-know",
 )
 
 # the process gets nothing of the parent environment but these, anything else of it, i.e. the
@@ -167,48 +159,559 @@ class ClaudeCodeLaunch(State):
         )
         return tuple(values)
 
+    @classmethod
+    def of(
+        cls,
+        config: ClaudeCodeConfig,
+        /,
+        *,
+        binary: str,
+        prompt: Sequence[Mapping[str, Any]],
+        workspace: ClaudeCodeWorkspace,
+        instructions: str = "",
+        session: ClaudeCodeSession = _NO_SESSION,
+        credential: ClaudeCodeResolvedCredential | Missing = Missing,
+        base_url: str | None = None,
+        trace_context: Mapping[str, str] | None = None,
+        resource_attributes: Mapping[str, str] | None = None,
+        tools_server: Mapping[str, BasicValue] | None = None,
+    ) -> Self:
+        """Prepare the launch of Claude Code for a single prompt.
 
-def claude_settings(
+        Parameters
+        ----------
+        config
+            Configuration of the run.
+        binary
+            Absolute path of the executable.
+        prompt
+            Content blocks of the user message.
+        workspace
+            Directories of the run.
+        instructions
+            Instructions of the agent.
+        session
+            Persistence of the run within Claude Code sessions.
+        credential
+            The only credential of the run.
+        base_url
+            Custom API endpoint.
+        trace_context
+            Trace context of the executing agent.
+        resource_attributes
+            Resource attributes of the exported telemetry.
+        tools_server
+            MCP server entry of the draive tools, added under the reserved ``draive`` name and
+            allowed.
+
+        Returns
+        -------
+        ClaudeCodeLaunch
+            Launch ready to be run.
+
+        Raises
+        ------
+        ClaudeCodeUnavailable
+            When account connectors are enabled and the credential can not use them, or the
+            configuration of connectors or ``CLAUDE.md`` can not work.
+        ValueError
+            When ``tools_server`` is given and the configured MCP servers use the ``draive`` name.
+        """
+        cls.verify_connectors(config, credential)
+        cls.verify_allowed_servers(config)
+        cls.verify_claude_md(config)
+        return cls(
+            binary=binary,
+            arguments=cls.prepare_arguments(
+                config,
+                instructions=instructions,
+                session=session,
+                directory=workspace.directory,
+                tools_server=tools_server,
+            ),
+            environment=cls.prepare_environment(
+                config,
+                workspace=workspace,
+                base_url=base_url,
+                trace_context=trace_context,
+                resource_attributes=resource_attributes,
+                credential=credential,
+            ),
+            directory=workspace.directory,
+            prompt=json.dumps(
+                {"type": "user", "message": {"role": "user", "content": list(prompt)}},
+                separators=(",", ":"),
+            ),
+            credential=credential,
+            marker=uuid4().hex,
+            timeout=config.timeout,
+            grace=config.stop_grace,
+        )
+
+    @staticmethod
+    def leaked_plugins(
+        config: ClaudeCodeConfig,
+        plugins: Sequence[str],
+        /,
+    ) -> Sequence[str]:
+        """Pick the built-in plugins a run loaded which its settings do not know.
+
+        They come with a version of Claude Code newer than the isolating settings. Plugins
+        which are disabled and loaded anyway are enforced by the organization of the
+        account instead, see ``enforced_plugins``.
+
+        Parameters
+        ----------
+        config
+            Configuration of the run.
+        plugins
+            Names of the plugins the run reported.
+
+        Returns
+        -------
+        Sequence[str]
+            Names of the unknown built-in plugins.
+        """
+        enabled: Mapping[str, bool] = _enabled_plugins(config)
+        return tuple(
+            name
+            for name in plugins
+            if name.startswith(_BUILTIN_PLUGIN_PREFIX) and _builtin_key(name) not in enabled
+        )
+
+    @staticmethod
+    def enforced_plugins(
+        config: ClaudeCodeConfig,
+        plugins: Sequence[str],
+        /,
+    ) -> Sequence[str]:
+        """Pick the plugins a run loaded although its settings disable them.
+
+        No setting disables a plugin which the organization of the account enforces. Plugins
+        enabled by the settings are not among them.
+
+        Parameters
+        ----------
+        config
+            Configuration of the run.
+        plugins
+            Names of the plugins the run reported.
+
+        Returns
+        -------
+        Sequence[str]
+            Names of the disabled plugins which were loaded.
+        """
+        enabled: Mapping[str, bool] = _enabled_plugins(config)
+        return tuple(name for name in plugins if enabled.get(_builtin_key(name)) is False)
+
+    @staticmethod
+    def prepare_settings(
+        config: ClaudeCodeConfig,
+        /,
+        *,
+        directory: str | None = None,
+        tools_server: Mapping[str, BasicValue] | None = None,
+    ) -> str:
+        """Prepare the isolating ``--settings`` JSON, configured settings are merged over it.
+
+        The lists ``claudeMdExcludes``, ``allowedMcpServers`` and ``deniedMcpServers`` derived
+        from ``claude_md`` and ``connectors`` are not replaced by the configured settings, the
+        entries of the configured ones are added to them instead. ``claudeMdExcludes`` always
+        starts with the ``CLAUDE.md`` of the user.
+
+        Parameters
+        ----------
+        config
+            Configuration of the run.
+        directory
+            Working directory of the run, ``directory`` of the configuration when not given.
+        tools_server
+            MCP server entry of the draive tools, allowed next to the configured servers when
+            connectors are allowed by an allowlist.
+
+        Returns
+        -------
+        str
+            The JSON of the settings.
+
+        Raises
+        ------
+        ValueError
+            When ``CLAUDE.md`` is loaded without a working directory.
+        """
+        settings: dict[str, Any] = {
+            "autoMemoryEnabled": False,
+        }
+        if isinstance(config.compaction, ClaudeCodeNoCompaction):
+            settings["autoCompactEnabled"] = False
+
+        settings.update(config.settings)
+        settings["enabledPlugins"] = _enabled_plugins(config)
+        derived: dict[str, Sequence[Any]] = dict(_derived_settings(config, directory, tools_server))
+        # project sources load the `CLAUDE.md` of every parent of the working directory, which
+        # reaches the private one of the user within its home whenever the directory is under it,
+        # configured exclusions extend the isolating ones instead of lifting them
+        derived["claudeMdExcludes"] = (
+            *_user_memory_patterns(),
+            *derived.get("claudeMdExcludes", ()),
+        )
+        for key, value in derived.items():
+            settings[key] = _merged_list(value, config.settings.get(key, Missing))
+
+        return json.dumps(settings, separators=(",", ":"), default=_json_value)
+
+    @staticmethod
+    def prepare_arguments(
+        config: ClaudeCodeConfig,
+        /,
+        *,
+        instructions: str = "",
+        session: ClaudeCodeSession = _NO_SESSION,
+        directory: str | None = None,
+        tools_server: Mapping[str, BasicValue] | None = None,
+    ) -> Sequence[str]:
+        """Prepare the arguments running Claude Code headless within the given configuration.
+
+        Parameters
+        ----------
+        config
+            Configuration of the run.
+        instructions
+            Instructions of the agent, added to or replacing the system prompt.
+        session
+            Persistence of the run within Claude Code sessions.
+        directory
+            Working directory of the run, ``directory`` of the configuration when not given. Needed
+            only when the ``CLAUDE.md`` of the working directory is loaded.
+        tools_server
+            MCP server entry of the draive tools, added under the reserved ``draive`` name and
+            allowed.
+
+        Returns
+        -------
+        Sequence[str]
+            Arguments of the executable. The prompt is not among them, it is sent to the input.
+
+        Raises
+        ------
+        ValueError
+            When ``tools_server`` is given and the configured MCP servers use the ``draive`` name,
+            or ``CLAUDE.md`` is loaded without a working directory.
+        """
+        arguments: list[str] = [
+            "-p",
+            "--input-format",
+            "stream-json",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--setting-sources",
+            ",".join(config.setting_sources),
+            "--settings",
+            ClaudeCodeLaunch.prepare_settings(
+                config,
+                directory=directory,
+                tools_server=tools_server,
+            ),
+            *_connector_arguments(config),
+            "--no-chrome",
+            "--permission-prompts",
+            "none",
+            "--permission-mode",
+            config.permission_mode,
+            "--model",
+            config.model,
+            "--tools",
+            ",".join(config.tools),
+            *_plugin_arguments(config),
+            *_permission_arguments(config, tools_server),
+            *_extension_arguments(config, directory, tools_server),
+            *_session_arguments(session),
+        ]
+        if instructions:
+            flag: str = (
+                "--system-prompt" if config.system_prompt == "replace" else "--append-system-prompt"
+            )
+            arguments.extend((flag, instructions))
+
+        if config.max_turns is not Missing:
+            arguments.extend(("--max-turns", str(config.max_turns)))
+
+        if config.max_budget_usd is not Missing:
+            arguments.extend(("--max-budget-usd", str(config.max_budget_usd)))
+
+        if config.effort is not Missing:
+            arguments.extend(("--effort", config.effort))
+
+        if config.stream_deltas:
+            arguments.append("--include-partial-messages")
+
+        return tuple(arguments)
+
+    @staticmethod
+    def prepare_environment(
+        config: ClaudeCodeConfig,
+        /,
+        *,
+        workspace: ClaudeCodeWorkspace,
+        base_url: str | None = None,
+        trace_context: Mapping[str, str] | None = None,
+        resource_attributes: Mapping[str, str] | None = None,
+        parent: Mapping[str, str] | None = None,
+        credential: ClaudeCodeResolvedCredential | Missing = Missing,
+    ) -> Mapping[str, str]:
+        """Prepare the environment of the process, nothing is taken from the parent besides a few
+        connectivity variables.
+
+        Parameters
+        ----------
+        config
+            Configuration of the run.
+        workspace
+            Directories of the run, the process gets its private ones.
+        base_url
+            Custom API endpoint, i.e. a gateway.
+        trace_context
+            Trace context of the executing agent, ``traceparent`` and ``tracestate``.
+        resource_attributes
+            Resource attributes of the exported telemetry in addition to the configured ones.
+        parent
+            Environment inherited from, the one of the process by default.
+        credential
+            The credential of the run, an access token declares its scopes within the environment.
+
+        Returns
+        -------
+        Mapping[str, str]
+            Environment of the process, without the credential descriptor and the marker.
+        """
+        environment: dict[str, str] = dict(
+            ClaudeCodeLaunch.inherited_environment(parent, extra=config.inherit_env),
+        )
+        environment.update(
+            {
+                "HOME": workspace.home,
+                "TMPDIR": workspace.temporary_directory,
+                "CLAUDE_CONFIG_DIR": workspace.config_directory,
+                "CLAUDE_CODE_TMPDIR": workspace.temporary_directory,
+                "DISABLE_AUTOUPDATER": "1",
+                "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
+                "CLAUDE_CODE_DISABLE_BUNDLED_SKILLS": "1",
+                "CLAUDE_AGENT_SDK_DISABLE_BUILTIN_AGENTS": "1",
+            }
+        )
+        if base_url:
+            environment["ANTHROPIC_BASE_URL"] = base_url
+
+        environment.update(_credential_environment(credential))
+        environment.update(_connector_environment(config))
+        environment.update(_claude_md_environment(config))
+
+        match config.compaction:
+            case ClaudeCodeAutoCompaction(percent=percent, window=window):
+                if percent is not Missing:
+                    environment["CLAUDE_AUTOCOMPACT_PCT_OVERRIDE"] = str(percent)
+
+                if window is not Missing:
+                    environment["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = str(window)
+
+            case ClaudeCodeNoCompaction():
+                pass  # disabled by the settings
+
+        if config.telemetry is not Missing:
+            environment.update(
+                _telemetry_environment(config.telemetry, trace_context, resource_attributes)
+            )
+
+        environment.update(config.env)
+        return environment
+
+    @staticmethod
+    def inherited_environment(
+        parent: Mapping[str, str] | None = None,
+        /,
+        *,
+        extra: Sequence[str] = (),
+    ) -> Mapping[str, str]:
+        """Pick the variables a process inherits - connectivity ones and the given extra names.
+
+        Parameters
+        ----------
+        parent
+            Environment inherited from, the one of the process by default.
+        extra
+            Names of additional variables to take.
+
+        Returns
+        -------
+        Mapping[str, str]
+            The inherited variables which are set.
+        """
+        source: Mapping[str, str] = os.environ if parent is None else parent
+        return {name: source[name] for name in (*_INHERITED_ENV, *extra) if name in source}
+
+    @staticmethod
+    def verify_connectors(
+        config: ClaudeCodeConfig,
+        credential: ClaudeCodeResolvedCredential | Missing,
+        /,
+    ) -> None:
+        """Refuse account connectors with a credential which can not use them.
+
+        Parameters
+        ----------
+        config
+            Configuration of the run.
+        credential
+            The resolved credential of the run.
+
+        Raises
+        ------
+        ClaudeCodeUnavailable
+            When connectors are enabled and the credential does not declare ``user:mcp_servers``.
+        """
+        match config.connectors:
+            case ClaudeCodeNoConnectors():
+                return
+
+            case ClaudeCodeAccountConnectors():
+                pass
+
+        if credential is Missing:
+            raise ClaudeCodeUnavailable("account connectors need a ClaudeCodeLocalLogin credential")
+
+        match credential:
+            case ClaudeCodeAccessToken(scopes=scopes) if _CONNECTORS_SCOPE in scopes:
+                return
+
+            case ClaudeCodeAccessToken():
+                raise ClaudeCodeUnavailable(
+                    f"the login has no '{_CONNECTORS_SCOPE}' scope, log in again with"
+                    " `claude /login` on a claude.ai account"
+                )
+
+            case ClaudeCodeApiKey() | ClaudeCodeOAuthToken():
+                raise ClaudeCodeUnavailable(
+                    "account connectors need a ClaudeCodeLocalLogin, an API key or a token of"
+                    f" `claude setup-token` has no '{_CONNECTORS_SCOPE}' scope"
+                )
+
+    @staticmethod
+    def verify_claude_md(
+        config: ClaudeCodeConfig,
+        /,
+    ) -> None:
+        """Refuse loading ``CLAUDE.md`` which can not work with the rest of the configuration.
+
+        Parameters
+        ----------
+        config
+            Configuration of the run.
+
+        Raises
+        ------
+        ClaudeCodeUnavailable
+            When ``CLAUDE.md`` of the working directory is loaded without the ``directory`` of the
+            configuration, or the additional directories are excluded and one has glob characters.
+        """
+        match config.claude_md:
+            case ClaudeCodeNoClaudeMd():
+                return
+
+            case ClaudeCodeProjectClaudeMd(additional_directories=additional):
+                if config.directory is Missing:
+                    raise ClaudeCodeUnavailable(
+                        "loading CLAUDE.md of the working directory needs the directory of the"
+                        " configuration"
+                    )
+
+                match additional:
+                    case ClaudeCodeLoadAdditionalClaudeMd():
+                        return
+
+                    case ClaudeCodeSkipAdditionalClaudeMd():
+                        for other in config.additional_directories:
+                            if any(char in other for char in _GLOB_CHARACTERS):
+                                raise ClaudeCodeUnavailable(
+                                    f"additional directory '{other}' has glob characters, its"
+                                    " CLAUDE.md can not be excluded"
+                                )
+
+    @staticmethod
+    def verify_allowed_servers(
+        config: ClaudeCodeConfig,
+        /,
+    ) -> None:
+        """Refuse an allowlist of connectors which can not allow the configured MCP servers.
+
+        Parameters
+        ----------
+        config
+            Configuration of the run.
+
+        Raises
+        ------
+        ClaudeCodeUnavailable
+            When connectors are allowed by URLs and a configured MCP server has a name which an
+            allowlist can not match.
+        """
+        match config.connectors:
+            case ClaudeCodeNoConnectors():
+                return
+
+            case ClaudeCodeAccountConnectors(allowed=allowed):
+                match allowed:
+                    case ClaudeCodeAllConnectors():
+                        return
+
+                    case ClaudeCodeConnectorsAt():
+                        for name in config.mcp_servers:
+                            if _ALLOWED_SERVER_NAME.fullmatch(name) is None:
+                                raise ClaudeCodeUnavailable(
+                                    f"MCP server '{name}' can not be allowed next to the allowed"
+                                    " connectors, its name has to be made of letters, digits,"
+                                    " '_' and '-'"
+                                )
+
+
+def _builtin_key(
+    name: str,
+    /,
+) -> str:
+    # plugins are reported without the marketplace their settings keys carry
+    return f"{name}@builtin"
+
+
+def _enabled_plugins(
     config: ClaudeCodeConfig,
     /,
-    *,
-    directory: str | None = None,
-) -> str:
-    """Prepare the isolating ``--settings`` JSON, configured settings are merged over it.
-
-    The lists ``claudeMdExcludes``, ``allowedMcpServers`` and ``deniedMcpServers`` derived from
-    ``claude_md`` and ``connectors`` are not replaced by the configured settings, the entries of
-    the configured ones are added to them instead.
-
-    Parameters
-    ----------
-    config
-        Configuration of the run.
-    directory
-        Working directory of the run, ``directory`` of the configuration when not given.
-
-    Returns
-    -------
-    str
-        The JSON of the settings.
-
-    Raises
-    ------
-    ValueError
-        When ``CLAUDE.md`` is loaded without a working directory.
-    """
-    settings: dict[str, Any] = {
-        "enabledPlugins": dict.fromkeys(_BUILTIN_PLUGINS, False),
-        "autoMemoryEnabled": False,
+) -> Mapping[str, bool]:
+    # built-in plugins are disabled, configured ones are added - a plugin can be enabled explicitly
+    return {
+        **{_builtin_key(name): False for name in _BUILTIN_PLUGINS},
+        **cast(Mapping[str, bool], config.settings.get("enabledPlugins", {})),
     }
-    if isinstance(config.compaction, ClaudeCodeNoCompaction):
-        settings["autoCompactEnabled"] = False
 
-    settings.update(config.settings)
-    for key, derived in _derived_settings(config, directory).items():
-        settings[key] = _merged_list(derived, config.settings.get(key, Missing))
 
-    return json.dumps(settings, separators=(",", ":"), default=_json_value)
+def _user_memory_patterns() -> list[str]:
+    home: str = os.path.realpath(os.path.expanduser("~"))
+    # exclusions are matched as written - escaping a character keeps it from matching at all, and
+    # a glob of a path with `(` or `{` matches nothing, an exact path matches still
+    return [
+        f"{home}/CLAUDE.md",
+        f"{home}/CLAUDE.local.md",
+        f"{home}/.claude/CLAUDE.md",
+        f"{home}/.claude/**",  # its rules as well
+    ]
+
+
+def _escaped_pattern(
+    path: str,
+    /,
+) -> str:
+    # characters special within glob patterns would match other paths
+    return "".join(f"\\{char}" if char in "\\*?[]" else char for char in path)
 
 
 def _working_directory(
@@ -228,11 +731,12 @@ def _working_directory(
 def _derived_settings(
     config: ClaudeCodeConfig,
     directory: str | None,
+    tools_server: Mapping[str, BasicValue] | None,
     /,
 ) -> Mapping[str, Sequence[Any]]:
     return {
         **_claude_md_settings(config, directory),
-        **_connector_settings(config),
+        **_connector_settings(config, tools_server),
     }
 
 
@@ -263,6 +767,7 @@ def _claude_md_settings(
 
 def _connector_settings(
     config: ClaudeCodeConfig,
+    tools_server: Mapping[str, BasicValue] | None,
     /,
 ) -> Mapping[str, Sequence[Any]]:
     match config.connectors:
@@ -287,10 +792,16 @@ def _connector_settings(
                     pass
 
                 case ClaudeCodeConnectorsAt(urls=urls):
-                    # an allowlist drops every server it does not match, the configured ones too
+                    # an allowlist drops every server it does not match, the configured ones and
+                    # the draive tools too
+                    names: Sequence[str] = (
+                        (*config.mcp_servers, TOOLS_SERVER_KEY)
+                        if tools_server is not None
+                        else tuple(config.mcp_servers)
+                    )
                     derived["allowedMcpServers"] = (
                         *({"serverUrl": url} for url in urls),
-                        *({"serverName": name} for name in config.mcp_servers),
+                        *({"serverName": name} for name in names),
                     )
 
             return derived
@@ -335,85 +846,6 @@ def _json_value(
     raise TypeError(f"Unsupported setting value: {type(value).__name__}")
 
 
-def claude_arguments(
-    config: ClaudeCodeConfig,
-    /,
-    *,
-    instructions: str = "",
-    session: ClaudeCodeSession = _NO_SESSION,
-    directory: str | None = None,
-) -> Sequence[str]:
-    """Prepare the arguments running Claude Code headless within the given configuration.
-
-    Parameters
-    ----------
-    config
-        Configuration of the run.
-    instructions
-        Instructions of the agent, added to or replacing the system prompt.
-    session
-        Persistence of the run within Claude Code sessions.
-    directory
-        Working directory of the run, ``directory`` of the configuration when not given. Needed
-        only when the ``CLAUDE.md`` of the working directory is loaded.
-
-    Returns
-    -------
-    Sequence[str]
-        Arguments of the executable. The prompt is not among them, it is sent to the input.
-
-    Raises
-    ------
-    ValueError
-        When ``CLAUDE.md`` is loaded without a working directory.
-    """
-    arguments: list[str] = [
-        "-p",
-        "--input-format",
-        "stream-json",
-        "--output-format",
-        "stream-json",
-        "--verbose",
-        "--setting-sources",
-        ",".join(config.setting_sources),
-        "--settings",
-        claude_settings(config, directory=directory),
-        *_connector_arguments(config),
-        "--no-chrome",
-        "--permission-prompts",
-        "none",
-        "--permission-mode",
-        config.permission_mode,
-        "--model",
-        config.model,
-        "--tools",
-        ",".join(config.tools),
-        *_plugin_arguments(config),
-        *_permission_arguments(config),
-        *_extension_arguments(config, directory),
-        *_session_arguments(session),
-    ]
-    if instructions:
-        flag: str = (
-            "--system-prompt" if config.system_prompt == "replace" else "--append-system-prompt"
-        )
-        arguments.extend((flag, instructions))
-
-    if config.max_turns is not Missing:
-        arguments.extend(("--max-turns", str(config.max_turns)))
-
-    if config.max_budget_usd is not Missing:
-        arguments.extend(("--max-budget-usd", str(config.max_budget_usd)))
-
-    if config.effort is not Missing:
-        arguments.extend(("--effort", config.effort))
-
-    if config.stream_deltas:
-        arguments.append("--include-partial-messages")
-
-    return tuple(arguments)
-
-
 def _connector_arguments(
     config: ClaudeCodeConfig,
     /,
@@ -440,11 +872,15 @@ def _plugin_arguments(
 
 def _permission_arguments(
     config: ClaudeCodeConfig,
+    tools_server: Mapping[str, BasicValue] | None,
     /,
 ) -> Sequence[str]:
     allowed: Sequence[str] = (
         _scoped_tools(config) if config.allowed_tools is Missing else config.allowed_tools
     )
+    if tools_server is not None:
+        allowed = (*allowed, TOOLS_SERVER_RULE)
+
     arguments: list[str] = []
     if allowed:
         arguments.extend(("--allowedTools", ",".join(allowed)))
@@ -458,15 +894,25 @@ def _permission_arguments(
 def _extension_arguments(
     config: ClaudeCodeConfig,
     directory: str | None,
+    tools_server: Mapping[str, BasicValue] | None,
     /,
 ) -> Sequence[str]:
+    servers: Mapping[str, Mapping[str, BasicValue]] = config.mcp_servers
+    if tools_server is not None:
+        if TOOLS_SERVER_KEY in servers:
+            raise ValueError(
+                f"The MCP server name '{TOOLS_SERVER_KEY}' is reserved for the draive tools"
+            )
+
+        servers = {**servers, TOOLS_SERVER_KEY: tools_server}
+
     arguments: list[str] = []
-    if config.mcp_servers:
+    if servers:
         arguments.extend(
             (
                 "--mcp-config",
                 json.dumps(
-                    {"mcpServers": config.mcp_servers},
+                    {"mcpServers": servers},
                     separators=(",", ":"),
                     default=_json_value,
                 ),
@@ -538,157 +984,8 @@ def _directory_pattern(
     directory: str,
     /,
 ) -> str:
-    # rules are gitignore patterns, characters special within them would match other directories
-    escaped: str = "".join(f"\\{char}" if char in "\\*?[]" else char for char in directory)
-    # absolute paths are written with a double slash within the rules
-    return f"//{escaped.lstrip('/')}/**"
-
-
-def inherited_environment(
-    parent: Mapping[str, str] | None = None,
-    /,
-    *,
-    extra: Sequence[str] = (),
-) -> Mapping[str, str]:
-    """Pick the variables a process inherits - connectivity ones and the given extra names.
-
-    Parameters
-    ----------
-    parent
-        Environment inherited from, the one of the process by default.
-    extra
-        Names of additional variables to take.
-
-    Returns
-    -------
-    Mapping[str, str]
-        The inherited variables which are set.
-    """
-    source: Mapping[str, str] = os.environ if parent is None else parent
-    return {name: source[name] for name in (*_INHERITED_ENV, *extra) if name in source}
-
-
-def verify_connectors(
-    config: ClaudeCodeConfig,
-    credential: ClaudeCodeResolvedCredential | Missing,
-    /,
-) -> None:
-    """Refuse account connectors with a credential which can not use them.
-
-    Parameters
-    ----------
-    config
-        Configuration of the run.
-    credential
-        The resolved credential of the run.
-
-    Raises
-    ------
-    ClaudeCodeUnavailable
-        When connectors are enabled and the credential does not declare ``user:mcp_servers``.
-    """
-    match config.connectors:
-        case ClaudeCodeNoConnectors():
-            return
-
-        case ClaudeCodeAccountConnectors():
-            pass
-
-    if credential is Missing:
-        raise ClaudeCodeUnavailable("account connectors need a ClaudeCodeLocalLogin credential")
-
-    match credential:
-        case ClaudeCodeAccessToken(scopes=scopes) if _CONNECTORS_SCOPE in scopes:
-            return
-
-        case ClaudeCodeAccessToken():
-            raise ClaudeCodeUnavailable(
-                f"the login has no '{_CONNECTORS_SCOPE}' scope, log in again with"
-                " `claude /login` on a claude.ai account"
-            )
-
-        case ClaudeCodeApiKey() | ClaudeCodeOAuthToken():
-            raise ClaudeCodeUnavailable(
-                "account connectors need a ClaudeCodeLocalLogin, an API key or a token of"
-                f" `claude setup-token` has no '{_CONNECTORS_SCOPE}' scope"
-            )
-
-
-def verify_claude_md(
-    config: ClaudeCodeConfig,
-    /,
-) -> None:
-    """Refuse loading ``CLAUDE.md`` which can not work with the rest of the configuration.
-
-    Parameters
-    ----------
-    config
-        Configuration of the run.
-
-    Raises
-    ------
-    ClaudeCodeUnavailable
-        When ``CLAUDE.md`` of the working directory is loaded without the ``directory`` of the
-        configuration, or the additional directories are excluded and one has glob characters.
-    """
-    match config.claude_md:
-        case ClaudeCodeNoClaudeMd():
-            return
-
-        case ClaudeCodeProjectClaudeMd(additional_directories=additional):
-            if config.directory is Missing:
-                raise ClaudeCodeUnavailable(
-                    "loading CLAUDE.md of the working directory needs the directory of the"
-                    " configuration"
-                )
-
-            match additional:
-                case ClaudeCodeLoadAdditionalClaudeMd():
-                    return
-
-                case ClaudeCodeSkipAdditionalClaudeMd():
-                    for other in config.additional_directories:
-                        if any(char in other for char in _GLOB_CHARACTERS):
-                            raise ClaudeCodeUnavailable(
-                                f"additional directory '{other}' has glob characters, its CLAUDE.md"
-                                " can not be excluded"
-                            )
-
-
-def verify_allowed_servers(
-    config: ClaudeCodeConfig,
-    /,
-) -> None:
-    """Refuse an allowlist of connectors which can not allow the configured MCP servers.
-
-    Parameters
-    ----------
-    config
-        Configuration of the run.
-
-    Raises
-    ------
-    ClaudeCodeUnavailable
-        When connectors are allowed by URLs and a configured MCP server has a name which an
-        allowlist can not match.
-    """
-    match config.connectors:
-        case ClaudeCodeNoConnectors():
-            return
-
-        case ClaudeCodeAccountConnectors(allowed=allowed):
-            match allowed:
-                case ClaudeCodeAllConnectors():
-                    return
-
-                case ClaudeCodeConnectorsAt():
-                    for name in config.mcp_servers:
-                        if _ALLOWED_SERVER_NAME.fullmatch(name) is None:
-                            raise ClaudeCodeUnavailable(
-                                f"MCP server '{name}' can not be allowed next to the allowed"
-                                " connectors, its name has to be made of letters, digits, '_' and"
-                                " '-'"
-                            )
+    # rules are gitignore patterns, absolute paths are written with a double slash within them
+    return f"//{_escaped_pattern(directory).lstrip('/')}/**"
 
 
 def _credential_environment(
@@ -731,84 +1028,6 @@ def _claude_md_environment(
 
         case ClaudeCodeNoClaudeMd():
             return {}
-
-
-def claude_environment(
-    config: ClaudeCodeConfig,
-    /,
-    *,
-    workspace: ClaudeCodeWorkspace,
-    base_url: str | None = None,
-    trace_context: Mapping[str, str] | None = None,
-    resource_attributes: Mapping[str, str] | None = None,
-    parent: Mapping[str, str] | None = None,
-    credential: ClaudeCodeResolvedCredential | Missing = Missing,
-) -> Mapping[str, str]:
-    """Prepare the environment of the process, nothing is taken from the parent besides a few
-    connectivity variables.
-
-    Parameters
-    ----------
-    config
-        Configuration of the run.
-    workspace
-        Directories of the run, the process gets its private ones.
-    base_url
-        Custom API endpoint, i.e. a gateway.
-    trace_context
-        Trace context of the executing agent, ``traceparent`` and ``tracestate``.
-    resource_attributes
-        Resource attributes of the exported telemetry in addition to the configured ones.
-    parent
-        Environment inherited from, the one of the process by default.
-    credential
-        The credential of the run, an access token declares its scopes within the environment.
-
-    Returns
-    -------
-    Mapping[str, str]
-        Environment of the process, without the credential descriptor and the marker.
-    """
-    environment: dict[str, str] = dict(
-        inherited_environment(parent, extra=config.inherit_env),
-    )
-    environment.update(
-        {
-            "HOME": workspace.home,
-            "TMPDIR": workspace.temporary_directory,
-            "CLAUDE_CONFIG_DIR": workspace.config_directory,
-            "CLAUDE_CODE_TMPDIR": workspace.temporary_directory,
-            "DISABLE_AUTOUPDATER": "1",
-            "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
-            "CLAUDE_CODE_DISABLE_BUNDLED_SKILLS": "1",
-            "CLAUDE_AGENT_SDK_DISABLE_BUILTIN_AGENTS": "1",
-        }
-    )
-    if base_url:
-        environment["ANTHROPIC_BASE_URL"] = base_url
-
-    environment.update(_credential_environment(credential))
-    environment.update(_connector_environment(config))
-    environment.update(_claude_md_environment(config))
-
-    match config.compaction:
-        case ClaudeCodeAutoCompaction(percent=percent, window=window):
-            if percent is not Missing:
-                environment["CLAUDE_AUTOCOMPACT_PCT_OVERRIDE"] = str(percent)
-
-            if window is not Missing:
-                environment["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = str(window)
-
-        case ClaudeCodeNoCompaction():
-            pass  # disabled by the settings
-
-    if config.telemetry is not Missing:
-        environment.update(
-            _telemetry_environment(config.telemetry, trace_context, resource_attributes)
-        )
-
-    environment.update(config.env)
-    return environment
 
 
 def _telemetry_environment(
@@ -863,84 +1082,3 @@ def _telemetry_environment(
             environment["TRACESTATE"] = tracestate
 
     return environment
-
-
-def build_launch(
-    config: ClaudeCodeConfig,
-    /,
-    *,
-    binary: str,
-    prompt: Sequence[Mapping[str, Any]],
-    workspace: ClaudeCodeWorkspace,
-    instructions: str = "",
-    session: ClaudeCodeSession = _NO_SESSION,
-    credential: ClaudeCodeResolvedCredential | Missing = Missing,
-    base_url: str | None = None,
-    trace_context: Mapping[str, str] | None = None,
-    resource_attributes: Mapping[str, str] | None = None,
-) -> ClaudeCodeLaunch:
-    """Prepare the launch of Claude Code for a single prompt.
-
-    Parameters
-    ----------
-    config
-        Configuration of the run.
-    binary
-        Absolute path of the executable.
-    prompt
-        Content blocks of the user message.
-    workspace
-        Directories of the run.
-    instructions
-        Instructions of the agent.
-    session
-        Persistence of the run within Claude Code sessions.
-    credential
-        The only credential of the run.
-    base_url
-        Custom API endpoint.
-    trace_context
-        Trace context of the executing agent.
-    resource_attributes
-        Resource attributes of the exported telemetry.
-
-    Returns
-    -------
-    ClaudeCodeLaunch
-        Launch ready to be run.
-
-    Raises
-    ------
-    ClaudeCodeUnavailable
-        When account connectors are enabled and the credential can not use them, or the
-        configuration of connectors or ``CLAUDE.md`` can not work.
-    """
-    verify_connectors(config, credential)
-    verify_allowed_servers(config)
-    verify_claude_md(config)
-    return ClaudeCodeLaunch(
-        binary=binary,
-        arguments=claude_arguments(
-            config,
-            instructions=instructions,
-            session=session,
-            directory=workspace.directory,
-        ),
-        environment=claude_environment(
-            config,
-            workspace=workspace,
-            base_url=base_url,
-            trace_context=trace_context,
-            resource_attributes=resource_attributes,
-            credential=credential,
-        ),
-        directory=workspace.directory,
-        prompt=json.dumps(
-            {"type": "user", "message": {"role": "user", "content": list(prompt)}},
-            separators=(",", ":"),
-        ),
-        credential=credential,
-        marker=uuid4().hex,
-        timeout=config.timeout,
-        grace=config.stop_grace,
-    )

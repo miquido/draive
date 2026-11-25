@@ -15,6 +15,7 @@ from draive.claude.exceptions import (
     ClaudeCodeOutputTooLarge,
     ClaudeCodeTimedOut,
     ClaudeCodeUnavailable,
+    ClaudeCodeUnfinished,
 )
 from draive.claude.launch import ClaudeCodeLaunch
 from draive.claude.login import ClaudeCodeLogins
@@ -32,6 +33,7 @@ __all__ = (
     "ClaudeCodeRunning",
     "ClaudeCodeTimedOut",
     "ClaudeCodeUnavailable",
+    "ClaudeCodeUnfinished",
 )
 
 

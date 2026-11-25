@@ -1,11 +1,12 @@
 import json
-from collections.abc import AsyncGenerator, Sequence
+from collections.abc import AsyncGenerator, Iterable, Mapping, Sequence
+from contextlib import asynccontextmanager
 from typing import Final, final
 from urllib.parse import quote
 
-from haiway import Meta, MetaValues, Missing, State, ctx
+from haiway import BasicValue, Meta, MetaValues, Missing, State, ctx
 
-from draive.agents import Agent, AgentIdentity, AgentMemory, AgentMessage, AgentThread
+from draive.agents import Agent, AgentIdentity, AgentMessage, AgentThread
 from draive.claude.config import (
     ClaudeCodeAccountConnectors,
     ClaudeCodeConfig,
@@ -24,69 +25,55 @@ from draive.claude.events import (
     ClaudeCodeToolResult,
     ClaudeCodeToolUse,
 )
-from draive.claude.launch import build_launch
+from draive.claude.launch import ClaudeCodeLaunch
+from draive.claude.prompt import prompt_blocks
 from draive.claude.sessions import (
     ClaudeCodeNewSession,
     ClaudeCodeNoSession,
     ClaudeCodeResumedSession,
     ClaudeCodeSession,
     ClaudeCodeSessions,
-    session_exists,
-    session_identifier,
 )
-from draive.claude.transcript import prompt_blocks, render_transcript
+from draive.claude.tools import TOOLS_SERVER_KEY, ClaudeCodeToolsBridge
 from draive.claude.types import (
-    ClaudeCodeEnded,
     ClaudeCodeErrored,
     ClaudeCodeException,
     ClaudeCodeRunner,
     ClaudeCodeUnavailable,
+    ClaudeCodeUnfinished,
 )
-from draive.claude.workspace import ClaudeCodeWorkspace, claude_workspace
-from draive.models import ModelContext, ModelInput, ModelOutput, record_usage_metrics
+from draive.claude.workspace import ClaudeCodeWorkspace
+from draive.models import record_usage_metrics
 from draive.multimodal import (
-    MultimodalContent,
     MultimodalContentPart,
     Template,
     TemplatesRepository,
     TextContent,
 )
+from draive.tools import Tool, Toolbox
 from draive.utils import ProcessingEvent
 
 __all__ = ("claude_code_agent",)
 
 _PROVIDER: Final[str] = "claude_code"
-# built-in plugins which an organization enforces for its accounts, no setting disables them
-_ENFORCED_PLUGINS: Final[Sequence[str]] = ("cc-plugin-sec-default",)
 # connectors named by the record and the warning, the rest is counted
 _REPORTED_CONNECTORS: Final[int] = 10
 
 type _Chunk = MultimodalContentPart | ProcessingEvent
 
-
-@final
-class _Continuity(State):
-    """How a run continues the conversation, the only source of its session and its history."""
-
-    session: ClaudeCodeSession
-    recalled: ModelContext = ()
+_PARAGRAPH: Final[str] = "\n\n"  # separates the text blocks of the main agent
+_LINE_BREAKS: Final[str] = "\r\n"
 
 
 @final
 class _Streamed(State):
-    """What was streamed of a run so far, the only source of its answer and its result."""
+    """What was streamed of a run so far, the only source of its text, session and result."""
 
-    previewed: str = ""  # streamed text which its complete block is not to repeat
-    answer: Sequence[str] = ()
+    previewed: str = ""  # streamed deltas which their complete block is not to repeat
+    text: str = ""  # text of the main agent exactly as it was streamed
+    separated: bool = False  # a block of the text ended, the next one starts a paragraph
+    started: str | None = None
     result: ClaudeCodeResult | None = None
-
-    def echoes(
-        self,
-        text: str,
-        /,
-    ) -> bool:
-        """Whether the complete block only repeats what was streamed of it already."""
-        return self.previewed.startswith(text)
 
 
 def claude_code_agent(
@@ -94,8 +81,9 @@ def claude_code_agent(
     *,
     description: str = "",
     instructions: Template | str = "",
-    memory: AgentMemory | ClaudeCodeSessions = AgentMemory.disabled,
+    sessions: ClaudeCodeSessions | None = None,
     config: ClaudeCodeConfig | None = None,
+    tools: Toolbox | Iterable[Tool] = Toolbox.empty,
     meta: Meta | MetaValues | None = None,
 ) -> Agent:
     """Create an agent which runs Claude Code, fully managed.
@@ -105,11 +93,9 @@ def claude_code_agent(
     agent is streamed as text parts, its tool use and results as ``ProcessingEvent``s named
     ``claude_code.tool_use``, ``claude_code.tool_result`` and ``claude_code.result``.
 
-    The memory of the conversation is either managed by draive or by Claude Code. With
-    ``AgentMemory`` the recalled history is handed to a fresh session and the turn remembered
-    afterwards, which works with any memory backend. With ``ClaudeCodeSessions`` Claude Code
-    keeps the session of each thread and resumes it, with the whole context it had. Nothing is
-    kept by default.
+    With ``sessions`` Claude Code keeps the session of each thread in the state directory and
+    resumes it with the whole context it had - tool use, compaction and prompt caching. Without
+    it every call is a fresh session and nothing is kept.
 
     The call is an async generator, close it when it is left early, i.e. with ``ctx.closing``.
 
@@ -117,17 +103,22 @@ def claude_code_agent(
     ----------
     agent
         Identity of the agent, or its name. The identity made of a name is stable, so agents
-        of the same name share the sessions and the memory of their threads, also after a
-        restart.
+        of the same name share the sessions of their threads, also after a restart.
     description
         Description of the agent, ignored when an identity is given.
     instructions
         Instructions of the agent, appended to the system prompt of Claude Code, or replacing
         it according to the configuration.
-    memory
-        Memory of the conversation, disabled by default.
+    sessions
+        Sessions of the threads kept by Claude Code, every call is a fresh session when not set.
     config
         Configuration of the runs, ``ClaudeCodeConfig`` of the scope when not set.
+    tools
+        Draive tools exposed to every run as the MCP server ``draive``, they appear as
+        ``mcp__draive__<tool>`` within the tool events and are allowed automatically. Distinct
+        from ``ClaudeCodeConfig.tools``, which selects the built-in tools of Claude Code. They run
+        within the process and the context of the agent, only the tools with ``response`` handling
+        are supported. Requires the ``mcp`` extra.
     meta
         Metadata of the identity, ignored when an identity is given.
 
@@ -143,8 +134,13 @@ def claude_code_agent(
     ClaudeCodeFailed
         When the run failed, timed out or reported an error.
     ValueError
-        When the message or the working directory is not supported.
+        When the message or the working directory is not supported, or a tool can not be exposed
+        to Claude Code - its handling is not ``response`` or its name is not accepted.
     """
+    toolbox: Toolbox = Toolbox.of(tools)
+    if toolbox.tools:
+        ClaudeCodeToolsBridge.verify(toolbox)
+
     identity: AgentIdentity = (
         # stable, as the sessions are found by it after a restart
         AgentIdentity.of(
@@ -165,16 +161,22 @@ def claude_code_agent(
             resolved: ClaudeCodeConfig = config or ctx.state(ClaudeCodeConfig)
             runner: ClaudeCodeRunner = ctx.state(ClaudeCodeRunner)
             text: str = await _resolved(instructions)
-            async with claude_workspace(
-                resolved,
-                memory if isinstance(memory, ClaudeCodeSessions) else None,
-            ) as workspace:
-                continuity: _Continuity = await _continuity(
-                    memory,
+            async with (
+                _serving(toolbox) as tools_server,
+                ClaudeCodeWorkspace.prepare(resolved, sessions) as workspace,
+            ):
+                if "project" in resolved.setting_sources and await workspace.reaches_user_agents():
+                    ctx.log_warning(
+                        "Claude Code loads the subagents of ~/.claude of the user as the ones of"
+                        " the project, the working directory is within the home and outside of"
+                        " a git repository"
+                    )
+
+                session: ClaudeCodeSession = await _session(
+                    sessions,
                     identity=identity,
                     thread=thread,
                     workspace=workspace,
-                    instructions=text,
                 )
                 streamed: _Streamed = _Streamed()
                 # every run gets a token which is valid now
@@ -184,19 +186,15 @@ def claude_code_agent(
                     else await runner.resolving(runner.credential, binary=runner.binary)
                 )
                 stream = runner.running(
-                    build_launch(
+                    ClaudeCodeLaunch.of(
                         resolved,
                         binary=runner.binary,
-                        prompt=prompt_blocks(
-                            message.content,
-                            history=render_transcript(continuity.recalled)
-                            if continuity.recalled
-                            else None,
-                        ),
+                        prompt=prompt_blocks(message.content),
                         workspace=workspace,
                         instructions=text,
-                        session=continuity.session,
+                        session=session,
                         credential=credential,
+                        tools_server=tools_server,
                         base_url=None if runner.base_url is Missing else runner.base_url,
                         # inside of the scope of the agent, so the run continues its trace
                         trace_context=ctx.trace_context(),
@@ -211,12 +209,16 @@ def claude_code_agent(
                     async for event in stream:
                         if isinstance(event, ClaudeCodeStarted):
                             _verify_authentication(event, credential)
-                            _report_started(event, resolved.connectors)
+                            _report_started(
+                                resolved,
+                                event,
+                                resolved.connectors,
+                                tools_server=tools_server is not None,
+                            )
 
-                        for chunk in _chunks(event, streamed):
+                        chunks, streamed = _step(event, streamed)
+                        for chunk in chunks:
                             yield chunk
-
-                        streamed = _accumulated(event, streamed)
 
                 finally:
                     await stream.aclose()
@@ -227,24 +229,25 @@ def claude_code_agent(
                         raise ClaudeCodeErrored.of(failure, session_id=result.session_id)
 
                     case ClaudeCodeSuccess(text=answer):
-                        if not streamed.answer and answer:
+                        if not streamed.text and answer:
                             yield TextContent.of(answer)  # nothing else carried the text
-
-                        if isinstance(memory, AgentMemory):
-                            await memory.remember(
-                                thread=thread,
-                                context=(
-                                    *continuity.recalled,
-                                    ModelInput.of(message.content, meta=message.meta),
-                                    ModelOutput.of(
-                                        MultimodalContent.of("".join(streamed.answer) or answer)
-                                    ),
-                                ),
-                            )
 
                         yield _summary(result)
 
     return Agent(identity, executing)
+
+
+@asynccontextmanager
+async def _serving(
+    toolbox: Toolbox,
+    /,
+) -> AsyncGenerator[Mapping[str, BasicValue] | None]:
+    if not toolbox.tools:
+        yield None
+        return
+
+    async with ClaudeCodeToolsBridge.serve(toolbox) as bridge:
+        yield bridge.mcp_server
 
 
 def _current_thread() -> AgentThread:
@@ -264,80 +267,102 @@ async def _resolved(
     return instructions
 
 
-async def _continuity(
-    memory: AgentMemory | ClaudeCodeSessions,
+async def _session(
+    sessions: ClaudeCodeSessions | None,
     /,
     *,
     identity: AgentIdentity,
     thread: AgentThread,
     workspace: ClaudeCodeWorkspace,
-    instructions: str,
-) -> _Continuity:
-    match memory:
-        case ClaudeCodeSessions():
-            identifier: str = session_identifier(identity.uri, thread.identifier)
-            # also a session which did not finish is stored, and can not be started again
-            if await session_exists(workspace.config_directory, identifier):
-                return _Continuity(session=ClaudeCodeResumedSession(identifier=identifier))
+) -> ClaudeCodeSession:
+    if sessions is None:
+        return ClaudeCodeNoSession()
 
-            return _Continuity(session=ClaudeCodeNewSession(identifier=identifier))
+    identifier: str = ClaudeCodeSessions.identifier(identity.uri, thread.identifier)
+    # also a session which did not finish is stored, and can not be started again
+    if await workspace.has_session(identifier):
+        return ClaudeCodeResumedSession(identifier=identifier)
 
-        case AgentMemory():
-            await memory.prepare(thread=thread, instructions=instructions)
-            return _Continuity(
-                session=ClaudeCodeNoSession(),
-                recalled=await memory.recall(thread=thread, context=()),
-            )
+    return ClaudeCodeNewSession(identifier=identifier)
 
 
-def _chunks(
+def _step(
     event: ClaudeCodeEvent,
     streamed: _Streamed,
     /,
-) -> Sequence[_Chunk]:
+) -> tuple[Sequence[_Chunk], _Streamed]:
     match event:
+        case ClaudeCodeStarted(session_id=session_id):
+            return (), streamed.updating(started=session_id)
+
         case ClaudeCodeDelta(text=text):
-            return (TextContent.of(text),)
+            chunks, streamed = _streaming(text, streamed)
+            return chunks, streamed.updating(previewed=streamed.previewed + text)
 
-        case ClaudeCodeText(text=text, parent=str() as parent):
-            return (ProcessingEvent.of("claude_code.subagent_text", text, meta={"parent": parent}),)
+        case ClaudeCodeText(text=text, parent=parent):
+            if parent is None:  # the main agent
+                return _completed(text, streamed)
 
-        case ClaudeCodeText(text=text):
-            return () if streamed.echoes(text) else (TextContent.of(text),)
+            return _subagent_text(text, parent), streamed
 
-        case ClaudeCodeToolUse():
-            return (_tool_use(event),)
-
-        case ClaudeCodeToolResult():
-            return (_tool_result(event),)
-
-        case _:
-            return ()
-
-
-def _accumulated(
-    event: ClaudeCodeEvent,
-    streamed: _Streamed,
-    /,
-) -> _Streamed:
-    match event:
-        case ClaudeCodeDelta(text=text):
-            return streamed.updating(
-                previewed=streamed.previewed + text,
-                answer=(*streamed.answer, text),
-            )
-
-        case ClaudeCodeText(text=text, parent=None):
-            if streamed.echoes(text):
-                return streamed.updating(previewed=streamed.previewed[len(text) :])
-
-            return streamed.updating(answer=(*streamed.answer, text))
+        case ClaudeCodeToolUse() | ClaudeCodeToolResult():
+            return (_tool_event(event),), streamed
 
         case ClaudeCodeResult():
-            return streamed.updating(result=event)
+            return (), streamed.updating(result=event)
 
-        case _:
-            return streamed
+
+def _completed(
+    text: str,
+    streamed: _Streamed,
+    /,
+) -> tuple[Sequence[_Chunk], _Streamed]:
+    chunks: Sequence[_Chunk]
+    if streamed.previewed.startswith(text):  # its deltas were streamed already
+        chunks = ()
+        streamed = streamed.updating(previewed=streamed.previewed[len(text) :])
+
+    else:  # a preview which the block does not continue is stale, it would never match again
+        chunks, streamed = _streaming(text, streamed.updating(previewed=""))
+
+    return chunks, streamed.updating(separated=streamed.separated or bool(text.strip()))
+
+
+def _streaming(
+    text: str,
+    streamed: _Streamed,
+    /,
+) -> tuple[Sequence[_Chunk], _Streamed]:
+    # only line breaks are dropped between blocks, the indentation of a block is its content
+    content: str = text.lstrip(_LINE_BREAKS) if streamed.separated or not streamed.text else text
+    if not content:
+        return (), streamed  # blank between blocks, the paragraph separates them already
+
+    piece: str = f"{_PARAGRAPH}{content}" if streamed.separated else content
+    return (TextContent.of(piece),), streamed.updating(text=streamed.text + piece, separated=False)
+
+
+def _subagent_text(
+    text: str,
+    parent: str,
+    /,
+) -> Sequence[_Chunk]:
+    if not text.strip():
+        return ()
+
+    return (ProcessingEvent.of("claude_code.subagent_text", text, meta={"parent": parent}),)
+
+
+def _tool_event(
+    event: ClaudeCodeToolUse | ClaudeCodeToolResult,
+    /,
+) -> ProcessingEvent:
+    match event:
+        case ClaudeCodeToolUse():
+            return _tool_use(event)
+
+        case ClaudeCodeToolResult():
+            return _tool_result(event)
 
 
 def _tool_use(
@@ -374,8 +399,8 @@ def _concluded(
     streamed: _Streamed,
     /,
 ) -> ClaudeCodeResult:
-    if streamed.result is None:  # a runner without a result would be a broken one
-        raise ClaudeCodeEnded()
+    if streamed.result is None:  # a custom runner which ended its stream without a result
+        raise ClaudeCodeUnfinished(session_id=streamed.started)
 
     _record_result(streamed.result)
     return streamed.result
@@ -420,9 +445,12 @@ def _named(
 
 
 def _report_started(
+    config: ClaudeCodeConfig,
     started: ClaudeCodeStarted,
     connectors: ClaudeCodeConnectors,
     /,
+    *,
+    tools_server: bool,
 ) -> None:
     unavailable: Sequence[str]
     failed: Sequence[str]
@@ -439,6 +467,12 @@ def _report_started(
             "claude_code.connectors_unavailable": list(unavailable[:_REPORTED_CONNECTORS]),
         },
     )
+    if tools_server and TOOLS_SERVER_KEY in started.failed_mcp_servers:
+        raise ClaudeCodeUnavailable(
+            "the draive tools server of the run did not connect, the agent would run without"
+            " its tools"
+        )
+
     if started.failed_mcp_servers:
         ctx.log_warning(
             f"Claude Code could not connect MCP servers: {', '.join(started.failed_mcp_servers)}"
@@ -449,13 +483,16 @@ def _report_started(
     if failed:
         ctx.log_warning(f"Claude Code could not connect connectors: {_named(failed)}")
 
-    if leaked := [
-        name
-        for name in started.plugins
-        if name.startswith("cc-plugin-") and name not in _ENFORCED_PLUGINS
-    ]:
+    if leaked := ClaudeCodeLaunch.leaked_plugins(config, started.plugins):
         ctx.log_warning(
-            f"Claude Code loaded built-in plugins which are not disabled: {', '.join(leaked)}"
+            "Claude Code loaded built-in plugins unknown to the isolating settings, which are"
+            f" not disabled: {', '.join(leaked)}"
+        )
+
+    if enforced := ClaudeCodeLaunch.enforced_plugins(config, started.plugins):
+        ctx.log_info(
+            "Claude Code loaded built-in plugins enforced by the organization of the account:"
+            f" {', '.join(enforced)}"
         )
 
 

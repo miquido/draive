@@ -18,7 +18,6 @@ from draive.claude import (
     ClaudeCodeNoSession,
     ClaudeCodeSession,
 )
-from draive.claude.launch import build_launch
 from draive.claude.process import marked_processes
 from draive.claude.workspace import ClaudeCodeWorkspace
 
@@ -248,6 +247,13 @@ elif scenario == "stderr_held":
         file.write(str(child.pid))
     sys.exit(5)
 
+elif scenario == "closed_output":
+    sys.stderr.write("closing the output" + chr(10))
+    sys.stderr.flush()
+    os.close(1)
+    while True:
+        time.sleep(0.1)
+
 elif scenario == "noresult":
     sys.stderr.write("fatal: bad credentials " + (key or "") + "\\n")
     sys.exit(3)
@@ -307,7 +313,7 @@ def launch_for(
 ) -> ClaudeCodeLaunch:
     """Prepare a launch of the fake executable within the given directory."""
     (directory / "work").mkdir(exist_ok=True)
-    return build_launch(
+    return ClaudeCodeLaunch.of(
         ClaudeCodeConfig(
             timeout=timeout,
             stop_grace=grace,

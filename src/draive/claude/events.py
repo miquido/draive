@@ -297,7 +297,8 @@ def _assistant(
         block_type: str | None = _string(block.get("type"))
         if block_type == "text":
             text: str | None = _string(block.get("text"))
-            if text is not None and text.strip():
+            # also a blank block, its deltas were streamed already and have to be matched
+            if text:
                 events.append(ClaudeCodeText(text=text, parent=parent))
 
         elif block_type == "tool_use":

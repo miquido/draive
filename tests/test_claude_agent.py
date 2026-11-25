@@ -11,24 +11,22 @@ from haiway.context.types import ContextStateMissing
 
 from draive import (
     Agent,
-    AgentMemory,
-    ModelInput,
-    ModelOutput,
     ResourceContent,
     ResourceReference,
     Template,
     TemplatesRepository,
     TextContent,
+    tool,
 )
 from draive.claude import (
     ClaudeCode,
     ClaudeCodeApiKey,
     ClaudeCodeAuthenticationFailed,
     ClaudeCodeConfig,
-    ClaudeCodeEnded,
     ClaudeCodeErrored,
     ClaudeCodeFailed,
     ClaudeCodeFailure,
+    ClaudeCodeMCPServer,
     ClaudeCodeOAuthToken,
     ClaudeCodeResult,
     ClaudeCodeRunner,
@@ -37,9 +35,11 @@ from draive.claude import (
     ClaudeCodeSuccess,
     ClaudeCodeTelemetry,
     ClaudeCodeUnavailable,
+    ClaudeCodeUnfinished,
     claude_code_agent,
 )
-from draive.claude.sessions import session_exists, session_identifier
+from draive.claude.events import parse_events
+from draive.claude.workspace import ClaudeCodeWorkspace
 from draive.multimodal import ArtifactContent, MultimodalContent
 from draive.utils import ProcessingEvent
 from tests._claude_cli import alive, write_fake_claude
@@ -85,7 +85,7 @@ class _Setup:
     def agent(self, name: str, **arguments: Any) -> Agent:
         """An agent of these sessions when there are any."""
         if self.sessions is not None:
-            arguments["memory"] = self.sessions
+            arguments["sessions"] = self.sessions
 
         return claude_code_agent(name, **arguments)
 
@@ -113,7 +113,7 @@ async def test_agent_streams_text_and_reports_tools_and_result(tmp_path: Path) -
     async with setup.scope():
         chunks = await _call(agent)
 
-    assert _texts(chunks) == ["reading", "done"]
+    assert _texts(chunks) == ["reading", "\n\ndone"]  # blocks apart as paragraphs
     use, result_of_tool, summary = _events(chunks)
     assert (use.event, use.meta.get("tool"), use.meta.get("identifier")) == (
         "claude_code.tool_use",
@@ -169,6 +169,84 @@ async def test_the_configuration_of_the_agent_wins_over_the_scope(tmp_path: Path
 
     arguments = setup.recorded()["arguments"]
     assert arguments[arguments.index("--model") + 1] == "agent-model"
+
+
+@tool(description="Reads a note.")
+async def read_note() -> str:
+    return "note"
+
+
+@tool(description="Returns to the user.", handling="output")
+async def output_note() -> str:
+    return "note"
+
+
+def test_tools_which_are_not_answered_to_the_model_are_refused_at_creation() -> None:
+    with pytest.raises(ValueError, match="response"):
+        claude_code_agent("coder", tools=[read_note, output_note])
+
+
+@pytest.mark.asyncio
+async def test_tools_are_exposed_to_the_run_as_the_draive_server(tmp_path: Path) -> None:
+    setup = _Setup(tmp_path)
+    agent = claude_code_agent("coder", tools=[read_note])
+
+    async with setup.scope():
+        await _call(agent)
+
+    arguments = setup.recorded()["arguments"]
+    server = json.loads(arguments[arguments.index("--mcp-config") + 1])["mcpServers"]["draive"]
+    assert server["args"][0] == "-I"
+    assert arguments[arguments.index("--allowedTools") + 1].split(",")[-1] == "mcp__draive"
+
+
+def _started_runner(*servers: ClaudeCodeMCPServer) -> Any:
+    async def running(launch: Any) -> Any:
+        yield ClaudeCodeStarted(session_id="s", mcp_servers=servers)
+
+    return running
+
+
+@pytest.mark.asyncio
+async def test_a_failed_draive_tools_server_fails_the_run() -> None:
+    running = _started_runner(ClaudeCodeMCPServer(name="draive", status="failed"))
+    async with ctx.scope(
+        "test",
+        ClaudeCodeConfig(),
+        ClaudeCodeRunner(binary="/fake", running=running),
+    ):
+        with pytest.raises(ClaudeCodeUnavailable, match="draive tools server"):
+            await _call(claude_code_agent("coder", tools=[read_note]))
+
+
+@pytest.mark.asyncio
+async def test_a_failed_server_named_draive_without_tools_only_warns(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    warnings: list[str] = []
+    monkeypatch.setattr(ctx, "log_warning", lambda message, *_, **__: warnings.append(message))
+    running = _started_runner(ClaudeCodeMCPServer(name="draive", status="failed"))
+    async with ctx.scope(
+        "test",
+        ClaudeCodeConfig(),
+        ClaudeCodeRunner(binary="/fake", running=running),
+    ):
+        with pytest.raises(ClaudeCodeUnfinished):  # the runner ends without a result
+            await _call(claude_code_agent("coder"))
+
+    assert any("MCP servers" in warning and "draive" in warning for warning in warnings)
+
+
+@pytest.mark.asyncio
+async def test_no_tools_leave_the_launch_untouched(tmp_path: Path) -> None:
+    setup = _Setup(tmp_path)
+
+    async with setup.scope():
+        await _call(claude_code_agent("coder"))
+
+    arguments = setup.recorded()["arguments"]
+    assert "--mcp-config" not in arguments
+    assert "--allowedTools" not in arguments
 
 
 @pytest.mark.asyncio
@@ -235,78 +313,6 @@ async def test_other_api_errors_stay_plain_errored_runs(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_a_failed_run_is_not_remembered(tmp_path: Path) -> None:
-    setup = _Setup(tmp_path, scenario="error401")
-    memory = AgentMemory.volatile()
-    agent = claude_code_agent("coder", memory=memory)
-    thread = uuid4()
-
-    async with setup.scope():
-        with pytest.raises(ClaudeCodeFailed):
-            await _call(agent, "hello", thread)
-
-        setup.config = setup.config.updating(
-            env={**setup.config.env, "FAKE_CLAUDE_SCENARIO": "echo"}
-        )
-
-    async with setup.scope():
-        await _call(agent, "again", thread)
-
-    assert "hello" not in setup.recorded()["text"]
-
-
-@pytest.mark.asyncio
-async def test_memory_of_draive_hands_the_history_to_a_fresh_session(tmp_path: Path) -> None:
-    setup = _Setup(tmp_path)
-    memory = AgentMemory.volatile()
-    agent = claude_code_agent("coder", memory=memory)
-    thread = uuid4()
-
-    async with setup.scope():
-        await _call(agent, "first question", thread)
-        first = setup.recorded()
-        assert "first question" == first["text"]  # nothing to recall yet
-        assert "--no-session-persistence" in first["arguments"]
-
-        await _call(agent, "second question", thread)
-        second = setup.recorded()
-        assert "--no-session-persistence" in second["arguments"]
-        assert "--resume" not in second["arguments"]
-        assert "<user>first question</user>" in second["text"]
-        assert "<assistant>echo: first question</assistant>" in second["text"]
-        assert second["text"].endswith("second question")
-
-        # another thread has its own history
-        await _call(agent, "unrelated", uuid4())
-        assert setup.recorded()["text"] == "unrelated"
-
-
-@pytest.mark.asyncio
-async def test_remembered_turns_are_available_to_any_memory(tmp_path: Path) -> None:
-    setup = _Setup(tmp_path)
-    memory = AgentMemory.volatile()
-    agent = claude_code_agent("coder", memory=memory)
-    thread = uuid4()
-    identity_uri = agent.identity.uri
-
-    async with setup.scope():
-        await _call(agent, "remember me", thread)
-
-        from draive.agents import AgentThread
-
-        recalled = await memory.recall(
-            thread=AgentThread.of(thread, agent_uri=identity_uri),
-            context=(),
-        )
-
-    assert len(recalled) == 2
-    assert isinstance(recalled[0], ModelInput)
-    assert recalled[0].content.to_str() == "remember me"
-    assert isinstance(recalled[1], ModelOutput)
-    assert recalled[1].content.to_str() == "echo: remember me"
-
-
-@pytest.mark.asyncio
 async def test_resumable_sessions_continue_the_session_of_the_thread(tmp_path: Path) -> None:
     state = tmp_path / "state"
     setup = _Setup(tmp_path, sessions=ClaudeCodeSessions(state_directory=str(state)))
@@ -317,7 +323,7 @@ async def test_resumable_sessions_continue_the_session_of_the_thread(tmp_path: P
         await _call(agent, "one", thread)
         first = setup.recorded()
         arguments = first["arguments"]
-        session = session_identifier(agent.identity.uri, thread)
+        session = ClaudeCodeSessions.identifier(agent.identity.uri, thread)
         assert arguments[arguments.index("--session-id") + 1] == session
         assert session != str(thread)
         assert "--no-session-persistence" not in arguments
@@ -337,7 +343,7 @@ async def test_resumable_sessions_continue_the_session_of_the_thread(tmp_path: P
         other = uuid4()
         await _call(agent, "other", other)
         arguments = setup.recorded()["arguments"]
-        assert arguments[arguments.index("--session-id") + 1] == session_identifier(
+        assert arguments[arguments.index("--session-id") + 1] == ClaudeCodeSessions.identifier(
             agent.identity.uri, other
         )
 
@@ -362,7 +368,7 @@ async def test_a_failed_run_keeps_its_session_for_the_next_one(tmp_path: Path) -
         await _call(agent, "two", thread)
 
     arguments = setup.recorded()["arguments"]
-    assert arguments[arguments.index("--resume") + 1] == session_identifier(
+    assert arguments[arguments.index("--resume") + 1] == ClaudeCodeSessions.identifier(
         agent.identity.uri, thread
     )
 
@@ -408,6 +414,145 @@ def test_invalid_configuration_can_not_reach_a_run() -> None:
         ClaudeCodeConfig(env={"ANTHROPIC_API_KEY": "sneaky"})
 
 
+def _delta_line(text: str) -> dict[str, Any]:
+    return {
+        "type": "stream_event",
+        "event": {"type": "content_block_delta", "delta": {"type": "text_delta", "text": text}},
+    }
+
+
+def _text_line(text: str, parent: str | None = None) -> dict[str, Any]:
+    return {
+        "type": "assistant",
+        "parent_tool_use_id": parent,
+        "message": {"content": [{"type": "text", "text": text}]},
+    }
+
+
+_TOOL_LINE: dict[str, Any] = {
+    "type": "assistant",
+    "message": {"content": [{"type": "tool_use", "id": "t1", "name": "Read", "input": {}}]},
+}
+
+
+def _lines_runner(lines: list[dict[str, Any]], answer: str) -> Any:
+    async def running(launch: Any) -> Any:
+        # the output as Claude Code streams it, through the parser
+        for line in (
+            *lines,
+            {"type": "result", "subtype": "success", "session_id": "s", "result": answer},
+        ):
+            for event in parse_events(json.dumps(line)):
+                yield event
+
+    return running
+
+
+@pytest.mark.parametrize(
+    ("lines", "streamed"),
+    [
+        pytest.param(
+            [_text_line("reading"), _TOOL_LINE, _text_line("done")],
+            ["reading", "\n\ndone"],
+            id="blocks",
+        ),
+        pytest.param(
+            [
+                _delta_line("reading"),
+                _text_line("reading"),
+                _TOOL_LINE,
+                _delta_line("do"),
+                _delta_line("ne"),
+                _text_line("done"),
+            ],
+            ["reading", "\n\ndo", "ne"],
+            id="deltas",
+        ),
+        pytest.param(
+            [_text_line("reading"), _text_line("\n\n"), _TOOL_LINE, _text_line("done")],
+            ["reading", "\n\ndone"],
+            id="blank_block",
+        ),
+        pytest.param(
+            [
+                _delta_line("\n\n"),
+                _text_line("\n\n"),
+                _TOOL_LINE,
+                _delta_line("done"),
+                _text_line("done"),
+                _delta_line("\n\n"),
+                _text_line("\n\n"),
+                _delta_line("again"),
+                _text_line("again"),
+            ],
+            ["done", "\n\nagain"],
+            id="blank_deltas",
+        ),
+        pytest.param(
+            [_delta_line("do"), _delta_line("ne")],
+            ["do", "ne"],
+            id="deltas_without_block",
+        ),
+        pytest.param(
+            [
+                _delta_line("abc"),
+                _text_line("xyz"),
+                _delta_line("next"),
+                _text_line("next"),
+            ],
+            ["abc", "xyz", "\n\nnext"],
+            id="stale_preview",
+        ),
+        pytest.param(
+            [_text_line("Example:"), _TOOL_LINE, _text_line("\n    print('ok')")],
+            ["Example:", "\n\n    print('ok')"],
+            id="indented_block",
+        ),
+        pytest.param(
+            [
+                _delta_line("Example:"),
+                _text_line("Example:"),
+                _delta_line("\n"),
+                _delta_line("    "),
+                _delta_line("print('ok')"),
+                _text_line("\n    print('ok')"),
+            ],
+            ["Example:", "\n\n    ", "print('ok')"],
+            id="indented_deltas",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_streamed_text_is_not_repeated_and_keeps_blocks_apart(
+    lines: list[dict[str, Any]],
+    streamed: list[str],
+) -> None:
+    agent = claude_code_agent("coder")
+    async with ctx.scope(
+        "test",
+        ClaudeCodeConfig(),
+        ClaudeCodeRunner(binary="/fake", running=_lines_runner(lines, "done")),
+    ):
+        chunks = await _call(agent, "hello")
+
+    assert _texts(chunks) == streamed
+
+
+@pytest.mark.asyncio
+async def test_blank_subagent_text_is_not_reported() -> None:
+    lines = [_text_line("\n\n", parent="agent-1"), _text_line("found", parent="agent-1")]
+    async with ctx.scope(
+        "test",
+        ClaudeCodeConfig(),
+        ClaudeCodeRunner(binary="/fake", running=_lines_runner(lines, "done")),
+    ):
+        chunks = await _call(claude_code_agent("coder"))
+
+    reported = [event for event in _events(chunks) if event.event == "claude_code.subagent_text"]
+    assert [event.content.to_str() for event in reported] == ["found"]
+    assert _texts(chunks) == ["done"]
+
+
 @pytest.mark.asyncio
 async def test_a_runner_which_ends_without_a_result_fails_the_run() -> None:
     async def running(launch: Any) -> Any:
@@ -418,8 +563,11 @@ async def test_a_runner_which_ends_without_a_result_fails_the_run() -> None:
         ClaudeCodeConfig(),
         ClaudeCodeRunner(binary="/fake", running=running),
     ):
-        with pytest.raises(ClaudeCodeEnded):
+        with pytest.raises(ClaudeCodeUnfinished) as raised:
             await _call(claude_code_agent("coder"))
+
+    assert raised.value.session_id == "s"
+    assert raised.value.stderr is None
 
 
 @pytest.mark.asyncio
@@ -626,7 +774,8 @@ async def test_without_a_configuration_the_defaults_apply(tmp_path: Path) -> Non
     arguments = setup.recorded()["arguments"]
     assert arguments[arguments.index("--model") + 1] == "sonnet"
     assert arguments[arguments.index("--permission-mode") + 1] == "dontAsk"
-    assert arguments[arguments.index("--tools") + 1] == "Read,Grep,Glob"
+    assert arguments[arguments.index("--tools") + 1] == ""  # no built-in tools by default
+    assert "--allowedTools" not in arguments
 
 
 @pytest.mark.asyncio
@@ -953,25 +1102,16 @@ async def test_the_text_of_the_result_is_streamed_when_nothing_else_was(tmp_path
             turns=1,
         )
 
-    memory = AgentMemory.volatile()
-    agent = claude_code_agent("coder", memory=memory)
-    thread = uuid4()
+    agent = claude_code_agent("coder")
 
     async with ctx.scope(
         "test",
         ClaudeCodeConfig(),
         ClaudeCodeRunner(binary="/fake", running=running),
     ):
-        chunks = await _call(agent, "hello", thread)
-        from draive.agents import AgentThread
-
-        recalled = await memory.recall(
-            thread=AgentThread.of(thread, agent_uri=agent.identity.uri),
-            context=(),
-        )
+        chunks = await _call(agent, "hello")
 
     assert _texts(chunks) == ["only the result says it"]
-    assert recalled[-1].content.to_str() == "only the result says it"
 
 
 @pytest.mark.asyncio
@@ -995,10 +1135,13 @@ async def test_a_relative_state_directory_is_resolved_for_the_process(
 
 @pytest.mark.asyncio
 async def test_stored_sessions_are_found_by_their_transcript(tmp_path: Path) -> None:
-    transcript = tmp_path / "projects" / "some-project" / "abc-123.jsonl"
+    transcript = tmp_path / "claude" / "projects" / "some-project" / "abc-123.jsonl"
     transcript.parent.mkdir(parents=True)
     transcript.write_text("{}")
 
-    assert await session_exists(str(tmp_path), "abc-123")
-    assert not await session_exists(str(tmp_path), "other")
-    assert not await session_exists(str(tmp_path / "missing"), "abc-123")
+    workspace = ClaudeCodeWorkspace(root=str(tmp_path), directory=str(tmp_path))
+    missing = ClaudeCodeWorkspace(root=str(tmp_path / "missing"), directory=str(tmp_path))
+
+    assert await workspace.has_session("abc-123")
+    assert not await workspace.has_session("other")
+    assert not await missing.has_session("abc-123")

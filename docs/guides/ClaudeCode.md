@@ -40,8 +40,10 @@ the process has its own private home, so the sessions, keychain and settings of 
 Code are out of its reach. When Claude Code reports to authenticate in any other way the run is
 stopped, and entering the scope without a credential fails.
 
-An OAuth token of a Team or Enterprise account may bring the `cc-plugin-sec-default` plugin its
-organization enforces. No setting disables it, and it is not reported as a leak of the isolation.
+The built-in plugins of Claude Code are disabled. A plugin which the organization of the account
+enforces can not be disabled by any setting - it is logged as enforced, not as a leak of the
+isolation. A built-in plugin which a newer version of Claude Code brings and the isolating settings
+do not know yet is logged as a warning.
 
 | Source                                                                        | Meaning                                                          |
 | ----------------------------------------------------------------------------- | ---------------------------------------------------------------- |
@@ -54,8 +56,7 @@ A credential is exactly one of the kinds - there is no pair of keys to choose be
 tokens, and the access token read from a login, can not be empty or larger than 4096 bytes, so they
 fit the pipe they are handed over through.
 
-The `claude` executable is resolved from `binary=`, `CLAUDE_CODE_BINARY`, the `PATH` and
-`~/.local/bin/claude`.
+The `claude` executable is resolved from `binary=`, `CLAUDE_CODE_BINARY` and the `PATH`.
 
 ## Account connectors and local login
 
@@ -105,8 +106,8 @@ async with ctx.scope(
             print(chunk)
 ```
 
-`allowed_tools` replaces the default allowed set (`Read`, `Grep` and `Glob`), list those too if they
-are wanted.
+`allowed_tools` replaces the allowed set derived from `tools`, list the configured tools there too
+if they are wanted.
 
 The login has to be made on this machine, as the user the process runs as. It is read from
 `<config_directory>/.credentials.json` - only file based logins are supported, logins kept in the
@@ -221,13 +222,13 @@ to be a list).
 
 ## Isolation and permissions
 
-A run is isolated by default and read-only. It has no user, project or local settings (and no
+A run is isolated by default and has no tools. It has no user, project or local settings (and no
 `CLAUDE.md` of the working directory, `claude_md` or `setting_sources=("project",)` opts in), no
 auto memory, plugins or skills of the installation, no MCP servers beyond the configured ones
-(unless account connectors are on), and only `Read`, `Grep` and `Glob` available. The environment is
-built from scratch - only `PATH`, locale, proxy and certificate variables are inherited, anything
-else of the parent process (especially the markers of a Claude Code running the parent) is left out.
-Claude Code never asks for a permission: what is not allowed is denied.
+(unless account connectors are on), and no built-in tools - `tools` makes them available. The
+environment is built from scratch - only `PATH`, locale, proxy and certificate variables are
+inherited, anything else of the parent process (especially the markers of a Claude Code running the
+parent) is left out. Claude Code never asks for a permission: what is not allowed is denied.
 
 `ClaudeCodeConfig` is a regular configuration state. It refuses what can not work when it is created
 (`ValidationError`) - non-positive limits, relative directories, reserved environment variables - so
@@ -237,7 +238,7 @@ a run never starts with an invalid one:
 | ------------------------------------------------------------ | -------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `model`, `effort`                                            | `sonnet`, model default    | model alias or name, reasoning effort                                                                                       |
 | `permission_mode`                                            | `dontAsk`                  | `dontAsk`, `acceptEdits`, `plan`, `bypassPermissions`                                                                       |
-| `tools`, `allowed_tools`, `disallowed_tools`                 | `Read`, `Grep`, `Glob`     | available tools, allowed ones (the available when not set, file tools within the directories of the run only), denied rules |
+| `tools`, `allowed_tools`, `disallowed_tools`                 | none                       | available tools, allowed ones (the available when not set, file tools within the directories of the run only), denied rules |
 | `max_turns`, `max_budget_usd`                                | none                       | limits of a run                                                                                                             |
 | `timeout`, `stop_grace`                                      | 30 min, 10 s               | the process is killed after the deadline, a stopped one has the grace to exit                                               |
 | `directory`, `additional_directories`                        | temporary directory        | working directory (removed after the run when temporary) and more accessible directories                                    |
@@ -249,11 +250,86 @@ a run never starts with an invalid one:
 | `stream_deltas`                                              | `False`                    | stream the text while it is generated                                                                                       |
 | `system_prompt`                                              | `append`                   | whether instructions append to the system prompt (it keeps the tool guidance) or replace it                                 |
 
+With `setting_sources=("project",)` Claude Code loads the `CLAUDE.md` and the `.claude/rules` of the
+working directory and of each of its parents, like it does for a monorepo - the ones of the user
+(`~/CLAUDE.md`, `~/CLAUDE.local.md` and everything within `~/.claude`) are excluded. Outside of a
+git repository it also loads the subagents of the `.claude` directories of the parents, which
+reaches the ones of the user when the working directory is within the home - no setting excludes
+them, so the run logs a warning then. Keep such a working directory within a git repository, or
+outside of the home.
+
 File tools are confined to the working and the additional directories by default - a symlink or `..`
 leading out of them is refused, so the agent can not read the keys or the files of the user. `Bash`
 is not confined to them, like any tool which is not about files. Use `bypassPermissions` and `Bash`
 only within an environment which is safe to be modified - the agent has no sandbox other than its
 own working directory and the tools you allow.
+
+## Sandboxing
+
+`Bash` is not confined to the working directory (see above). The sandbox of Claude Code confines the
+commands of `Bash` at the OS level - Seatbelt on macOS, bubblewrap on Linux. It is enabled through
+`settings` of the configuration, nothing else is needed from draive:
+
+```python
+ClaudeCodeConfig(
+    tools=("Bash",),
+    settings={
+        "sandbox": {
+            "enabled": True,
+            "autoAllowBashIfSandboxed": True,
+            "allowUnsandboxedCommands": False,
+            "failIfUnavailable": True,
+        },
+    },
+)
+```
+
+`allowUnsandboxedCommands` set to `False` keeps the model from rerunning a blocked command outside
+of the sandbox. `failIfUnavailable` fails the run when the sandbox can not start, instead of running
+the commands unsandboxed.
+
+Commands write within the working directory, writes outside of it are refused by the OS
+(`operation not permitted` on macOS, `Read-only file system` on Linux). The draive tools keep
+working - the relay of [draive tools](#draive-tools) is a process of Claude Code outside of the
+sandbox, which confines the commands of `Bash` only.
+
+Linux needs `bubblewrap` and `socat` (Claude Code uses it for the network proxy of the sandbox)
+installed, and unprivileged user namespaces. Hosts which restrict them, i.e. Ubuntu 23.10 and newer
+with the AppArmor restriction or hardened kernels, can not start the sandbox - with
+`failIfUnavailable` the run fails there.
+
+The sandbox does not replace a container for agents which must not reach anything else of the
+machine. Run agents which have `Bash` within a container or a disposable environment, as
+[Stopping runs](#stopping-runs) recommends.
+
+## draive tools
+
+`tools=` gives the run draive tools, the ones of `ClaudeCodeConfig.tools` stay the built-in tools of
+Claude Code. They need the `mcp` extra (`draive[mcp]`):
+
+```python
+from draive import tool
+
+@tool(description="Look up the status of an order.")
+async def order_status(order: str) -> str:
+    return await orders.status(order)
+
+support = claude_code_agent("support", tools=[order_status])
+```
+
+Claude Code starts its MCP servers as processes of its own, while the tools live in your process.
+Each call serves the tools as the MCP server `draive` for that run only: it listens on a private
+Unix socket (in a directory only you can access, removed with the run) and Claude Code starts a
+small relay process which connects to it. The tools run within the agent's process and context, so
+the state of the scope is visible to them. They are named `mcp__draive__<tool>` within the tool
+events and allowed automatically, `disallowed_tools` still applies. The name `draive` is reserved
+among `mcp_servers`. A run which reports the `draive` server as not connected fails with
+`ClaudeCodeUnavailable` instead of continuing without the tools.
+
+Only tools with `response` handling are supported, as only the results returned to the model map to
+MCP - other tools are refused when the agent is created. So are names with characters other than
+letters, digits, `_` and `-`, and names longer than 115 characters - Claude Code silently drops the
+tools with longer ones.
 
 ## Stopping runs
 
@@ -278,51 +354,45 @@ there. Run agents which have `Bash` within a container or a disposable environme
 
 ## Output
 
-The text of the agent is streamed as text parts. Everything else is reported as `ProcessingEvent`s:
-`claude_code.tool_use` and `claude_code.tool_result` for each tool use, `claude_code.subagent_text`
-for the subagents and `claude_code.result` at the end, with the cost, turns and duration. A failed
-run raises a variant of `ClaudeCodeFailed`, while a run which can not start - authentication,
-connectors, login resolution - raises `ClaudeCodeUnavailable` instead, and its variant
-`ClaudeCodeLoginUnusable` when a `ClaudeCodeLocalLogin` gives no valid token - its credentials file
-is missing, unreadable or malformed, or its token has expired and could not be refreshed - so
-logging in again (`claude /login` as the user of the login) is what helps. Each variant of
-`ClaudeCodeFailed` carries only what is known of its kind: `ClaudeCodeErrored` for an error the run
-reported - an API failure, an exhausted limit - with its `failure` (`reason`, `api_error_status`,
-`api_error_type`, `terminal_reason`) and its variant `ClaudeCodeAuthenticationFailed` when the API
-rejected the credential (HTTP 401 or `authentication_error`) - a `ClaudeCodeLocalLogin` token which
-was revoked or rotated by another process fails like that, and refreshing the login and running
-again may help, `ClaudeCodeTimedOut`, `ClaudeCodeEnded` for a process which ended without a result
-(`exit_code` and a redacted tail of the error output) and `ClaudeCodeOutputTooLarge`. All have the
-`session_id` when the run reported one. Text and images are accepted as input.
+The text of the agent is streamed as text parts, its blocks apart as paragraphs. Everything else is
+reported as `ProcessingEvent`s: `claude_code.tool_use` and `claude_code.tool_result` for each tool
+use, `claude_code.subagent_text` for the subagents and `claude_code.result` at the end, with the
+cost, turns and duration. A failed run raises a variant of `ClaudeCodeFailed`, while a run which can
+not start - authentication, connectors, login resolution - raises `ClaudeCodeUnavailable` instead,
+and its variant `ClaudeCodeLoginUnusable` when a `ClaudeCodeLocalLogin` gives no valid token - its
+credentials file is missing, unreadable or malformed, or its token has expired and could not be
+refreshed - so logging in again (`claude /login` as the user of the login) is what helps. Each
+variant of `ClaudeCodeFailed` carries only what is known of its kind: `ClaudeCodeErrored` for an
+error the run reported - an API failure, an exhausted limit - with its `failure` (`reason`,
+`api_error_status`, `api_error_type`, `terminal_reason`) and its variant
+`ClaudeCodeAuthenticationFailed` when the API rejected the credential (HTTP 401 or
+`authentication_error`) - a `ClaudeCodeLocalLogin` token which was revoked or rotated by another
+process fails like that, and refreshing the login and running again may help, `ClaudeCodeTimedOut`,
+`ClaudeCodeEnded` for a process which ended without a result (`exit_code` and a redacted tail of the
+error output), `ClaudeCodeUnfinished` for an output which ended without a result while no exit of
+the process is known - it kept running, or a custom runner ended its stream (a redacted tail of the
+error output) - and `ClaudeCodeOutputTooLarge`. All have the `session_id` when the run reported one.
+Text and images are accepted as input.
 
 ## Context and memory
 
 Claude Code manages its own context and compacts it when it grows. `compaction` tunes that:
 `ClaudeCodeAutoCompaction(percent=, window=)` lowers the point of compaction,
-`ClaudeCodeNoCompaction()` turns it off. What stays between calls is the `memory` of the agent, one
-of:
+`ClaudeCodeNoCompaction()` turns it off. What stays between calls is the `sessions` of the agent.
+Without them every call is a fresh session and nothing is kept.
 
-- **Nothing (default).** Every call is a fresh session.
+With `ClaudeCodeSessions` the session of each thread is kept in the state directory and resumed by
+its next call, with the whole context Claude Code had - tool use, compaction and prompt caching
+included. The session of an interrupted run is resumed too.
 
-- **`AgentMemory` managed by draive.** The recalled history is handed to a fresh session and the
-    turn is remembered afterwards, so any memory backend works. Claude Code does not see its earlier
-    tool use, only the conversation.
+```python
+coder = claude_code_agent("coder", sessions=ClaudeCodeSessions(state_directory="/var/lib/agent"))
+```
 
-    ```python
-    coder = claude_code_agent("coder", memory=AgentMemory.volatile())
-    ```
-
-- **`ClaudeCodeSessions` managed by Claude Code.** The session of each thread is kept in the state
-    directory and resumed by its next call, with the whole context Claude Code had - tool use,
-    compaction and prompt caching included. The directories are stable, as sessions are stored by
-    them, and the session of an interrupted run is resumed too.
-
-    ```python
-    coder = claude_code_agent("coder", memory=ClaudeCodeSessions(state_directory="/var/lib/agent"))
-    ```
-
-The memory is a single choice, so the two can not be combined. Injecting an arbitrary history into a
-session, or reading how much of the context is used, is not possible with Claude Code.
+The state directory has to be stable and persistent, as the sessions are files of Claude Code under
+it. With several replicas a thread has to run where its directory is, or the directory has to be on
+a shared, persistent volume. Injecting an arbitrary history into a session, or reading how much of
+the context is used, is not possible with Claude Code.
 
 ## Telemetry
 
@@ -340,8 +410,8 @@ ClaudeCodeConfig(
 )
 ```
 
-`signals` choose what is exported - metrics and events by default, traces are a beta of Claude Code
-and at least one is required. Prompts, tool details and tool content are not exported unless
+`signals` choose what is exported - metrics and events by default, traces are a beta of Claude Code.
+At least one is required. Prompts, tool details and tool content are not exported unless
 `log_prompts`, `log_tool_details` and `log_tool_content` are set. Exports are short-lived like the
 runs, so `export_interval_ms` is short by default. The result of each run is also recorded by draive
 itself - the token usage as the usual `model.*` metrics (provider `claude_code`) and the cost as

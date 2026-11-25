@@ -1,5 +1,3 @@
-import asyncio
-from pathlib import Path
 from typing import Annotated, final
 from uuid import NAMESPACE_URL, UUID, uuid5
 
@@ -11,8 +9,6 @@ __all__ = (
     "ClaudeCodeResumedSession",
     "ClaudeCodeSession",
     "ClaudeCodeSessions",
-    "session_exists",
-    "session_identifier",
 )
 
 
@@ -71,8 +67,7 @@ class ClaudeCodeSessions(State):
     """Memory of an agent kept by Claude Code, as the sessions of the threads of the agent.
 
     A thread continues the session it has with the whole context Claude Code had - tool use,
-    compaction and prompt caching included. It is the alternative of ``AgentMemory``, which hands
-    the history to a fresh session of every run.
+    compaction and prompt caching included.
 
     Attributes
     ----------
@@ -82,61 +77,27 @@ class ClaudeCodeSessions(State):
 
     state_directory: Annotated[str, Verifier(_directory)]
 
+    @staticmethod
+    def identifier(
+        agent_uri: str,
+        thread: UUID,
+        /,
+    ) -> str:
+        """Identifier of the Claude Code session of an agent thread.
 
-def session_identifier(
-    agent_uri: str,
-    thread: UUID,
-    /,
-) -> str:
-    """Identifier of the Claude Code session of an agent thread.
+        Sessions of different agents never share an identifier, even within the same thread,
+        sessions of the same agent and thread always do.
 
-    Sessions of different agents never share an identifier, even within the same thread,
-    sessions of the same agent and thread always do.
+        Parameters
+        ----------
+        agent_uri
+            URI of the agent.
+        thread
+            Identifier of the thread.
 
-    Parameters
-    ----------
-    agent_uri
-        URI of the agent.
-    thread
-        Identifier of the thread.
-
-    Returns
-    -------
-    str
-        Session identifier, a UUID as Claude Code requires.
-    """
-    return str(uuid5(NAMESPACE_URL, f"{agent_uri}#{thread}"))
-
-
-def _transcript_exists(
-    config_directory: str,
-    session_id: str,
-    /,
-) -> bool:
-    # sessions are stored by Claude Code as `projects/<project>/<session id>.jsonl`
-    return any(Path(config_directory, "projects").glob(f"*/{session_id}.jsonl"))
-
-
-async def session_exists(
-    config_directory: str,
-    session_id: str,
-    /,
-) -> bool:
-    """Check if Claude Code stored a session, whether it finished or not.
-
-    The transcript of a session is written while it runs, so also a run which was interrupted
-    or failed leaves a session which has to be resumed - it can not be started again.
-
-    Parameters
-    ----------
-    config_directory
-        Configuration directory of the runs.
-    session_id
-        Identifier of the session.
-
-    Returns
-    -------
-    bool
-        Whether the session has a stored transcript.
-    """
-    return await asyncio.to_thread(_transcript_exists, config_directory, session_id)
+        Returns
+        -------
+        str
+            Session identifier, a UUID as Claude Code requires.
+        """
+        return str(uuid5(NAMESPACE_URL, f"{agent_uri}#{thread}"))

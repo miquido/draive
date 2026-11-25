@@ -62,6 +62,7 @@ from draive.claude.types import (
     ClaudeCodeRunning,
     ClaudeCodeTimedOut,
     ClaudeCodeUnavailable,
+    ClaudeCodeUnfinished,
 )
 
 __all__ = (
@@ -118,6 +119,7 @@ __all__ = (
     "ClaudeCodeToolResult",
     "ClaudeCodeToolUse",
     "ClaudeCodeUnavailable",
+    "ClaudeCodeUnfinished",
     "ClaudeCodeUsage",
     "claude_code_agent",
 )

@@ -25,6 +25,7 @@ from draive.claude import (
     ClaudeCodeToolResult,
     ClaudeCodeToolUse,
     ClaudeCodeUnavailable,
+    ClaudeCodeUnfinished,
 )
 from draive.claude import process as process_module
 from draive.claude.process import marked_processes, run_process
@@ -244,6 +245,26 @@ async def test_a_process_ending_without_a_result_fails_with_redacted_error_outpu
     assert SECRET not in raised.value.stderr
     assert "***" in raised.value.stderr
     assert SECRET not in str(raised.value)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("grace", [0.0, 0.5])
+async def test_a_process_closing_its_output_without_exiting_is_unfinished(
+    tmp_path: Path,
+    grace: float,
+) -> None:
+    # also without a grace, which is not to make the run wait for its deadline
+    launch = launch_for(
+        write_fake_claude(tmp_path), tmp_path, "closed_output", grace=grace, timeout=20.0
+    )
+
+    started = time.monotonic()
+    with pytest.raises(ClaudeCodeUnfinished, match="output ended without a result") as raised:
+        await _events(launch)
+
+    assert time.monotonic() - started < 10.0
+    assert raised.value.stderr is not None
+    assert "closing the output" in raised.value.stderr
 
 
 @pytest.mark.asyncio

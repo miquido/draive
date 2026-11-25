@@ -50,6 +50,30 @@ _MAXIMAL_PERCENT: Final[int] = 100
 _MINIMAL_COMPACTION_WINDOW: Final[int] = 100_000
 
 
+def _settings(
+    value: Mapping[str, BasicValue],
+) -> Mapping[str, BasicValue]:
+    for key in _MERGED_SETTINGS:
+        configured: BasicValue | Missing = value.get(key, Missing)
+        if configured is not Missing and (
+            not isinstance(configured, Sequence) or isinstance(configured, str | bytes)
+        ):
+            raise ValueError(f"Setting '{key}' has to be a list")
+
+    excludes: BasicValue | Missing = value.get("claudeMdExcludes", Missing)
+    if isinstance(excludes, Sequence) and not all(isinstance(pattern, str) for pattern in excludes):
+        raise ValueError("Setting 'claudeMdExcludes' has to be a list of patterns")
+
+    if "enabledPlugins" in value:
+        plugins: BasicValue = value["enabledPlugins"]
+        if not isinstance(plugins, Mapping) or not all(
+            isinstance(enabled, bool) for enabled in plugins.values()
+        ):
+            raise ValueError("Setting 'enabledPlugins' has to be a mapping of names to booleans")
+
+    return value
+
+
 def _positive_integer(
     value: int,
 ) -> int:
@@ -147,19 +171,6 @@ def _not_empty_urls(
 ) -> Sequence[str]:
     if not value:
         raise ValueError("Allowed connectors need at least one URL pattern")
-
-    return value
-
-
-def _list_settings(
-    value: Mapping[str, BasicValue],
-) -> Mapping[str, BasicValue]:
-    for key in _MERGED_SETTINGS:
-        configured: BasicValue | Missing = value.get(key, Missing)
-        if configured is not Missing and (
-            not isinstance(configured, Sequence) or isinstance(configured, str | bytes)
-        ):
-            raise ValueError(f"Setting '{key}' has to be a list")
 
     return value
 
@@ -439,8 +450,8 @@ class ClaudeCodeConfig(Configuration):
     """Configuration of Claude Code runs.
 
     Runs are isolated by default - no user, project or local settings, no auto memory,
-    plugins or skills of the installation, only what is configured here. Claude Code
-    is allowed to read files and nothing else.
+    plugins or skills of the installation, only what is configured here. Claude Code has
+    no built-in tools unless they are configured.
 
     Attributes
     ----------
@@ -488,14 +499,20 @@ class ClaudeCodeConfig(Configuration):
         Absolute directories of plugins to load, skills and commands are disabled without them.
     settings
         Additional settings of Claude Code, merged over the isolating ones. The lists
-        ``claudeMdExcludes``, ``allowedMcpServers`` and ``deniedMcpServers`` are the exception -
-        they are added to the entries derived from ``claude_md`` and ``connectors``, so a filter of
-        the configuration is never silently replaced. They have to be lists then.
+        ``claudeMdExcludes``, ``allowedMcpServers`` and ``deniedMcpServers`` and the mapping
+        ``enabledPlugins`` are the exception - they are added to the isolating entries and the
+        ones derived from ``claude_md`` and ``connectors``, so a filter of the configuration is
+        never silently replaced. They have to be lists (of patterns for ``claudeMdExcludes``)
+        and a mapping of names to booleans then.
     setting_sources
         Settings Claude Code loads besides the given ones, none by default. ``project`` loads
-        the ``CLAUDE.md`` and the ``.claude`` settings of the working directory - use it when
-        the agent works within a project which has its own rules, ``user`` and ``local`` load
-        the ones of the private home and of the directory. Project settings can add hooks and
+        the ``.claude`` settings of the working directory and the ``CLAUDE.md`` of it and of its
+        parents, but the ones of the user (``~/CLAUDE.md``, ``~/CLAUDE.local.md``,
+        ``~/.claude``) - use it when the agent works within a project which has its own rules.
+        Outside of a git repository the subagents of the parent ``.claude`` directories are
+        loaded too, also of ``~/.claude`` when the directory is within the home, which the run
+        warns about. ``user`` and ``local`` load the ones of the private home
+        and of the directory. Project settings can add hooks and
         MCP servers, which is what the isolation keeps out otherwise.
     directory
         Absolute working directory, a temporary one removed after each run when not set.
@@ -516,7 +533,7 @@ class ClaudeCodeConfig(Configuration):
     model: str = "sonnet"
     effort: Literal["low", "medium", "high", "xhigh", "max"] | Missing = Missing
     permission_mode: Literal["dontAsk", "acceptEdits", "plan", "bypassPermissions"] = "dontAsk"
-    tools: Sequence[str] = ("Read", "Grep", "Glob")
+    tools: Sequence[str] = ()
     allowed_tools: Sequence[str] | Missing = Missing
     disallowed_tools: Sequence[str] = ()
     max_turns: Annotated[int, Verifier(_positive_integer)] | Missing = Missing
@@ -530,7 +547,7 @@ class ClaudeCodeConfig(Configuration):
     claude_md: ClaudeCodeClaudeMd = ClaudeCodeNoClaudeMd()
     subagents: Mapping[str, Mapping[str, BasicValue]] = {}
     plugin_directories: Annotated[Sequence[str], Verifier(_absolute_directories)] = ()
-    settings: Annotated[Mapping[str, BasicValue], Verifier(_list_settings)] = {}
+    settings: Annotated[Mapping[str, BasicValue], Verifier(_settings)] = {}
     setting_sources: Sequence[Literal["user", "project", "local"]] = ()
     directory: Annotated[str, Verifier(_absolute)] | Missing = Missing
     additional_directories: Annotated[Sequence[str], Verifier(_absolute_directories)] = ()

@@ -21,7 +21,7 @@ from draive.claude.credentials import (
     ClaudeCodeResolvedCredential,
 )
 from draive.claude.exceptions import ClaudeCodeLoginUnusable, ClaudeCodeUnavailable
-from draive.claude.launch import inherited_environment
+from draive.claude.launch import ClaudeCodeLaunch
 
 __all__ = ("ClaudeCodeLogins",)
 
@@ -382,7 +382,7 @@ def _refresh_environment(
 ) -> dict[str, str]:
     # as the user of the login with its real home - the refresh needs the login, not an isolated
     # one, and the token it writes never reaches anything but the credentials file
-    environment: dict[str, str] = dict(inherited_environment())
+    environment: dict[str, str] = dict(ClaudeCodeLaunch.inherited_environment())
     environment["HOME"] = os.path.expanduser("~")
     directory: str = os.path.expanduser(login.config_directory)
     if os.path.realpath(directory) != os.path.realpath(os.path.expanduser(DEFAULT_LOGIN_DIRECTORY)):

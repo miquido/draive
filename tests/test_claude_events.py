@@ -100,6 +100,7 @@ def test_assistant_message_carries_text_and_tool_use_in_order() -> None:
 
     assert events == (
         ClaudeCodeText(text="reading"),
+        ClaudeCodeText(text="   "),  # its deltas were streamed, the agent has to match them
         ClaudeCodeToolUse(identifier="t1", tool="Read", arguments={"path": "a"}),
     )
 
