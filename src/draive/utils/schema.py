@@ -1,8 +1,9 @@
 import json
-from collections.abc import Sequence
-from typing import Any
+from collections.abc import Mapping, Sequence
+from datetime import datetime, time, timedelta
+from typing import Any, Final
 
-from haiway import TypeSpecification
+from haiway import State, TypeSpecification
 
 __all__ = ("simplified_schema",)
 
@@ -72,6 +73,9 @@ def _simplified_inline(
         case {"type": "string", "format": str() as format}:
             return format
 
+        case {"type": "string", "pattern": str() as pattern} if pattern in _WRITTEN_FORMATS:
+            return _WRITTEN_FORMATS[pattern]
+
         case {"enum": [*selection]}:
             return _enum_alternatives(selection)
 
@@ -132,3 +136,22 @@ def _enum_element(
 
         case other:
             return str(other)
+
+
+def _written_formats() -> Mapping[str, str]:
+    # haiway states the spelling of these values as a pattern, no format fits it - the patterns
+    # are taken from haiway itself and named for the model by what they spell
+    class _Written(State):
+        moment: datetime
+        clock: time
+        duration: timedelta
+
+    properties: Mapping[str, Any] = json.loads(_Written.json_schema())["properties"]
+    return {
+        properties["moment"]["pattern"]: "date-time",
+        properties["clock"]["pattern"]: "time",
+        properties["duration"]["pattern"]: "duration",
+    }
+
+
+_WRITTEN_FORMATS: Final[Mapping[str, str]] = _written_formats()

@@ -50,6 +50,7 @@ _ALLOWED_KEYWORDS: Final[frozenset[str]] = frozenset(
         "enum",
         "format",
         "items",
+        "pattern",
         "properties",
         "required",
         "type",

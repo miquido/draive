@@ -56,12 +56,19 @@
 
 ### Changed
 
-- **Breaking:** requires haiway 0.66.0. Its State validation and JSON are stricter: a mutable plain
+- **Breaking:** requires haiway 0.67.0. Its State validation and JSON are stricter: a mutable plain
   default (`{}`, `[]`, `set()`) of a State attribute raises `TypeError` when the class is created -
   use `Default(factory=...)` or an immutable value - no string is parsed into a number, and
-  `to_json` writes compact, strict JSON. The JSON schema of a State agrees with its validation: a
-  `bool` accepts `0`, `1` and the words `true` and `false`, `datetime`, `time` and `timedelta` state
-  no `format`, and a closed tuple states `minItems` and `maxItems`.
+  `to_json` writes compact, strict JSON. The JSON schema of a State describes the strict form it
+  writes: `datetime`, `time`, `timedelta`, `UUID` and `bytes` state a `pattern` of their spelling
+  instead of a `format`, enums list their values alone and a closed tuple states `minItems` and
+  `maxItems`.
+- OpenAI strict structured output and strict tool parameters keep the `pattern` of a string, which
+  strict mode accepts and follows - a datetime, time, duration, UUID or bytes value no longer turns
+  strict mode off.
+- The simplified schema injected into a model prompt names a datetime, a time and a duration
+  (`date-time`, `time`, `duration`) by the pattern haiway states for them.
+- Development uses uv 0.13.10.
 - **Breaking:** `claude_code_agent` keeps memory only as `sessions` (`ClaudeCodeSessions`), the
   `memory` argument and `AgentMemory` support are removed - a call without sessions is a fresh
   session.
@@ -101,7 +108,7 @@
 
 ### Fixed
 
-- SurrealDB field definitions keep their types under haiway 0.66.0: they follow the attributes as
+- SurrealDB field definitions keep their types under haiway 0.67.0: they follow the attributes as
   haiway resolves them - type aliases, forward references and tuples included - instead of the JSON
   schema of a State, which no longer tells a `datetime` or a `bool` apart. An attribute which can
   be `Missing` is an `option`, as a missing value is left out of the record.

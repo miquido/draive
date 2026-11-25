@@ -1,6 +1,6 @@
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, time, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -233,11 +233,26 @@ def test_keywords_outside_the_specification_vocabulary_are_not_convertible() -> 
         ("not", {"type": "integer"}),
         ("patternProperties", {"^a": {"type": "string"}}),
         ("minLength", 2),
-        ("pattern", "^a+$"),
         ("title", "Name"),
         ("someFutureKeyword", True),
     ):
         assert strict_schema(_object({"p": {"type": "string", keyword: value}})) is None, keyword
+
+
+def test_patterns_of_written_values_stay_strict() -> None:
+    # verified live 2026-11-25: strict mode accepts and follows the patterns haiway states for
+    # datetime, time, timedelta, UUID and bytes
+    class _Written(State):
+        starts: datetime
+        at: time
+        duration: timedelta
+        ref: UUID
+
+    converted = strict_schema(as_dict(_Written.__SPECIFICATION__))
+
+    assert converted is not None
+    for name in ("starts", "at", "duration", "ref"):
+        assert converted["properties"][name]["pattern"].startswith("^"), name
 
 
 def test_declared_descriptions_are_preserved() -> None:
@@ -375,5 +390,8 @@ def test_state_with_bytes_and_set_stays_strict() -> None:
     converted = strict_schema(as_dict(_Binary.__SPECIFICATION__))
 
     assert converted is not None
-    assert converted["properties"]["data"] == {"type": "string"}
+    # the spelling of the bytes stays constrained, their encoding annotation is dropped
+    assert converted["properties"]["data"]["type"] == "string"
+    assert "pattern" in converted["properties"]["data"]
+    assert "contentEncoding" not in converted["properties"]["data"]
     assert "uniqueItems" not in converted["properties"]["tags"]
