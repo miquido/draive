@@ -101,7 +101,6 @@ class OpenAIResponses(OpenAIAPI):
                 tools=tools,
                 output=output,
                 verbosity=config.verbosity,
-                patterns=_follows_patterns(config.model),
                 reasoning=config.reasoning,
                 service_tier=config.service_tier,
                 truncation=config.truncation,
@@ -112,6 +111,7 @@ class OpenAIResponses(OpenAIAPI):
             text_config: ResponseTextConfigParam | Omit = _text_output(
                 output,
                 verbosity=config.verbosity,
+                patterns=_follows_patterns(config.model),
             )
 
             input_context: list[ResponseInputItemParam]
@@ -398,7 +398,7 @@ def _text_output(
     /,
     *,
     verbosity: Literal["low", "medium", "high"] | Missing = Missing,
-    patterns: bool = True,
+    patterns: bool,
 ) -> ResponseTextConfigParam | Omit:
     text_format: ResponseFormatTextConfigParam | None = _text_format(output, patterns=patterns)
     if verbosity is Missing:
