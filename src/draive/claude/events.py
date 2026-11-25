@@ -174,12 +174,16 @@ class ClaudeCodeFailure(State):
         Reason reported by Claude Code for ending the run, i.e. ``api_error``.
     api_error_type
         Type of the API failure which ended the run, i.e. ``authentication_error``.
+    startup_failure
+        Reason reported by Claude Code for not starting the run at all, i.e.
+        ``sandbox_required_unavailable``.
     """
 
     reason: str
     api_error_status: int | None = None
     terminal_reason: str | None = None
     api_error_type: str | None = None
+    startup_failure: str | None = None
 
     @property
     def authentication_failed(self) -> bool:
@@ -400,11 +404,16 @@ def _result(
     outcome: ClaudeCodeSuccess | ClaudeCodeFailure
     # Claude Code reports `success` even for a turn which failed with an API error
     if payload.get("is_error") is True or (subtype or "success") != "success":
+        # a run which failed before its first turn describes itself only by its errors
+        errors: str = "; ".join(
+            error for error in _sequence(payload.get("errors")) if isinstance(error, str)
+        )
         outcome = ClaudeCodeFailure(
-            reason=text or subtype or "the run failed",
+            reason=text or errors or subtype or "the run failed",
             api_error_status=status if isinstance(status, int) and status else None,
             terminal_reason=_string(payload.get("terminal_reason")),
             api_error_type=_string(payload.get("api_error_type")),
+            startup_failure=_string(payload.get("startup_failure_reason")),
         )
 
     else:

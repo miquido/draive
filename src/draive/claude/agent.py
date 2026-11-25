@@ -226,7 +226,7 @@ def claude_code_agent(
                 result: ClaudeCodeResult = _concluded(streamed)
                 match result.outcome:
                     case ClaudeCodeFailure() as failure:
-                        raise ClaudeCodeErrored.of(failure, session_id=result.session_id)
+                        raise _failed(failure, session_id=result.session_id)
 
                     case ClaudeCodeSuccess(text=answer):
                         if not streamed.text and answer:
@@ -393,6 +393,22 @@ def _tool_result(
             **({"parent": event.parent} if event.parent else {}),
         },
     )
+
+
+def _failed(
+    failure: ClaudeCodeFailure,
+    /,
+    *,
+    session_id: str | None,
+) -> ClaudeCodeException:
+    if failure.startup_failure is not None:
+        # the run never started - the setup is missing something, i.e. the dependencies of the
+        # sandbox, which is no failure of a run
+        return ClaudeCodeUnavailable(
+            f"Claude Code did not start the run ({failure.startup_failure}): {failure.reason}"
+        )
+
+    return ClaudeCodeErrored.of(failure, session_id=session_id)
 
 
 def _concluded(

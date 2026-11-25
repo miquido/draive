@@ -317,8 +317,9 @@ a process of Claude Code outside of the sandbox, which confines the commands of 
 Linux needs `bubblewrap` and `socat` (Claude Code uses it for the network proxy of the sandbox)
 installed, and unprivileged user namespaces. Hosts and containers which restrict them, i.e. Ubuntu
 23.10 and newer with the AppArmor restriction or hardened kernels, can not start the sandbox and the
-run fails there. Opt out with `sandbox=ClaudeCodeNoSandbox()` within a container which isolates the
-run already:
+run fails there, before its first turn, with `ClaudeCodeUnavailable` carrying the reason Claude Code
+gives (i.e. `bubblewrap (bwrap) not installed`). Opt out with `sandbox=ClaudeCodeNoSandbox()` within
+a container which isolates the run already:
 
 ```python
 ClaudeCodeConfig(tools=("Bash",), sandbox=ClaudeCodeNoSandbox())

@@ -554,6 +554,34 @@ async def test_blank_subagent_text_is_not_reported() -> None:
 
 
 @pytest.mark.asyncio
+async def test_a_run_which_did_not_start_is_unavailable() -> None:
+    lines = [
+        {
+            "type": "result",
+            "subtype": "error_during_execution",
+            "is_error": True,
+            "errors": ["Sandbox required but unavailable: bubblewrap (bwrap) not installed"],
+            "startup_failure_reason": "sandbox_required_unavailable",
+        }
+    ]
+
+    async def running(launch: Any) -> Any:
+        for line in lines:
+            for event in parse_events(json.dumps(line)):
+                yield event
+
+    async with ctx.scope(
+        "test",
+        ClaudeCodeConfig(),
+        ClaudeCodeRunner(binary="/fake", running=running),
+    ):
+        with pytest.raises(ClaudeCodeUnavailable, match="bubblewrap") as raised:
+            await _call(claude_code_agent("coder"))
+
+    assert "sandbox_required_unavailable" in str(raised.value)
+
+
+@pytest.mark.asyncio
 async def test_a_runner_which_ends_without_a_result_fails_the_run() -> None:
     async def running(launch: Any) -> Any:
         yield ClaudeCodeStarted(session_id="s")
