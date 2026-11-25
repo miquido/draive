@@ -962,6 +962,24 @@ def test_tools_server_is_allowed_without_built_in_tools() -> None:
     assert _value(arguments, "--allowedTools") == "mcp__draive"
 
 
+def test_tools_server_is_added_to_a_configured_allowlist() -> None:
+    settings = json.loads(
+        ClaudeCodeLaunch.prepare_settings(
+            ClaudeCodeConfig(settings={"allowedMcpServers": [{"serverName": "docs"}]}),
+            tools_server=_TOOLS_SERVER,
+        )
+    )
+
+    assert {"serverName": "draive"} in settings["allowedMcpServers"]
+    assert {"serverName": "docs"} in settings["allowedMcpServers"]
+    # without the tools the configured allowlist is left as it is
+    assert json.loads(
+        ClaudeCodeLaunch.prepare_settings(
+            ClaudeCodeConfig(settings={"allowedMcpServers": [{"serverName": "docs"}]})
+        )
+    )["allowedMcpServers"] == [{"serverName": "docs"}]
+
+
 def test_tools_server_name_is_reserved() -> None:
     with pytest.raises(ValueError, match="reserved"):
         ClaudeCodeLaunch.prepare_arguments(

@@ -32,6 +32,7 @@ _NAME_LIMIT: Final[int] = 128  # Claude Code silently drops the tools with longe
 _NAME_PATTERN: Final[re.Pattern[str]] = re.compile(r"[A-Za-z0-9_-]+")
 _SOCKET_LIMIT: Final[int] = 100  # AF_UNIX paths are limited to ~104 bytes on macOS
 _LINE_LIMIT: Final[int] = 64 * 1024 * 1024  # tool results can be big
+_CLOSE_LIMIT: Final[float] = 1.0  # flushing a closed connection, aborted after it
 _RELAY: Final[str] = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_mcp_relay.py")
 
 
@@ -44,7 +45,7 @@ class ClaudeCodeToolsBridge:
     script, started by Claude Code, connects its stdio to it.
     """
 
-    __slots__ = ("_connections", "_directory", "_socket", "_stopping")
+    __slots__ = ("_connections", "_directory", "_socket", "_stopping", "_writers")
 
     def __init__(
         self,
@@ -55,6 +56,8 @@ class ClaudeCodeToolsBridge:
         self._socket: Final[str] = os.path.join(directory, "mcp.sock")
         self._connections: Final[set[asyncio.Task[None]]] = set()
         self._stopping: bool = False
+        # writers of the accepted connections, also of handlers which never started
+        self._writers: Final[set[asyncio.StreamWriter]] = set()
 
     @staticmethod
     def verify(
@@ -167,10 +170,15 @@ class ClaudeCodeToolsBridge:
             for connection in connections:
                 connection.cancel()
 
+            # the transports are owned here, a handler cancelled before its first step never
+            # closes its own and the listener would wait for it
+            for writer in tuple(self._writers):
+                writer.transport.abort()
+
             await asyncio.gather(*connections, return_exceptions=True)
             if listening is not None:
                 with suppress(Exception):
-                    await listening.wait_closed()
+                    await asyncio.wait_for(listening.wait_closed(), _CLOSE_LIMIT)
 
         finally:
             await asyncio.to_thread(shutil.rmtree, self._directory, True)
@@ -187,6 +195,7 @@ class ClaudeCodeToolsBridge:
             writer.close()
             return
 
+        self._writers.add(writer)
         task: asyncio.Task[None] = asyncio.create_task(
             self._handle(server, reader, writer),
             context=context.copy(),
@@ -211,9 +220,14 @@ class ClaudeCodeToolsBridge:
             ctx.log_error("Claude Code tools connection failed", exception=exc)
 
         finally:
+            self._writers.discard(writer)
             writer.close()
-            with suppress(Exception):
-                await writer.wait_closed()
+            try:
+                # a relay which stopped reading would hold the flush, and the teardown, forever
+                await asyncio.wait_for(writer.wait_closed(), _CLOSE_LIMIT)
+
+            except Exception:
+                writer.transport.abort()
 
 
 async def _serve_connection(

@@ -782,16 +782,16 @@ def _connector_settings(
     tools_server: Mapping[str, BasicValue] | None,
     /,
 ) -> Mapping[str, Sequence[Any]]:
+    derived: dict[str, Sequence[Any]] = {}
     match config.connectors:
         case ClaudeCodeNoConnectors():
-            return {}
+            pass
 
         case ClaudeCodeAccountConnectors(
             excluded=excluded_names,
             excluded_urls=excluded_urls,
             allowed=allowed,
         ):
-            derived: dict[str, Sequence[Any]] = {}
             denied: Sequence[Mapping[str, str]] = (
                 *({"serverName": f"claude.ai {name}"} for name in excluded_names),
                 *({"serverUrl": url} for url in excluded_urls),
@@ -816,7 +816,15 @@ def _connector_settings(
                         *({"serverName": name} for name in names),
                     )
 
-            return derived
+    # a configured allowlist would drop the draive tools as well, they are added to it
+    if (
+        tools_server is not None
+        and "allowedMcpServers" in config.settings
+        and "allowedMcpServers" not in derived
+    ):
+        derived["allowedMcpServers"] = ({"serverName": TOOLS_SERVER_KEY},)
+
+    return derived
 
 
 def _sandbox_settings(

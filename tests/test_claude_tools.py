@@ -276,3 +276,25 @@ async def test_a_connection_delivered_during_the_teardown_is_closed() -> None:
 
     assert writer.closed
     assert not bridge._connections
+
+
+@pytest.mark.asyncio
+async def test_an_idle_connection_does_not_hold_the_teardown() -> None:
+    import socket
+    import time
+
+    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        async with ClaudeCodeToolsBridge.serve(Toolbox.of(read_marker)) as bridge:
+            await asyncio.to_thread(client.connect, bridge._socket)
+            await asyncio.sleep(0.1)  # accepted, never sends nor reads anything
+            directory = bridge._directory
+            started = time.monotonic()
+
+        assert time.monotonic() - started < 3.0
+        assert not os.path.exists(directory)
+        assert not bridge._connections
+        assert not bridge._writers
+
+    finally:
+        client.close()

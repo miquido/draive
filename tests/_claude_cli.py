@@ -123,7 +123,13 @@ emit(
         "apiKeySource": os.environ.get("FAKE_CLAUDE_SOURCE")
         or ("ANTHROPIC_API_KEY" if (variable or "").startswith("CLAUDE_CODE_API_KEY") else "none"),
         "tools": [],
-        "mcp_servers": json.loads(os.environ.get("FAKE_CLAUDE_MCP", "[]")),
+        # the configured servers connect, as with Claude Code, unless a scenario reports others
+        "mcp_servers": json.loads(os.environ["FAKE_CLAUDE_MCP"])
+        if "FAKE_CLAUDE_MCP" in os.environ
+        else [
+            {{"name": name, "status": "connected"}}
+            for name in json.loads(after("--mcp-config") or "{{}}").get("mcpServers", {{}})
+        ],
         "plugins": {plugins},
     }}
 )

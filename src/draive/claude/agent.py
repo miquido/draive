@@ -229,7 +229,7 @@ def claude_code_agent(
                         raise _failed(failure, session_id=result.session_id)
 
                     case ClaudeCodeSuccess(text=answer):
-                        if not streamed.text and answer:
+                        if not streamed.text.strip() and answer:
                             yield TextContent.of(answer)  # nothing else carried the text
 
                         yield _summary(result)
@@ -483,7 +483,10 @@ def _report_started(
             "claude_code.connectors_unavailable": list(unavailable[:_REPORTED_CONNECTORS]),
         },
     )
-    if tools_server and TOOLS_SERVER_KEY in started.failed_mcp_servers:
+    # a server which settings filtered out is not reported at all, so it has to be connected
+    if tools_server and not any(
+        server.name == TOOLS_SERVER_KEY and server.connected for server in started.mcp_servers
+    ):
         raise ClaudeCodeUnavailable(
             "the draive tools server of the run did not connect, the agent would run without"
             " its tools"

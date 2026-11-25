@@ -220,6 +220,19 @@ async def test_a_failed_draive_tools_server_fails_the_run() -> None:
 
 
 @pytest.mark.asyncio
+async def test_a_draive_tools_server_which_is_not_reported_fails_the_run() -> None:
+    # settings filtering the server out leave it unreported, not reported as failed
+    running = _started_runner()
+    async with ctx.scope(
+        "test",
+        ClaudeCodeConfig(),
+        ClaudeCodeRunner(binary="/fake", running=running),
+    ):
+        with pytest.raises(ClaudeCodeUnavailable, match="draive tools server"):
+            await _call(claude_code_agent("coder", tools=[read_note]))
+
+
+@pytest.mark.asyncio
 async def test_a_failed_server_named_draive_without_tools_only_warns(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -502,6 +515,11 @@ def _lines_runner(lines: list[dict[str, Any]], answer: str) -> Any:
             ],
             ["abc", "xyz", "\n\nnext"],
             id="stale_preview",
+        ),
+        pytest.param(
+            [_text_line("  ")],
+            ["  ", "done"],  # whitespace carries no answer, the result text still does
+            id="whitespace_block",
         ),
         pytest.param(
             [_text_line("Example:"), _TOOL_LINE, _text_line("\n    print('ok')")],
