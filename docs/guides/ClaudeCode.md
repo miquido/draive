@@ -119,7 +119,9 @@ default), draive refreshes the login through Claude Code itself (`claude auth st
 \- within the scope and across draive processes, as a refresh rotates the refresh token. The lock is
 the file `<config_directory>/.login-refresh.lock`, so the directory has to be writable for
 refreshes. The lock coordinates draive processes only, not the interactive Claude Code of the user,
-which may refresh the same login. A run gets the access token only - never the refresh token nor the
+which may refresh the same login. Use Claude Code 2.1.317 or newer for refreshes - older versions
+may let `claude auth status` exit before a slow refresh is saved, which signs the login out; draive
+does not check the version. A run gets the access token only - never the refresh token nor the
 directory of the login - and still has its private home and configuration.
 
 A refresh runs on its own task, a run which is cancelled or gives up on it does not stop it, and
