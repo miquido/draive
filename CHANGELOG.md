@@ -61,11 +61,11 @@
   use `Default(factory=...)` or an immutable value - no string is parsed into a number, and
   `to_json` writes compact, strict JSON. The JSON schema of a State describes the strict form it
   writes: `datetime`, `time`, `timedelta`, `UUID` and `bytes` state a `pattern` of their spelling
-  instead of a `format`, enums list their values alone and a closed tuple states `minItems` and
-  `maxItems`.
+  instead of a `format`, enums list their values without the names of their members and a closed
+  tuple states `minItems` and `maxItems`.
 - OpenAI strict structured output and strict tool parameters keep the `pattern` of a string, which
-  strict mode accepts and follows - a datetime, time, duration, UUID or bytes value no longer turns
-  strict mode off.
+  strict mode accepts and follows - the spelling of a datetime, time, duration, UUID or bytes value
+  is enforced as well.
 - The simplified schema injected into a model prompt names a datetime, a time and a duration
   (`date-time`, `time`, `duration`) by the pattern haiway states for them.
 - Development uses uv 0.13.10.

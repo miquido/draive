@@ -739,3 +739,14 @@ def test_surrealdb_field_definitions_follow_the_resolved_attributes() -> None:
 def _positive(value: int) -> None:
     if value < 0:
         raise ValueError("negative")
+
+
+def test_surrealdb_field_definitions_keep_any_optional() -> None:
+    class _Loose(State):
+        anything: Any
+        many: Sequence[Any] = ()
+
+    assert surreal_field_definitions(_Loose) == (
+        "DEFINE FIELD IF NOT EXISTS anything ON TABLE _Loose TYPE option<any>;",
+        "DEFINE FIELD IF NOT EXISTS many ON TABLE _Loose TYPE array<option<any>>;",
+    )

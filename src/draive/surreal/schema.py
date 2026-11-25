@@ -3,11 +3,15 @@ from typing import Any, Literal
 
 from haiway import State
 from haiway.attributes.annotations import (
+    AliasAttribute,
+    AnyAttribute,
     BoolAttribute,
     BytesAttribute,
+    CustomAttribute,
     DateAttribute,
     DatetimeAttribute,
     FloatAttribute,
+    FunctionAttribute,
     IntegerAttribute,
     IntEnumAttribute,
     LiteralAttribute,
@@ -84,7 +88,7 @@ _SCALAR_TYPES: tuple[tuple[tuple[type[Any], ...], str], ...] = (
 )
 
 
-def _surreal_type(  # noqa: PLR0911
+def _surreal_type(  # noqa: C901, PLR0911
     annotation: Any,
     /,
 ) -> tuple[str, bool]:
@@ -112,11 +116,16 @@ def _surreal_type(  # noqa: PLR0911
         case LiteralAttribute(values=values):
             return _surreal_literal_type(values), False
 
-        case NoneAttribute() | MissingAttribute():
+        case NoneAttribute() | MissingAttribute() | AnyAttribute():
+            # a value which can be absent is an option, a field of a plain type refuses it
             return "option<any>", False
 
-        case _:
+        case AliasAttribute() | CustomAttribute() | FunctionAttribute():
+            # a recursive alias, a custom type or a callable has no SurrealDB type to name
             return "any", False
+
+        case other:
+            raise TypeError(f"Unsupported attribute for a SurrealDB field: {type(other).__name__}")
 
 
 def _surreal_union_type(

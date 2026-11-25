@@ -912,8 +912,9 @@ def _counted_tuple(
     maximum: Any = translated.get("maxItems")
     translated["maxItems"] = min(maximum, length) if isinstance(maximum, int) else length
     minimum: Any = translated.get("minItems")
+    # every position is required unless the schema states a smaller count
     translated["minItems"] = (
-        min(minimum, translated["maxItems"]) if isinstance(minimum, int) else length
+        min(minimum, translated["maxItems"]) if isinstance(minimum, int) else translated["maxItems"]
     )
     return translated
 

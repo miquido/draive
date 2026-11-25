@@ -147,10 +147,12 @@ def _written_formats() -> Mapping[str, str]:
         duration: timedelta
 
     properties: Mapping[str, Any] = json.loads(_Written.json_schema())["properties"]
+    names: Mapping[str, str] = {"moment": "date-time", "clock": "time", "duration": "duration"}
+    # a spelling haiway states differently is rendered as its plain type instead
     return {
-        properties["moment"]["pattern"]: "date-time",
-        properties["clock"]["pattern"]: "time",
-        properties["duration"]["pattern"]: "duration",
+        pattern: name
+        for key, name in names.items()
+        if isinstance(pattern := properties.get(key, {}).get("pattern"), str)
     }
 
 

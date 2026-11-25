@@ -38,9 +38,10 @@ _DROPPED_KEYWORDS: Final[frozenset[str]] = frozenset(
     )
 )
 # Every keyword a model or tool declaration can produce, except the ones strict mode
-# has no equivalent for - `prefixItems`, where a tuple needs `items` of `false`, and
+# has no equivalent for - `prefixItems`, where a tuple needs `items` of `false`,
 # `$anchor`/`$ref`, where a reference resolves only against a `$defs` entry while a
-# recursive type produces an inline anchor. Anything outside of this makes the schema
+# recursive type produces an inline anchor, and `propertyNames` of a mapping keyed by
+# a UUID or an enum. Anything outside of this makes the schema
 # untranslatable instead of being passed through into a rejected request.
 _ALLOWED_KEYWORDS: Final[frozenset[str]] = frozenset(
     (
