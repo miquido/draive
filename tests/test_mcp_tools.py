@@ -317,6 +317,39 @@ def test_mcp_tool_parameters_translate_composition_keywords() -> None:
     }
 
 
+@pytest.mark.parametrize(
+    ("declared", "expected"),
+    [
+        pytest.param({}, (2, 2), id="counts_left_out"),
+        pytest.param({"minItems": 1}, (1, 2), id="minimum_kept"),
+        pytest.param({"minItems": 2, "maxItems": 2}, (2, 2), id="counts_stated"),
+    ],
+)
+def test_mcp_tool_parameters_state_the_length_of_closed_tuples(
+    declared: Mapping[str, int],
+    expected: tuple[int, int],
+) -> None:
+    # a closed tuple of the specification states its length, schemas of servers often do not
+    parameters = _tool_parameters(  # pyright: ignore[reportPrivateUsage]
+        "tool",
+        {
+            "type": "object",
+            "properties": {
+                "pair": {
+                    "type": "array",
+                    "prefixItems": [{"type": "integer"}, {"type": "string"}],
+                    "items": False,
+                    **declared,
+                }
+            },
+            "required": ["pair"],
+        },
+    )
+
+    pair: Any = parameters["properties"]["pair"]
+    assert (pair["minItems"], pair["maxItems"]) == expected
+
+
 def test_mcp_tool_parameters_merge_root_composition_arguments() -> None:
     assert _converted_parameters(
         {

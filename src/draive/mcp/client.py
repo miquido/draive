@@ -897,6 +897,22 @@ _STRUCTURAL_KEYWORDS: Final[frozenset[str]] = frozenset(
 _ANCHOR_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[A-Za-z_][-A-Za-z0-9._]*$")
 
 
+def _counted_tuple(
+    translated: dict[str, Any],
+    /,
+) -> dict[str, Any]:
+    # a closed tuple of the specification states its length, a schema may leave it out - every
+    # position is required then, a tool takes all of its arguments
+    items: Any = translated.get("prefixItems")
+    if translated.get("items") is not False or not isinstance(items, list):
+        return translated
+
+    length: int = len(cast(list[Any], items))
+    translated.setdefault("maxItems", length)
+    translated.setdefault("minItems", translated["maxItems"])
+    return translated
+
+
 @final
 class _SchemaTranslation:
     """Translate a JSON schema into the form of a type specification, or refuse it.
@@ -1113,7 +1129,7 @@ class _SchemaTranslation:
                 case _:
                     translated[keyword] = value
 
-        return translated
+        return _counted_tuple(translated)
 
     def _resolved(
         self,

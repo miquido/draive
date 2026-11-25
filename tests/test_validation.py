@@ -54,6 +54,8 @@ def test_validation() -> None:
             "type": "array",
             "prefixItems": ({"type": "integer"},),
             "items": False,
+            "minItems": 1,
+            "maxItems": 1,
         },
         {  # object
             "type": "object",

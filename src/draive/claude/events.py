@@ -119,7 +119,7 @@ class ClaudeCodeToolUse(State):
 
     identifier: str
     tool: str
-    arguments: Mapping[str, BasicValue] = Default(factory=dict)
+    arguments: Mapping[str, BasicValue] = Default(factory=dict[str, BasicValue])
     parent: str | None = None
 
 

@@ -5,9 +5,10 @@ from typing import Any, cast
 from uuid import UUID
 
 import pytest
-from haiway import AttributeRequirement, Pagination, State, ctx
+from haiway import AttributeRequirement, Missing, Pagination, State, ctx
 from surrealdb import RecordID, Table
 
+from draive.surreal.schema import surreal_field_definitions
 from draive.surreal.state import Surreal, SurrealSession
 from draive.surreal.types import SurrealID, SurrealObject
 
@@ -662,3 +663,29 @@ async def test_surreal_transaction_scopes_transaction_session_within_active_sess
         "transaction-exit",
         "base:SELECT 2;",
     ]
+
+
+def test_surrealdb_field_definitions_take_datetimes_and_bools_from_annotations() -> None:
+    # the schema of a State states no format of a datetime, the annotation decides
+    class _Timestamps(State):
+        created: datetime
+        updated: datetime | None = None
+        reviewed: datetime | Missing = Missing
+        history: Sequence[datetime] = ()
+        label: str = ""
+        note: str | Missing = Missing
+        flag: bool = False
+        maybe: bool | None = None
+
+    assert surreal_field_definitions(_Timestamps) == (
+        "DEFINE FIELD IF NOT EXISTS created ON TABLE _Timestamps TYPE datetime;",
+        "DEFINE FIELD IF NOT EXISTS updated ON TABLE _Timestamps TYPE option<datetime>;",
+        # a missing value is left out of the record
+        "DEFINE FIELD IF NOT EXISTS reviewed ON TABLE _Timestamps TYPE option<datetime>;",
+        "DEFINE FIELD IF NOT EXISTS history ON TABLE _Timestamps TYPE array<datetime>;",
+        "DEFINE FIELD IF NOT EXISTS label ON TABLE _Timestamps TYPE string;",
+        "DEFINE FIELD IF NOT EXISTS note ON TABLE _Timestamps TYPE option<string>;",
+        # the schema of a bool accepts its written forms, the annotation decides
+        "DEFINE FIELD IF NOT EXISTS flag ON TABLE _Timestamps TYPE bool;",
+        "DEFINE FIELD IF NOT EXISTS maybe ON TABLE _Timestamps TYPE option<bool>;",
+    )

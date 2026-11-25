@@ -522,7 +522,7 @@ async def test_strict_tool_parameters_fall_back_for_an_open_mapping() -> None:
 async def test_schema_output_keeps_strict_for_an_open_mapping() -> None:
     class Extracted(State, serializable=True):
         name: str
-        labels: Mapping[str, str] = Default(factory=dict)
+        labels: Mapping[str, str] = Default(factory=dict[str, str])
 
     requests: list[dict[str, Any]] = []
     model = _model([_terminal_event(kind="response.completed")], requests=requests)

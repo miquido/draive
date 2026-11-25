@@ -177,7 +177,7 @@ class _Item(State, serializable=True):
 class _Order(State, serializable=True):
     reference: str
     items: Sequence[_Item]
-    attributes: Mapping[str, str] = Default(factory=dict)
+    attributes: Mapping[str, str] = Default(factory=dict[str, str])
     identifier: UUID | None = None
     moment: datetime | None = None
     total: float | None = None
@@ -319,7 +319,7 @@ class _WithAny(State, serializable=True):
 
 class _WithAnyMapping(State, serializable=True):
     name: str
-    attributes: Mapping[str, Any] = Default(factory=dict)
+    attributes: Mapping[str, Any] = Default(factory=dict[str, Any])
 
 
 class _Empty(State, serializable=True):
