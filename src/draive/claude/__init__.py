@@ -1,16 +1,22 @@
 from draive.claude.agent import claude_code_agent
 from draive.claude.client import ClaudeCode
 from draive.claude.config import (
+    ClaudeCodeAccountConnectors,
     ClaudeCodeAutoCompaction,
     ClaudeCodeCompaction,
     ClaudeCodeConfig,
+    ClaudeCodeConnectors,
     ClaudeCodeNoCompaction,
+    ClaudeCodeNoConnectors,
     ClaudeCodeTelemetry,
 )
 from draive.claude.credentials import (
+    ClaudeCodeAccessToken,
     ClaudeCodeApiKey,
     ClaudeCodeCredential,
+    ClaudeCodeLocalLogin,
     ClaudeCodeOAuthToken,
+    ClaudeCodeResolvedCredential,
 )
 from draive.claude.events import (
     ClaudeCodeDelta,
@@ -39,6 +45,7 @@ from draive.claude.types import (
     ClaudeCodeException,
     ClaudeCodeFailed,
     ClaudeCodeOutputTooLarge,
+    ClaudeCodeResolving,
     ClaudeCodeRunner,
     ClaudeCodeRunning,
     ClaudeCodeTimedOut,
@@ -47,10 +54,13 @@ from draive.claude.types import (
 
 __all__ = (
     "ClaudeCode",
+    "ClaudeCodeAccessToken",
+    "ClaudeCodeAccountConnectors",
     "ClaudeCodeApiKey",
     "ClaudeCodeAutoCompaction",
     "ClaudeCodeCompaction",
     "ClaudeCodeConfig",
+    "ClaudeCodeConnectors",
     "ClaudeCodeCredential",
     "ClaudeCodeDelta",
     "ClaudeCodeEnded",
@@ -60,12 +70,16 @@ __all__ = (
     "ClaudeCodeFailed",
     "ClaudeCodeFailure",
     "ClaudeCodeLaunch",
+    "ClaudeCodeLocalLogin",
     "ClaudeCodeMCPServer",
     "ClaudeCodeNewSession",
     "ClaudeCodeNoCompaction",
+    "ClaudeCodeNoConnectors",
     "ClaudeCodeNoSession",
     "ClaudeCodeOAuthToken",
     "ClaudeCodeOutputTooLarge",
+    "ClaudeCodeResolvedCredential",
+    "ClaudeCodeResolving",
     "ClaudeCodeResult",
     "ClaudeCodeResumedSession",
     "ClaudeCodeRunner",

@@ -7,6 +7,7 @@ from haiway import Meta, MetaValues, Missing, State, ctx
 
 from draive.agents import Agent, AgentIdentity, AgentMemory, AgentMessage, AgentThread
 from draive.claude.config import ClaudeCodeConfig
+from draive.claude.credentials import ClaudeCodeResolvedCredential
 from draive.claude.events import (
     ClaudeCodeDelta,
     ClaudeCodeEvent,
@@ -169,6 +170,12 @@ def claude_code_agent(
                     instructions=text,
                 )
                 streamed: _Streamed = _Streamed()
+                # every run gets a token which is valid now
+                credential: ClaudeCodeResolvedCredential | Missing = (
+                    Missing
+                    if runner.credential is Missing
+                    else await runner.resolving(runner.credential, binary=runner.binary)
+                )
                 stream = runner.running(
                     build_launch(
                         resolved,
@@ -182,7 +189,7 @@ def claude_code_agent(
                         workspace=workspace,
                         instructions=text,
                         session=continuity.session,
-                        credential=runner.credential,
+                        credential=credential,
                         base_url=None if runner.base_url is Missing else runner.base_url,
                         # inside of the scope of the agent, so the run continues its trace
                         trace_context=ctx.trace_context(),
@@ -196,7 +203,7 @@ def claude_code_agent(
                 try:
                     async for event in stream:
                         if isinstance(event, ClaudeCodeStarted):
-                            _verify_authentication(event, runner)
+                            _verify_authentication(event, credential)
                             _report_started(event)
 
                         for chunk in _chunks(event, streamed):
@@ -369,17 +376,17 @@ def _concluded(
 
 def _verify_authentication(
     started: ClaudeCodeStarted,
-    runner: ClaudeCodeRunner,
+    credential: ClaudeCodeResolvedCredential | Missing,
     /,
 ) -> None:
     # never run on a local session of Claude Code - the one of the user or of an earlier login
-    if runner.credential is Missing:
+    if credential is Missing:
         return
 
-    if started.api_key_source != runner.credential.reported_source:
+    if started.api_key_source != credential.reported_source:
         raise ClaudeCodeUnavailable(
             f"Claude Code authenticates with '{started.api_key_source}'"
-            f" instead of the provided {runner.credential.label}"
+            f" instead of the provided {credential.label}"
         )
 
 

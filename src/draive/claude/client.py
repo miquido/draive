@@ -1,5 +1,6 @@
 import os
 import shutil
+import weakref
 from collections.abc import Iterable
 from types import TracebackType
 from typing import Final, final
@@ -9,8 +10,10 @@ from haiway import Missing, State, ValidationError, getenv_str
 from draive.claude.credentials import (
     ClaudeCodeApiKey,
     ClaudeCodeCredential,
+    ClaudeCodeLocalLogin,
     ClaudeCodeOAuthToken,
 )
+from draive.claude.login import ClaudeCodeLogins
 from draive.claude.process import run_process
 from draive.claude.types import ClaudeCodeRunner, ClaudeCodeUnavailable
 
@@ -29,15 +32,19 @@ class ClaudeCode:
     imported - there is no additional dependency. The executable and the credential are
     verified when the scope is entered.
 
-    Runs always authenticate with the credential. They never use the login of the user - its
-    session, keychain and configuration are out of reach of the isolated process - and are
-    stopped if Claude Code reports to authenticate in any other way. Without a credential
-    entering the scope fails.
+    Runs always authenticate with the credential, and are stopped if Claude Code reports to
+    authenticate in any other way. By default they never use the login of the user - its
+    session, keychain and configuration are out of reach of the isolated process. With
+    ``ClaudeCodeLocalLogin`` draive reads only a short-lived access token from the credentials
+    file of the login, refreshing it under a lock through Claude Code itself, and the run still
+    gets a private home and configuration - never the directory of the login nor its refresh
+    token. Without a credential entering the scope fails.
 
     Parameters
     ----------
     credential
-        ``ClaudeCodeApiKey`` or ``ClaudeCodeOAuthToken`` (``claude setup-token``). Resolved from
+        ``ClaudeCodeApiKey``, ``ClaudeCodeOAuthToken`` (``claude setup-token``) or
+        ``ClaudeCodeLocalLogin`` - the only one which allows account connectors. Resolved from
         ``ANTHROPIC_API_KEY`` or ``CLAUDE_CODE_OAUTH_TOKEN`` when not set. A key given as the
         token or the other way is refused unless a custom endpoint is used.
     binary
@@ -61,12 +68,16 @@ class ClaudeCode:
     ------
     ValueError
         When the kind of the credential does not match its value.
+    ClaudeCodeUnavailable
+        When entering the scope and the executable, the credential or the credentials file of
+        a local login is missing.
     """
 
     __slots__ = (
         "_base_url",
         "_binary",
         "_credential",
+        "_logins",
     )
 
     def __init__(
@@ -82,6 +93,10 @@ class ClaudeCode:
         self._credential: ClaudeCodeCredential | None = credential
         self._binary: str | None = binary
         self._base_url: str | None = base_url
+        # one per entry, made in its context so what its refreshes report reaches its scope - exits
+        # can not be told apart (haiway enters and exits from different tasks), so each exit waits
+        # for the refreshes of every live entry; an entry is gone once its runner is released
+        self._logins: weakref.WeakSet[ClaudeCodeLogins] = weakref.WeakSet()
 
     def __repr__(self) -> str:
         return "ClaudeCode()"  # nothing of the credential
@@ -89,9 +104,18 @@ class ClaudeCode:
     async def __aenter__(self) -> Iterable[State]:
         credential: ClaudeCodeCredential = self._credential or _environment_credential()
         _verify_kind(credential, custom_endpoint=bool(self._base_url))
+        if isinstance(credential, ClaudeCodeLocalLogin):
+            await ClaudeCodeLogins.verify(
+                credential
+            )  # fails at startup, the token is resolved per run
+
+        binary: str = _resolved_binary(self._binary)
+        logins: ClaudeCodeLogins = ClaudeCodeLogins()
+        self._logins.add(logins)
         return (
             ClaudeCodeRunner(
-                binary=_resolved_binary(self._binary),
+                resolving=logins.resolve,
+                binary=binary,
                 running=run_process,
                 credential=credential,
                 base_url=self._base_url or Missing,
@@ -104,7 +128,10 @@ class ClaudeCode:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        pass  # runs release their processes on their own
+        # runs release their processes on their own, refreshes of a login are waited for - one
+        # cut off by the end of the event loop could lose the rotated refresh token
+        for logins in tuple(self._logins):
+            await logins.drain()
 
 
 def _environment_credential() -> ClaudeCodeCredential:
@@ -140,8 +167,8 @@ def _verify_kind(
         case ClaudeCodeOAuthToken(value=value) if value.startswith(_API_KEY_PREFIX):
             raise ValueError("The given OAuth token is an API key, use ClaudeCodeApiKey")
 
-        case _:
-            pass
+        case ClaudeCodeApiKey() | ClaudeCodeOAuthToken() | ClaudeCodeLocalLogin():
+            pass  # a local login has no value to be told by
 
 
 def _resolved_binary(

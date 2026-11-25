@@ -463,7 +463,11 @@ async def test_mcp_servers_which_failed_to_connect_are_reported(
         tmp_path,
         env={
             "FAKE_CLAUDE_MCP": json.dumps(
-                [{"name": "good", "status": "connected"}, {"name": "bad", "status": "failed"}]
+                [
+                    {"name": "good", "status": "connected"},
+                    {"name": "bad", "status": "failed"},
+                    {"name": "claude.ai Slack", "status": "needs-auth", "source": "claudeai"},
+                ]
             )
         },
     )
@@ -471,7 +475,11 @@ async def test_mcp_servers_which_failed_to_connect_are_reported(
     async with setup.scope():
         await _call(claude_code_agent("coder"))
 
-    assert any("bad" in warning and "good" not in warning for warning in warnings)
+    reported = [warning for warning in warnings if "MCP servers" in warning]
+    assert len(reported) == 1
+    assert "bad" in reported[0]
+    assert "good" not in reported[0]
+    assert "claude.ai Slack" not in reported[0]
 
 
 @pytest.mark.asyncio

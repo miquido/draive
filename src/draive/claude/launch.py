@@ -8,12 +8,20 @@ from uuid import uuid4
 from haiway import Missing, Sensitive, State, Verifier
 
 from draive.claude.config import (
+    ClaudeCodeAccountConnectors,
     ClaudeCodeAutoCompaction,
     ClaudeCodeConfig,
     ClaudeCodeNoCompaction,
+    ClaudeCodeNoConnectors,
     ClaudeCodeTelemetry,
 )
-from draive.claude.credentials import ClaudeCodeCredential
+from draive.claude.credentials import (
+    ClaudeCodeAccessToken,
+    ClaudeCodeApiKey,
+    ClaudeCodeOAuthToken,
+    ClaudeCodeResolvedCredential,
+)
+from draive.claude.exceptions import ClaudeCodeUnavailable
 from draive.claude.sessions import (
     ClaudeCodeNewSession,
     ClaudeCodeNoSession,
@@ -28,7 +36,11 @@ __all__ = (
     "claude_arguments",
     "claude_environment",
     "claude_settings",
+    "inherited_environment",
+    "verify_connectors",
 )
+
+_CONNECTORS_SCOPE: Final[str] = "user:mcp_servers"
 
 _NO_SESSION: Final[ClaudeCodeNoSession] = ClaudeCodeNoSession()
 
@@ -125,7 +137,7 @@ class ClaudeCodeLaunch(State):
     environment: Annotated[Mapping[str, str], Sensitive()]
     directory: str
     prompt: str
-    credential: ClaudeCodeCredential | Missing
+    credential: ClaudeCodeResolvedCredential | Missing
     marker: Annotated[str, Verifier(_marker)]
     timeout: float
     grace: float
@@ -205,7 +217,7 @@ def claude_arguments(
         ",".join(config.setting_sources),
         "--settings",
         claude_settings(config),
-        "--strict-mcp-config",
+        *_connector_arguments(config),
         "--no-chrome",
         "--permission-prompts",
         "none",
@@ -239,6 +251,18 @@ def claude_arguments(
         arguments.append("--include-partial-messages")
 
     return tuple(arguments)
+
+
+def _connector_arguments(
+    config: ClaudeCodeConfig,
+    /,
+) -> Sequence[str]:
+    match config.connectors:
+        case ClaudeCodeNoConnectors():
+            return ("--strict-mcp-config",)  # also keeps the connectors of the account out
+
+        case ClaudeCodeAccountConnectors():
+            return ()
 
 
 def _plugin_arguments(
@@ -348,6 +372,106 @@ def _directory_pattern(
     return f"//{escaped.lstrip('/')}/**"
 
 
+def inherited_environment(
+    parent: Mapping[str, str] | None = None,
+    /,
+    *,
+    extra: Sequence[str] = (),
+) -> Mapping[str, str]:
+    """Pick the variables a process inherits - connectivity ones and the given extra names.
+
+    Parameters
+    ----------
+    parent
+        Environment inherited from, the one of the process by default.
+    extra
+        Names of additional variables to take.
+
+    Returns
+    -------
+    Mapping[str, str]
+        The inherited variables which are set.
+    """
+    source: Mapping[str, str] = os.environ if parent is None else parent
+    return {name: source[name] for name in (*_INHERITED_ENV, *extra) if name in source}
+
+
+def verify_connectors(
+    config: ClaudeCodeConfig,
+    credential: ClaudeCodeResolvedCredential | Missing,
+    /,
+) -> None:
+    """Refuse account connectors with a credential which can not use them.
+
+    Parameters
+    ----------
+    config
+        Configuration of the run.
+    credential
+        The resolved credential of the run.
+
+    Raises
+    ------
+    ClaudeCodeUnavailable
+        When connectors are enabled and the credential does not declare ``user:mcp_servers``.
+    """
+    match config.connectors:
+        case ClaudeCodeNoConnectors():
+            return
+
+        case ClaudeCodeAccountConnectors():
+            pass
+
+    if credential is Missing:
+        raise ClaudeCodeUnavailable("account connectors need a ClaudeCodeLocalLogin credential")
+
+    match credential:
+        case ClaudeCodeAccessToken(scopes=scopes) if _CONNECTORS_SCOPE in scopes:
+            return
+
+        case ClaudeCodeAccessToken():
+            raise ClaudeCodeUnavailable(
+                f"the login has no '{_CONNECTORS_SCOPE}' scope, log in again with"
+                " `claude /login` on a claude.ai account"
+            )
+
+        case ClaudeCodeApiKey() | ClaudeCodeOAuthToken():
+            raise ClaudeCodeUnavailable(
+                "account connectors need a ClaudeCodeLocalLogin, an API key or a token of"
+                f" `claude setup-token` has no '{_CONNECTORS_SCOPE}' scope"
+            )
+
+
+def _credential_environment(
+    credential: ClaudeCodeResolvedCredential | Missing,
+    /,
+) -> Mapping[str, str]:
+    if credential is Missing:
+        return {}
+
+    match credential:
+        case ClaudeCodeAccessToken(scopes=scopes):
+            # a token handed over this way is assumed to have the inference scopes only, scopes
+            # are not secret
+            return {"CLAUDE_CODE_OAUTH_SCOPES": " ".join(scopes)}
+
+        case ClaudeCodeApiKey() | ClaudeCodeOAuthToken():
+            return {}
+
+
+def _connector_environment(
+    config: ClaudeCodeConfig,
+    /,
+) -> Mapping[str, str]:
+    match config.connectors:
+        case ClaudeCodeAccountConnectors(wait=wait):
+            # connectors are not connected yet when the model starts otherwise
+            return {"MCP_CONNECTION_NONBLOCKING": "0"} if wait else {}
+
+        case ClaudeCodeNoConnectors():
+            return {}
+
+
 def claude_environment(
     config: ClaudeCodeConfig,
     /,
@@ -357,6 +481,7 @@ def claude_environment(
     trace_context: Mapping[str, str] | None = None,
     resource_attributes: Mapping[str, str] | None = None,
     parent: Mapping[str, str] | None = None,
+    credential: ClaudeCodeResolvedCredential | Missing = Missing,
 ) -> Mapping[str, str]:
     """Prepare the environment of the process, nothing is taken from the parent besides a few
     connectivity variables.
@@ -375,16 +500,17 @@ def claude_environment(
         Resource attributes of the exported telemetry in addition to the configured ones.
     parent
         Environment inherited from, the one of the process by default.
+    credential
+        The credential of the run, an access token declares its scopes within the environment.
 
     Returns
     -------
     Mapping[str, str]
         Environment of the process, without the credential descriptor and the marker.
     """
-    source: Mapping[str, str] = os.environ if parent is None else parent
-    environment: dict[str, str] = {
-        name: source[name] for name in (*_INHERITED_ENV, *config.inherit_env) if name in source
-    }
+    environment: dict[str, str] = dict(
+        inherited_environment(parent, extra=config.inherit_env),
+    )
     environment.update(
         {
             "HOME": workspace.home,
@@ -399,6 +525,9 @@ def claude_environment(
     )
     if base_url:
         environment["ANTHROPIC_BASE_URL"] = base_url
+
+    environment.update(_credential_environment(credential))
+    environment.update(_connector_environment(config))
 
     match config.compaction:
         case ClaudeCodeAutoCompaction(percent=percent, window=window):
@@ -483,7 +612,7 @@ def build_launch(
     workspace: ClaudeCodeWorkspace,
     instructions: str = "",
     session: ClaudeCodeSession = _NO_SESSION,
-    credential: ClaudeCodeCredential | Missing = Missing,
+    credential: ClaudeCodeResolvedCredential | Missing = Missing,
     base_url: str | None = None,
     trace_context: Mapping[str, str] | None = None,
     resource_attributes: Mapping[str, str] | None = None,
@@ -517,7 +646,13 @@ def build_launch(
     -------
     ClaudeCodeLaunch
         Launch ready to be run.
+
+    Raises
+    ------
+    ClaudeCodeUnavailable
+        When account connectors are enabled and the credential can not use them.
     """
+    verify_connectors(config, credential)
     return ClaudeCodeLaunch(
         binary=binary,
         arguments=claude_arguments(config, instructions=instructions, session=session),
@@ -527,6 +662,7 @@ def build_launch(
             base_url=base_url,
             trace_context=trace_context,
             resource_attributes=resource_attributes,
+            credential=credential,
         ),
         directory=workspace.directory,
         prompt=json.dumps(
