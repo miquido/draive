@@ -93,6 +93,38 @@ model may answer with content that fails decoding:
 `Mapping[str, str]` and other fully typed mappings do stay strict. They are the one exception to
 "every field is filled" - the API keeps them optional, so the model may leave one out entirely.
 
+## Prompt Caching
+
+Anthropic caches a prompt prefix only where a request marks it. Set `instructions_cache` on
+`AnthropicConfig` to mark the instructions, with the cache lifetime as its value (`"5m"` or `"1h"`).
+The cached prefix covers the tool declarations and the instructions, so later requests sharing both
+read them from the cache instead of processing them again.
+
+```python
+from draive import ModelGeneration, ctx
+from draive.anthropic import Anthropic, AnthropicConfig
+
+
+async with ctx.scope(
+    "cached_generation",
+    AnthropicConfig(model="claude-sonnet-5-5", instructions_cache="1h"),
+    disposables=(Anthropic(),),
+):
+    place: InterestingPlace = await ModelGeneration.generate(
+        InterestingPlace,
+        instructions=long_travel_guidelines,  # the same text on every request
+        input="Recommend one must-see location in London.",
+    )
+```
+
+Instructions stay uncached when the option is not set. A prefix shorter than the model's minimum
+cacheable length is not cached at all, and the reported `model.input_tokens.cached` metric shows how
+much of each request was read from the cache.
+
+Messages are marked individually through their metadata:
+`ModelInput.of(..., meta={"cache": "ephemeral"})` places a marker on the last element of that
+message. Anthropic accepts at most four markers in one request, the instructions marker included.
+
 ## Useful Options
 
 - `schema_injection="full" | "simplified" | "skip"`
